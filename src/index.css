@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary-fixed-dim: #00e2ee;
+  --color-on-surface: #ffffff;
+  --color-secondary: #feb700;
+  --color-primary-dim: #00e2ee;
+  --color-surface-variant: #262626;
+  --color-tertiary-fixed-dim: #ff7b74;
+  --color-surface-tint: #99f7ff;
+  --color-background: #0e0e0e;
+  --color-tertiary: #ff716b;
+  --color-error-container: #9f0519;
+  --color-outline: #767575;
+  --color-secondary-fixed: #ffc965;
+  --color-on-primary-fixed-variant: #006065;
+  --color-primary-container: #00f1fe;
+  --color-primary-fixed: #00f1fe;
+  --color-on-tertiary-container: #000000;
+  --color-on-error-container: #ffa8a3;
+  --color-on-error: #490006;
+  --color-surface-container: #1a1a1a;
+  --color-on-secondary: #533a00;
+  --color-on-tertiary-fixed-variant: #79000e;
+  --color-surface-container-low: #131313;
+  --color-on-secondary-container: #fff6ee;
+  --color-tertiary-container: #f94647;
+  --color-on-surface-variant: #adaaaa;
+  --color-tertiary-dim: #ff716b;
+  --color-secondary-container: #7c5800;
+  --color-error: #ff716c;
+  --color-secondary-dim: #ecaa00;
+  --color-on-primary: #005f64;
+  --color-on-secondary-fixed: #463000;
+  --color-tertiary-fixed: #ff928b;
+  --color-on-secondary-fixed-variant: #6b4b00;
+  --color-primary: #99f7ff;
+  --color-surface: #0e0e0e;
+  --color-on-primary-container: #00555a;
+  --color-surface-dim: #0e0e0e;
+  --color-on-tertiary-fixed: #3a0003;
+  --color-on-primary-fixed: #004145;
+  --color-surface-bright: #2c2c2c;
+  --color-on-tertiary: #490005;
+  --color-surface-container-highest: #262626;
+  --color-secondary-fixed-dim: #feb700;
+  --color-inverse-on-surface: #565555;
+  --color-on-background: #ffffff;
+  --color-inverse-surface: #fcf9f8;
+  --color-surface-container-high: #20201f;
+  --color-error-dim: #d7383b;
+  --color-inverse-primary: #006a70;
+  --color-surface-container-lowest: #000000;
+  --color-outline-variant: #484847;
+
+  --font-headline: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+body {
+  @apply bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container;
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
