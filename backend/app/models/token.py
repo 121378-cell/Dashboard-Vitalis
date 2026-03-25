@@ -6,8 +6,8 @@ class Token(Base):
     __tablename__ = "tokens"
 
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
-    email = Column(String)
-    password = Column(String)
+    garmin_email = Column(String)
+    garmin_password = Column(String)
     garmin_session = Column(String)
     wger_api_key = Column(String)
     hevy_username = Column(String)

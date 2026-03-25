@@ -37,8 +37,8 @@ def garmin_login(
             token_entry = Token(user_id=user_id)
             db.add(token_entry)
         
-        token_entry.email = email
-        token_entry.password = password
+        token_entry.garmin_email = email
+        token_entry.garmin_password = password
         # Simplified: storing a placeholder for session as garth handles it on disk
         token_entry.garmin_session = "garth_managed" 
         
@@ -46,12 +46,15 @@ def garmin_login(
         return {"success": True}
     except Exception as e:
         logger.error(f"Garmin login failed: {e}")
+        # Log the traceback for better debugging
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status")
 def get_auth_status(db: Session = Depends(get_db), user_id: str = "default_user"):
     token = db.query(Token).filter(Token.user_id == user_id).first()
-    return {"authenticated": bool(token and token.email)}
+    return {"authenticated": bool(token and token.garmin_email)}
 
 @router.post("/disconnect")
 def disconnect(db: Session = Depends(get_db), user_id: str = "default_user"):

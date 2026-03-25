@@ -1,3 +1,4 @@
+import os
 import garth
 from garminconnect import Garmin
 from typing import Any, Optional
