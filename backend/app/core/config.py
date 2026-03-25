@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    PORT: int = 8001
     
-    model_config = ConfigDict(case_sensitive=True, env_file=".env")
+    model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 
 settings = Settings()

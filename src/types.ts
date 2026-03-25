@@ -28,7 +28,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
-  provider?: 'Groq' | 'Ollama' | 'Gemini';
+  provider?: string;
 }
 
 export interface PDFDocument {

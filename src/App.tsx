@@ -118,7 +118,7 @@ const App: React.FC = () => {
 
   const handleSaveServices = async () => {
     try {
-      await axios.post(`${BACKEND_URL}/api/settings/services`, {
+      await axios.post(`${BACKEND_URL}/settings/services`, {
         wger_api_key: wgerKey,
         hevy_username: hevyUser
       }, {
@@ -133,7 +133,7 @@ const App: React.FC = () => {
 
   const fetchServiceSettings = useCallback(async () => {
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/settings/services`, {
+      const res = await axios.get(`${BACKEND_URL}/settings/services`, {
         headers: { "x-user-id": "default_user" }
       });
       setWgerKey(res.data.wger_api_key || "");
@@ -150,7 +150,7 @@ const App: React.FC = () => {
       // Sync Garmin
       if (isGarminConnected) {
         try {
-          await axios.post(`${BACKEND_URL}/api/sync/garmin`, {}, {
+          await axios.post(`${BACKEND_URL}/sync/garmin`, {}, {
             headers: { 'x-user-id': 'default_user' }
           });
           results.push("Garmin ✅");
@@ -162,7 +162,7 @@ const App: React.FC = () => {
       // Sync Wger
       if (wgerKey) {
         try {
-          await axios.post(`${BACKEND_URL}/api/sync/wger`, {}, {
+          await axios.post(`${BACKEND_URL}/sync/wger`, {}, {
             headers: { 'x-user-id': 'default_user' }
           });
           results.push("Wger ✅");
@@ -174,7 +174,7 @@ const App: React.FC = () => {
       // Sync Hevy
       if (hevyUser) {
         try {
-          await axios.post(`${BACKEND_URL}/api/sync/hevy`, {}, {
+          await axios.post(`${BACKEND_URL}/sync/hevy`, {}, {
             headers: { 'x-user-id': 'default_user' }
           });
           results.push("Hevy ✅");
@@ -201,7 +201,7 @@ const App: React.FC = () => {
 
   const fetchWorkouts = async () => {
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/workouts`, {
+      const res = await axios.get(`${BACKEND_URL}/workouts`, {
         headers: { "x-user-id": "default_user" }
       });
       setWorkouts(res.data);
@@ -214,7 +214,7 @@ const App: React.FC = () => {
   const fetchBiometrics = async () => {
     setLoadingBiometrics(true);
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/biometrics`, {
+      const res = await axios.get(`${BACKEND_URL}/biometrics`, {
         headers: { "x-user-id": "default_user" }
       });
       setBiometrics(res.data);
@@ -381,7 +381,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 
-                {isGarminConnected ? (
+                {(isGarminConnected || biometrics) ? (
                   <BiometricsWidget data={biometrics} />
                 ) : (
                   <div className="bg-surface-container-high p-6 rounded-xl border border-outline-variant/10 text-center space-y-4">

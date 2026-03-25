@@ -25,49 +25,69 @@ class AIService:
             base_url=f"{settings.OLLAMA_BASE_URL}/v1"
         )
 
+    @staticmethod
+    def chat(messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> Dict[str, Any]:
+        """Class method for direct chat with provider fallback."""
+        service = AIService()
+        content = service._generate_chat_response(messages, system_prompt)
+        return content
+
     def generate_response(self, prompt: str, system_instruction: Optional[str] = None) -> str:
-        """Resilience-based generation: Groq -> Ollama -> Gemini"""
-        
+        """Simple prompt-based generation."""
+        messages = [{"role": "user", "content": prompt}]
+        res = self._generate_chat_response(messages, system_instruction)
+        return res["content"]
+
+    def _generate_chat_response(self, messages: List[Dict[str, str]], system_instruction: Optional[str] = None) -> Dict[str, Any]:
         # 1. Try Groq
         if self.groq_client:
             try:
-                return self._generate_openai_compatible(self.groq_client, "llama-3.3-70b-versatile", prompt, system_instruction)
+                content = self._generate_openai_compatible(self.groq_client, "llama-3.3-70b-versatile", messages, system_instruction)
+                return {"content": content, "provider": "Groq"}
             except Exception as e:
                 logger.warning(f"Groq failed: {e}")
 
-        # 2. Try Ollama (Local)
+        # 2. Try Ollama
         try:
-            return self._generate_openai_compatible(self.ollama_client, "llama3", prompt, system_instruction)
+            content = self._generate_openai_compatible(self.ollama_client, "llama3", messages, system_instruction)
+            return {"content": content, "provider": "Ollama (Local)"}
         except Exception as e:
             logger.warning(f"Ollama failed: {e}")
 
         # 3. Fallback to Gemini
         if self.gemini_client:
             try:
-                return self._generate_gemini(prompt, system_instruction)
+                content = self._generate_gemini(messages, system_instruction)
+                return {"content": content, "provider": "Gemini"}
             except Exception as e:
                 logger.error(f"Gemini failed: {e}")
         
         raise Exception("All AI providers failed")
 
-    def _generate_openai_compatible(self, client: OpenAI, model: str, prompt: str, system_instruction: str = None) -> str:
-        messages = []
+    def _generate_openai_compatible(self, client: OpenAI, model: str, messages: List[Dict], system_instruction: str = None) -> str:
+        full_messages = []
         if system_instruction:
-            messages.append({"role": "system", "content": system_instruction})
-        messages.append({"role": "user", "content": prompt})
+            full_messages.append({"role": "system", "content": system_instruction})
+        full_messages.extend(messages)
         
         response = client.chat.completions.create(
             model=model,
-            messages=messages,
+            messages=full_messages,
             stream=False
         )
         return response.choices[0].message.content
 
-    def _generate_gemini(self, prompt: str, system_instruction: str = None) -> str:
+    def _generate_gemini(self, messages: List[Dict], system_instruction: str = None) -> str:
+        # Convert messages to Gemini format
+        contents = []
+        for m in messages:
+            role = "model" if m["role"] == "assistant" else "user"
+            contents.append(types.Content(role=role, parts=[types.Part(text=m["content"])]))
+            
         config = types.GenerateContentConfig(system_instruction=system_instruction)
         response = self.gemini_client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=prompt,
+            contents=contents,
             config=config
         )
         return response.text
