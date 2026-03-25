@@ -39,13 +39,30 @@ def get_garmin_client(
             client = Garmin(email=email, password=password)
             client.login()  # This should use the resumed session
             logger.info("Resumed Garmin session successfully")
-        except Exception as e:
-            logger.info(f"Could not resume session, logging in... Error: {e}")
+        except FileNotFoundError as e:
+            logger.info(f"Token files not found, logging in fresh... Error: {e}")
             client = Garmin(email=email, password=password)
             client.login()
             garth.save(token_dir)
             session_updated = True
             logger.info("Login successful, session saved")
+        except Exception as e:
+            logger.warning(f"Could not resume session: {e}")
+            # Si hay un error al reanudar, intentamos iniciar sesión de nuevo
+            client = Garmin(email=email, password=password)
+            try:
+                client.login()
+                garth.save(token_dir)
+                session_updated = True
+                logger.info("Login successful, session saved")
+            except Exception as login_error:
+                logger.error(f"Login failed: {login_error}")
+                # Verificar si es un error 429 (Too Many Requests)
+                if "429" in str(login_error):
+                    logger.error(
+                        "Received 429 Too Many Requests. Please wait before trying again."
+                    )
+                return None, False
 
         # Ensure display_name is set
         try:
