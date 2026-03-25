@@ -10,4 +10,10 @@ class Biometrics(Base):
     date = Column(String)  # YYYY-MM-DD
     data = Column(String)  # JSON-encoded biometrics
     source = Column(String)
+    
+    # Advanced metrics added from AI_Fitness
+    recovery_time = Column(Integer, nullable=True) # hours
+    training_status = Column(String, nullable=True) # productive, maintenance, etc.
+    hrv_status = Column(String, nullable=True) # balanced, unbalanced, etc.
+    
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

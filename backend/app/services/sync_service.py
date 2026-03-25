@@ -20,9 +20,13 @@ class SyncService:
             logger.warning(f"No Garmin credentials for user {user_id}")
             return False
 
-        client = get_garmin_client(creds.garmin_email, creds.garmin_password)
+        client, session_update = get_garmin_client(creds.garmin_email, creds.garmin_password, creds.garmin_session)
         if not client:
             return False
+        
+        if session_update and session_update != creds.garmin_session:
+            creds.garmin_session = session_update
+            db.commit()
 
         success = True
         for date_str in date_range:
@@ -31,6 +35,14 @@ class SyncService:
                 stats = client.get_stats(date_str)
                 sleep = client.get_sleep_data(date_str)
                 hrv = client.get_hrv_data(date_str)
+                
+                # Recovery and Training Status (often in training status endpoint)
+                training_status_data = client.get_training_status(date_str)
+                recovery_time = safe_get(training_status_data, "mostRecentTerminatedTrainingStatus", "recoveryTime") or \
+                                safe_get(training_status_data, "recoveryTime")
+                
+                training_status = safe_get(training_status_data, "mostRecentTerminatedTrainingStatus", "trainingStatus") or \
+                                  safe_get(training_status_data, "trainingStatus")
                 
                 # Respiration fallback
                 respiration = safe_get(stats, "averageRespirationValue")
@@ -51,6 +63,7 @@ class SyncService:
                 hrv_val = safe_get(hrv, "hrvSummary", "weeklyAverage") or \
                           safe_get(hrv, "hrvSummary", "lastNightAvg") or \
                           safe_get(hrv, "lastNightAvg")
+                hrv_status = safe_get(hrv, "hrvSummary", "status")
                 
                 # Combine into a single JSON blob for the 'data' field
                 biometric_data = {
@@ -63,7 +76,7 @@ class SyncService:
                     "calories": safe_get(stats, "totalCalories") or 0,
                     "respiration": respiration or 0,
                     "vo2max": vo2max or 0,
-                    "spo2": safe_get(stats, "averageSpo2") or 98 # Default or from stats
+                    "spo2": safe_get(stats, "averageSpo2") or 98
                 }
                 
                 # Update or create Biometrics record
@@ -78,6 +91,9 @@ class SyncService:
                 
                 biometric.data = json.dumps(biometric_data)
                 biometric.source = "garmin"
+                biometric.recovery_time = recovery_time
+                biometric.training_status = training_status
+                biometric.hrv_status = hrv_status
                 
             except Exception as e:
                 logger.error(f"Error syncing Garmin health for {date_str}: {e}")
@@ -92,8 +108,12 @@ class SyncService:
         creds = db.query(Token).filter(Token.user_id == user_id).first()
         if not (creds and creds.garmin_email): return False
         
-        client = get_garmin_client(creds.garmin_email, creds.garmin_password)
+        client, session_update = get_garmin_client(creds.garmin_email, creds.garmin_password, creds.garmin_session)
         if not client: return False
+
+        if session_update and session_update != creds.garmin_session:
+            creds.garmin_session = session_update
+            db.commit()
 
         try:
             # Fetch activities for the date range
