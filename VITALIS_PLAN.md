@@ -40,9 +40,9 @@ Este plan detalla la evolución del Dashboard Vitalis integrando las capacidades
 ## 🎨 Sprint 3: UI de Insights Avanzados (Frontend)
 *Objetivo: Visualización clara de la preparación y el rendimiento del atleta.*
 
-- [ ] **3.1 Widgets de Tendencia (Dashboard)**
+- [x] **3.1 Widgets de Tendencia (Dashboard)**
   - Mostrar indicadores visuales (flechas/colores) comparando el día actual con la media semanal.
-- [ ] **3.2 Dial de Readiness (Preparación)**
+- [x] **3.2 Dial de Readiness (Preparación)**
   - Implementar un indicador visual de "Puntuación de Preparación" basado en HRV, Sueño y Carga.
 - [ ] **3.3 Visualizador de Zonas de FC**
   - Añadir gráficos de distribución de intensidad (Z1-Z5) en el detalle de los entrenamientos.

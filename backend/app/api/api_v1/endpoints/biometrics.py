@@ -7,6 +7,8 @@ import json
 
 router = APIRouter()
 
+from app.services.analytics_service import AnalyticsService
+
 @router.get("/")
 def get_biometrics(
     db: Session = Depends(get_db),
@@ -21,9 +23,23 @@ def get_biometrics(
         Biometrics.date == date_str
     ).first()
     
+    # Get advanced readiness and baselines
+    readiness = AnalyticsService.get_readiness_score(db, user_id)
+    
     if biometric:
         data = json.loads(biometric.data)
-        return {**data, "source": biometric.source}
+        # Merge baseline info
+        return {
+            **data, 
+            "source": biometric.source,
+            "readiness": readiness.get("score", 70),
+            "status": readiness.get("status", "good"),
+            "hrv_baseline": readiness.get("hrv_baseline"),
+            "rhr_baseline": readiness.get("rhr_baseline"),
+            "recovery_time": biometric.recovery_time,
+            "training_status": biometric.training_status,
+            "hrv_status": biometric.hrv_status
+        }
     
     # Fallback to demo data if nothing found
     return {
@@ -35,8 +51,10 @@ def get_biometrics(
         "sleep": 7.5,
         "calories": 2100,
         "respiration": 14,
-        "readiness": 78,
-        "status": "good",
+        "readiness": readiness.get("score", 78),
+        "status": readiness.get("status", "good"),
+        "hrv_baseline": readiness.get("hrv_baseline"),
+        "rhr_baseline": readiness.get("rhr_baseline"),
         "overtraining": False,
         "source": "demo"
     }
