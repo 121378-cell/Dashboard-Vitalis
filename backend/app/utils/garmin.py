@@ -23,14 +23,22 @@ def safe_get(data: Any, *keys: str, default: Any = None) -> Any:
 def get_garmin_client(email: str, password: str, token_dir: str = ".garth") -> Optional[Garmin]:
     """Authenticates or resumes a Garth session and returns a Garmin client."""
     try:
+        # Create token directory if it doesn't exist
+        if not os.path.exists(token_dir):
+            os.makedirs(token_dir)
+
         # Try to resume first
-        if os.path.exists(token_dir):
+        try:
             garth.resume(token_dir)
             client = Garmin(email, password)
-            client.garth = garth.client
-        else:
+            client.login() # This should use the resumed session
+            logger.info("Resumed Garmin session successfully")
+        except Exception:
+            logger.info("Could not resume session, logging in...")
             client = Garmin(email, password)
-            client.login(token_dir)
+            client.login()
+            client.garth.save(token_dir)
+            logger.info("Login successful, session saved")
         
         # Ensure display_name is set
         try:

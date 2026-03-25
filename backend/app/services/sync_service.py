@@ -27,20 +27,43 @@ class SyncService:
         success = True
         for date_str in date_range:
             try:
-                # Fetch various stats
+                # Fetch various stats with fallbacks similar to AI_Fitness
                 stats = client.get_stats(date_str)
                 sleep = client.get_sleep_data(date_str)
-                rhr = client.get_rhr_day(date_str)
                 hrv = client.get_hrv_data(date_str)
+                
+                # Respiration fallback
+                respiration = safe_get(stats, "averageRespirationValue")
+                if not respiration:
+                    resp_data = client.get_respiration_data(date_str)
+                    respiration = safe_get(resp_data, "avgWakingRespirationValue") or safe_get(resp_data, "avgSleepRespirationValue")
+                
+                # VO2 Max fallback
+                vo2max = safe_get(stats, "vo2Max")
+                if not vo2max:
+                    max_metrics = client.get_max_metrics(date_str)
+                    for metric in (max_metrics or []):
+                        if safe_get(metric, "generic", "vo2MaxPreciseValue"):
+                            vo2max = metric["generic"]["vo2MaxPreciseValue"]
+                            break
+                
+                # HRV fallback
+                hrv_val = safe_get(hrv, "hrvSummary", "weeklyAverage") or \
+                          safe_get(hrv, "hrvSummary", "lastNightAvg") or \
+                          safe_get(hrv, "lastNightAvg")
                 
                 # Combine into a single JSON blob for the 'data' field
                 biometric_data = {
-                    "heartRate": rhr or 0,
-                    "hrv": safe_get(hrv, "hrvSummary", "lastNightAvg") or 0,
+                    "heartRate": safe_get(stats, "restingHeartRate") or 0,
+                    "hrv": hrv_val or 0,
                     "stress": safe_get(stats, "averageStressLevel") or 0,
                     "sleep": safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds", default=0) / 3600,
+                    "sleepScore": safe_get(sleep, "dailySleepDTO", "sleepScores", "overall", "value") or 0,
                     "steps": safe_get(stats, "totalSteps") or 0,
                     "calories": safe_get(stats, "totalCalories") or 0,
+                    "respiration": respiration or 0,
+                    "vo2max": vo2max or 0,
+                    "spo2": safe_get(stats, "averageSpo2") or 98 # Default or from stats
                 }
                 
                 # Update or create Biometrics record
@@ -65,7 +88,7 @@ class SyncService:
 
     @staticmethod
     def sync_garmin_activities(db: Session, user_id: str, date_range: list) -> bool:
-        """Fetch Garmin activities and save to Workouts table."""
+        """Fetch Garmin activities and save to Workouts table with detailed metrics."""
         creds = db.query(Token).filter(Token.user_id == user_id).first()
         if not (creds and creds.garmin_email): return False
         
@@ -73,11 +96,15 @@ class SyncService:
         if not client: return False
 
         try:
-            # We'll fetch activities for the last N days based on date_range
-            # For simplicity, we fetch the last 10 activities and filter by date
-            activities = client.get_activities(0, 10)
+            # Fetch activities for the date range
+            # Garmin API can fetch by date range, which is more efficient
+            start_date = min(date_range)
+            end_date = max(date_range)
+            activities = client.get_activities_by_date(start_date, end_date)
+            
             for act in activities:
-                act_date = act["startTimeLocal"].split(" ")[0]
+                act_date_time = act["startTimeLocal"]
+                act_date = act_date_time.split(" ")[0]
                 if act_date not in date_range:
                     continue
                 
@@ -96,9 +123,31 @@ class SyncService:
                     )
                     db.add(workout)
                 
+                # Extract detailed metrics like AI_Fitness
+                metrics = {
+                    "distance": safe_get(act, "distance"),
+                    "avgSpeed": safe_get(act, "averageSpeed"),
+                    "maxSpeed": safe_get(act, "maxSpeed"),
+                    "avgHR": safe_get(act, "averageHR"),
+                    "maxHR": safe_get(act, "maxHR"),
+                    "avgPower": safe_get(act, "avgPower") or safe_get(act, "averagePower"),
+                    "maxPower": safe_get(act, "maxPower"),
+                    "avgCadence": safe_get(act, "averageCadence") or safe_get(act, "avgCadence"),
+                    "hrZones": {
+                        "z1": safe_get(act, "hrTimeInZone_1"),
+                        "z2": safe_get(act, "hrTimeInZone_2"),
+                        "z3": safe_get(act, "hrTimeInZone_3"),
+                        "z4": safe_get(act, "hrTimeInZone_4"),
+                        "z5": safe_get(act, "hrTimeInZone_5"),
+                    },
+                    "elevationGain": safe_get(act, "elevationGain"),
+                    "sport": safe_get(act, "activityType", "typeKey")
+                }
+
                 workout.name = act.get("activityName") or "Garmin Activity"
-                workout.description = act.get("description") or ""
-                workout.date = datetime.strptime(act["startTimeLocal"], "%Y-%m-%d %H:%M:%S")
+                # Store detailed metrics in description as JSON for extensibility
+                workout.description = json.dumps(metrics)
+                workout.date = datetime.strptime(act_date_time, "%Y-%m-%d %H:%M:%S")
                 workout.duration = int(act.get("duration") or 0)
                 workout.calories = int(act.get("calories") or 0)
                 
