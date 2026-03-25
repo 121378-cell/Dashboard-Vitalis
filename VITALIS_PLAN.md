@@ -28,11 +28,11 @@ Este plan detalla la evolución del Dashboard Vitalis integrando las capacidades
 ## 🧠 Sprint 2: El "Motor de Contexto Vitalis" (Lógica AI)
 *Objetivo: Traducir datos fríos en insights narrativos para que la IA actúe como un coach real.*
 
-- [ ] **2.1 Servicio de Traducción de Métricas (`context_service.py`)**
+- [x] **2.1 Servicio de Traducción de Métricas (`context_service.py`)**
   - Desarrollar el motor que convierte JSON de Garmin en lenguaje natural para Gemini.
-- [ ] **2.2 Algoritmo de Carga Aguda vs Crónica (ACWR)**
+- [x] **2.2 Algoritmo de Carga Aguda vs Crónica (ACWR)**
   - Calcular el ratio de carga de entrenamiento para predecir riesgos de lesión.
-- [ ] **2.3 Integración de "Daily Briefing"**
+- [x] **2.3 Integración de "Daily Briefing"**
   - Inyectar el resumen de recuperación y carga en el prompt del Chat de IA automáticamente.
 
 ---
