@@ -214,7 +214,7 @@ const App: React.FC = () => {
   const fetchBiometrics = async () => {
     setLoadingBiometrics(true);
     try {
-      const res = await axios.get(`${BACKEND_URL}/biometrics`, {
+      const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
         headers: { "x-user-id": "default_user" }
       });
       setBiometrics(res.data);

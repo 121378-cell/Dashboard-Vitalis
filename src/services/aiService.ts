@@ -5,7 +5,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8001/a
 
 export async function callAI(messages: Message[], systemPrompt: string): Promise<{ content: string; provider: string }> {
   try {
-    const response = await axios.post(`${BACKEND_URL}/ai/chat`, {
+    const response = await axios.post(`${BACKEND_URL}/ai/chat/`, {
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       system_prompt: systemPrompt
     }, {

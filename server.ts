@@ -66,7 +66,7 @@ db.prepare("INSERT OR IGNORE INTO users (id, name) VALUES (?, ?)").run("default_
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
 
   app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
   app.use(express.json());
@@ -76,7 +76,7 @@ async function startServer() {
 
   // REQ-B16: CSP Headers (to address report-only violations if possible)
   app.use((req, res, next) => {
-    res.setHeader("Content-Security-Policy-Report-Only", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https: https://fonts.gstatic.com; connect-src 'self' wss: https://api.groq.com https://api.openai.com https://api.anthropic.com;");
+    res.setHeader("Content-Security-Policy-Report-Only", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https: https://fonts.gstatic.com; connect-src 'self' ws://localhost:* http://localhost:* wss: https: https://api.groq.com https://api.openai.com https://api.anthropic.com;");
     next();
   });
 
