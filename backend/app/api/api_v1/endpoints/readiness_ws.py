@@ -112,7 +112,7 @@ manager = ConnectionManager()
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.orm import Session
-from app.db.session import get_db
+from app.api.deps import get_db
 from app.api.deps import get_current_user_id_from_token
 
 router = APIRouter()

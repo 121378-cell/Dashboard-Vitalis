@@ -16,11 +16,10 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 import json
 
-from app.db.session import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.models.biometrics import Biometrics
 from app.models.user import User
 from app.core.readiness_engine import compute_readiness_score, ReadinessEngine
-from app.api.deps import get_current_user_id
 
 router = APIRouter()
 
