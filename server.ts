@@ -305,17 +305,31 @@ async function startServer() {
       
       const date = new Date(dateStr);
       
-      // Fetch data in parallel (REQ-B07)
-      const [heartRateData, sleepData, stressData, stepsData] = await Promise.all([
+      // Fetch data in parallel with Promise.allSettled to handle partial failures
+      const results = await Promise.allSettled([
         client.getHeartRate(date),
         client.getSleepData(date),
         client.getStressData(date),
         client.getSteps(date)
       ]);
 
+      const heartRateData = results[0].status === 'fulfilled' ? results[0].value : null;
+      const sleepData = results[1].status === 'fulfilled' ? results[1].value : null;
+      const stressData = results[2].status === 'fulfilled' ? results[2].value : null;
+      const stepsData = results[3].status === 'fulfilled' ? results[3].value : null;
+
+      // Log any partial failures
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          console.warn(`Endpoint ${i} failed:`, r.reason);
+        }
+      });
+
       const biometrics = {
         heartRate: heartRateData?.lastSevenDaysAvgRestingHeartRate || 70,
-        hrv: heartRateData?.heartRateValues?.length > 0 ? 50 : 0, // Simplified HRV
+        hrv: heartRateData?.heartRateValues?.length > 0 
+          ? heartRateData.heartRateValues[heartRateData.heartRateValues.length - 1]?.[1] || 0 
+          : 0,
         spo2: 98, // SpO2 often requires specific endpoint
         stress: stressData?.avgStressLevel || 30,
         steps: stepsData || 0,

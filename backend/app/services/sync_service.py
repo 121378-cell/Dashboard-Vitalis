@@ -35,8 +35,8 @@ class SyncService:
         if not client:
             return False
 
-        if session_updated:
-            creds.garmin_session = str("garth_managed")
+        if session_updated and session_updated != creds.garmin_session:
+            creds.garmin_session = session_updated
             db.commit()
 
         success = True
@@ -92,7 +92,7 @@ class SyncService:
                 # Combine into a single JSON blob for the 'data' field
                 biometric_data = {
                     "heartRate": safe_get(stats, "restingHeartRate") or 0,
-                    "hrv": hrv_val or 0,
+                    "hrv": hrv_val or None,
                     "stress": safe_get(stats, "averageStressLevel") or 0,
                     "sleep": safe_get(
                         sleep, "dailySleepDTO", "sleepTimeSeconds", default=0
@@ -108,98 +108,7 @@ class SyncService:
                     "calories": safe_get(stats, "totalCalories") or 0,
                     "respiration": respiration or 0,
                     "vo2max": vo2max or 0,
-                    "spo2": safe_get(stats, "averageSpo2") or 98,
-                }
-
-                # Update or create Biometrics record
-                biometric = (
-                    db.query(Biometrics)
-                    .filter(Biometrics.user_id == user_id, Biometrics.date == date_str)
-                    .first()
-                )
-
-                if not biometric:
-                    biometric = Biometrics(user_id=user_id, date=date_str)
-                    db.add(biometric)
-
-                biometric.data = json.dumps(biometric_data)
-                biometric.source = "garmin"
-                biometric.recovery_time = recovery_time
-                biometric.training_status = training_status
-                biometric.hrv_status = hrv_status
-
-            except Exception as e:
-                logger.error(f"Error syncing Garmin health for {date_str}: {e}")
-                success = False
-
-        db.commit()
-        return success
-
-        success = True
-        for date_str in date_range:
-            try:
-                # Fetch various stats with fallbacks similar to AI_Fitness
-                stats = client.get_stats(date_str)
-                sleep = client.get_sleep_data(date_str)
-                hrv = client.get_hrv_data(date_str)
-
-                # Recovery and Training Status (often in training status endpoint)
-                training_status_data = client.get_training_status(date_str)
-                recovery_time = safe_get(
-                    training_status_data,
-                    "mostRecentTerminatedTrainingStatus",
-                    "recoveryTime",
-                ) or safe_get(training_status_data, "recoveryTime")
-
-                training_status = safe_get(
-                    training_status_data,
-                    "mostRecentTerminatedTrainingStatus",
-                    "trainingStatus",
-                ) or safe_get(training_status_data, "trainingStatus")
-
-                # Respiration fallback
-                respiration = safe_get(stats, "averageRespirationValue")
-                if not respiration:
-                    resp_data = client.get_respiration_data(date_str)
-                    respiration = safe_get(
-                        resp_data, "avgWakingRespirationValue"
-                    ) or safe_get(resp_data, "avgSleepRespirationValue")
-
-                # VO2 Max fallback
-                vo2max = safe_get(stats, "vo2Max")
-                if not vo2max:
-                    max_metrics = client.get_max_metrics(date_str)
-                    for metric in max_metrics or []:
-                        if safe_get(metric, "generic", "vo2MaxPreciseValue"):
-                            vo2max = metric["generic"]["vo2MaxPreciseValue"]
-                            break
-
-                # HRV fallback
-                hrv_val = (
-                    safe_get(hrv, "hrvSummary", "weeklyAverage")
-                    or safe_get(hrv, "hrvSummary", "lastNightAvg")
-                    or safe_get(hrv, "lastNightAvg")
-                )
-                hrv_status = safe_get(hrv, "hrvSummary", "status")
-
-                # Combine into a single JSON blob for the 'data' field
-                biometric_data = {
-                    "heartRate": safe_get(stats, "restingHeartRate") or 0,
-                    "hrv": hrv_val or 0,
-                    "stress": safe_get(stats, "averageStressLevel") or 0,
-                    "sleep": safe_get(
-                        sleep, "dailySleepDTO", "sleepTimeSeconds", default=0
-                    )
-                    / 3600,
-                    "sleepScore": safe_get(
-                        sleep, "dailySleepDTO", "sleepScores", "overall", "value"
-                    )
-                    or 0,
-                    "steps": safe_get(stats, "totalSteps") or 0,
-                    "calories": safe_get(stats, "totalCalories") or 0,
-                    "respiration": respiration or 0,
-                    "vo2max": vo2max or 0,
-                    "spo2": safe_get(stats, "averageSpo2") or 98,
+                    "spo2": safe_get(stats, "averageSpo2") or None,
                 }
 
                 # Update or create Biometrics record

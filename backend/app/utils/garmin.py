@@ -23,45 +23,42 @@ def safe_get(data: Any, *keys: str, default: Any = None) -> Any:
 
 
 def get_garmin_client(
-    email: str, password: str, token_dir: str = ".garth"
+    email: str, password: str, token_dir: str = None
 ) -> Tuple[Optional[Garmin], bool]:
     """Authenticates or resumes a Garth session and returns a Garmin client."""
     session_updated = False
-
+    if token_dir is None:
+        token_dir = ".garth"
     try:
         # Create token directory if it doesn't exist
         if not os.path.exists(token_dir):
             os.makedirs(token_dir)
 
-        # Try to resume first
-        try:
-            garth.resume(token_dir)
-            client = Garmin(email=email, password=password)
-            client.login()  # This should use the resumed session
-            logger.info("Resumed Garmin session successfully")
-        except FileNotFoundError as e:
-            logger.info(f"Token files not found, logging in fresh... Error: {e}")
-            client = Garmin(email=email, password=password)
-            client.login()
-            garth.save(token_dir)
-            session_updated = True
-            logger.info("Login successful, session saved")
-        except Exception as e:
-            logger.warning(f"Could not resume session: {e}")
-            # Si hay un error al reanudar, intentamos iniciar sesión de nuevo
-            client = Garmin(email=email, password=password)
+        # Check if tokens exist before attempting to resume
+        oauth1_path = os.path.join(token_dir, "oauth1_token.json")
+        oauth2_path = os.path.join(token_dir, "oauth2_token.json")
+        tokens_exist = os.path.exists(oauth1_path) and os.path.exists(oauth2_path)
+
+        if tokens_exist:
             try:
+                garth.resume(token_dir)
+                client = Garmin(email=email, password=password)
+                client.garth = garth.client
+                logger.info("Resumed Garmin session from tokens successfully")
+            except Exception as e:
+                logger.warning(f"Could not resume token session: {e}")
+                return None, False
+        else:
+            try:
+                client = Garmin(email=email, password=password)
                 client.login()
                 garth.save(token_dir)
                 session_updated = True
-                logger.info("Login successful, session saved")
-            except Exception as login_error:
-                logger.error(f"Login failed: {login_error}")
-                # Verificar si es un error 429 (Too Many Requests)
-                if "429" in str(login_error):
-                    logger.error(
-                        "Received 429 Too Many Requests. Please wait before trying again."
-                    )
+                logger.info("Fresh login successful, session saved")
+            except Exception as e:
+                logger.error(f"Login failed: {e}")
+                if "429" in str(e):
+                    logger.error("429 Too Many Requests — wait before retrying")
                 return None, False
 
         # Ensure display_name is set
