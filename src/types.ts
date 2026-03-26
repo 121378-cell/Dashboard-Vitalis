@@ -8,9 +8,15 @@ export interface Biometrics {
   calories: number;
   respiration: number;
   readiness: number;
-  status: 'excellent' | 'good' | 'poor';
+  status: 'excellent' | 'good' | 'poor' | 'high' | 'medium' | 'low';
   overtraining: boolean;
   source: 'garmin_api' | 'cache' | 'demo';
+  // Optional fields from backend
+  training_status?: string;
+  recovery_time?: number;
+  hrv_status?: string;
+  rhr_baseline?: number;
+  hrv_baseline?: number;
 }
 
 export interface AthleteProfile {

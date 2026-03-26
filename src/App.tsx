@@ -321,9 +321,8 @@ const App: React.FC = () => {
     checkAuthStatus();
     fetchServiceSettings();
     fetchWorkouts();
-    // REQ-F07: Auto-sync every 5 minutes
-    const interval = setInterval(fetchBiometrics, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // NOTA: El polling de biometrics cada 5 minutos ha sido eliminado
+    // Ahora usamos WebSocket en tiempo real via BiometricsWidget
   }, [checkAuthStatus, fetchServiceSettings]);
 
   // Handle OAuth callback in URL
@@ -382,7 +381,7 @@ const App: React.FC = () => {
                 </div>
                 
                 {(isGarminConnected || biometrics) ? (
-                  <BiometricsWidget data={biometrics} />
+                  <BiometricsWidget data={biometrics} userId="default_user" />
                 ) : (
                   <div className="bg-surface-container-high p-6 rounded-xl border border-outline-variant/10 text-center space-y-4">
                     <div className="w-12 h-12 bg-surface-variant rounded-full flex items-center justify-center mx-auto text-on-surface-variant">

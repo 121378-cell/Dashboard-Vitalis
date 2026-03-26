@@ -4,9 +4,10 @@ import { Biometrics } from '../types';
 
 interface Props {
   data: Biometrics | null;
+  userId?: string;
 }
 
-export const BiometricsWidget: React.FC<Props> = ({ data }) => {
+export const BiometricsWidget: React.FC<Props> = ({ data, userId = 'default_user' }) => {
   if (!data) return <div className="p-4 text-center text-on-surface-variant">No data available</div>;
 
   const getMetricColor = (value: number, type: string) => {
