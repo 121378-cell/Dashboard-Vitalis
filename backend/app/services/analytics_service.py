@@ -128,9 +128,12 @@ class AnalyticsService:
     @staticmethod
     def get_readiness_score(db: Session, user_id: str) -> dict:
         """
-        Compare today's metrics with baselines to determine readiness.
-        Returns a dict with score and status.
+        Wrapper que usa el ReadinessEngine consolidado.
+        Mantiene compatibilidad con endpoints existentes.
         """
+        from app.core.readiness_engine import ReadinessEngine, AthleteProfile
+        
+        # Obtener datos de hoy
         today_str = date.today().isoformat()
         today_bio = db.query(Biometrics).filter(
             Biometrics.user_id == user_id,
@@ -139,36 +142,41 @@ class AnalyticsService:
         
         if not today_bio:
             return {"score": 0, "status": "unknown", "message": "No data for today"}
-            
-        today_data = json.loads(today_bio.data)
-        today_hrv = today_data.get("hrv", 0)
-        today_rhr = today_data.get("heartRate", 0)
         
-        hrv_baseline = AnalyticsService.get_hrv_baseline(db, user_id)
-        rhr_baseline = AnalyticsService.get_rhr_baseline(db, user_id)
+        try:
+            today_data = json.loads(today_bio.data)
+        except:
+            return {"score": 0, "status": "error", "message": "Invalid data format"}
         
-        # Basic Readiness Logic (to be refined in Sprint 2)
-        score = 70 # start with base
+        # Crear engine y calcular
+        engine = ReadinessEngine(user_id, db, AthleteProfile.HYBRID)
+        engine.calculate_personal_baseline(days_of_history=90)
         
-        if hrv_baseline > 0:
-            hrv_diff = ((today_hrv - hrv_baseline) / hrv_baseline) * 100
-            if hrv_diff > 10: score += 10 # Good recovery
-            elif hrv_diff < -15: score -= 20 # Potential overtraining/illness
-            
-        if rhr_baseline > 0:
-            rhr_diff = today_rhr - rhr_baseline
-            if rhr_diff > 5: score -= 15 # Stress/low recovery
-            elif rhr_diff < -3: score += 5 # Good fitness trend
-            
-        score = max(0, min(100, score))
+        input_data = {
+            "heart_rate": today_data.get("heartRate", 60),
+            "hrv": today_data.get("hrv"),
+            "sleep_hours": today_data.get("sleep", 0),
+            "stress_level": today_data.get("stress", 50),
+            "steps": today_data.get("steps", 0),
+            "steps_prev_7d_avg": 10000,
+            "is_rest_day": today_data.get("steps", 0) < 8000,
+            "exercise_load_7d": 1.0
+        }
         
-        status = "excellent" if score >= 85 else "good" if score >= 65 else "fair" if score >= 45 else "poor"
+        score, factors = engine.calculate_readiness(input_data)
+        
+        # Mapear status al formato antiguo
+        status_map = {
+            "high": "excellent" if score >= 85 else "good",
+            "medium": "fair" if score < 65 else "good",
+            "low": "poor"
+        }
         
         return {
-            "score": score,
-            "status": status,
-            "hrv_baseline": round(hrv_baseline, 1),
-            "rhr_baseline": round(rhr_baseline, 1),
-            "hrv_today": today_hrv,
-            "rhr_today": today_rhr
+            "score": int(score),
+            "status": status_map.get("high" if score >= 71 else "medium" if score >= 41 else "low", "good"),
+            "hrv_baseline": engine.baseline.hrv_avg if engine.baseline else 55,
+            "rhr_baseline": engine.baseline.hr_resting_avg if engine.baseline else 60,
+            "hrv_today": today_data.get("hrv", 0),
+            "rhr_today": today_data.get("heartRate", 0)
         }

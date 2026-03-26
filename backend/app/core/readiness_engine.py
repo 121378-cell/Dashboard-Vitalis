@@ -1,24 +1,24 @@
 """
-VITALIS READINESS SCORE ENGINE v1.0
-====================================
-Sistema de puntuación de preparación física basado en datos biométricos.
+VITALIS READINESS SCORE ENGINE v2.0 (CONSOLIDADO)
+=================================================
+Motor unificado de puntuación de preparación física.
 
-Fórmula ponderada:
-- Sueño (30%): Duración + calidad relativa al histórico personal
-- Recuperación/HRV (25%): Variabilidad cardíaca como indicador de recuperación
-- Estrés/Strain (20%): Nivel de estrés acumulado
-- Actividad (15%): Balance entre carga y descanso
-- FC Reposos (10%): Desviación del baseline personal
+CONSOLIDACIÓN v2.0:
+- Integra v1.0 + v2.0 PRO + analytics_service
+- API unificada manteniendo retrocompatibilidad
 
-Score: 0-100
+FÓRMULA: sleep*w + recovery*w + strain*w + activity*w + hr*w
+Score: 0-100 → status: low | medium | high
 """
 
 import json
 import statistics
+import random
+from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from sqlalchemy.orm import Session
 
 
 class ReadinessStatus(Enum):
