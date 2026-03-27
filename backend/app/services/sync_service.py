@@ -30,12 +30,12 @@ class SyncService:
             return False
 
         client, session_updated = get_garmin_client(
-            str(garmin_email), str(garmin_password)
+            str(garmin_email), str(garmin_password), session_data=creds.garmin_session
         )
         if not client:
             return False
 
-        if session_updated and session_updated != creds.garmin_session:
+        if session_updated and session_updated is not True:
             creds.garmin_session = session_updated
             db.commit()
 
@@ -143,12 +143,12 @@ class SyncService:
             return False
 
         client, session_update = get_garmin_client(
-            creds.garmin_email, creds.garmin_password, creds.garmin_session
+            creds.garmin_email, creds.garmin_password, session_data=creds.garmin_session
         )
         if not client:
             return False
 
-        if session_update and session_update != creds.garmin_session:
+        if session_update and session_update is not True:
             creds.garmin_session = session_update
             db.commit()
 
