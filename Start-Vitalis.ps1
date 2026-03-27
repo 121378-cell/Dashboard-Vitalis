@@ -13,7 +13,7 @@
 # Funciones
 # -------------------------
 
-function Kill-NodePythonProcesses {
+function Stop-NodePythonProcesses {
     Write-Host "[INFO] Comprobando procesos Node.js y Python..." -ForegroundColor Cyan
     $nodeProcesses = Get-Process node -ErrorAction SilentlyContinue
     $pythonProcesses = Get-Process python -ErrorAction SilentlyContinue        
@@ -66,7 +66,7 @@ function Start-Backend {
 
     # Comprobar si ya hay un proceso uvicorn corriendo
     $existing = Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object {
-        ($_ | Select-String -Pattern "uvicorn") -ne $null
+        $null -ne ($_ | Select-String -Pattern "uvicorn")
     }
     if ($existing) {
         $existing | Stop-Process -Force
@@ -81,7 +81,7 @@ function Start-Backend {
 function Start-Frontend {
     # Comprobar si npm está corriendo con Vite
     $existing = Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {
-        ($_ | Select-String -Pattern "server.ts") -ne $null
+        $null -ne ($_ | Select-String -Pattern "server.ts")
     }
     if ($existing) {
         $existing | Stop-Process -Force
@@ -104,7 +104,7 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Cerrar procesos Node.js y Python
-Kill-NodePythonProcesses
+Stop-NodePythonProcesses
 Write-Host ""
 
 # 2. Verificar puertos críticos
