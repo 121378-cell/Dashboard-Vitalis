@@ -30,14 +30,19 @@ class SyncService:
             return False
 
         client, session_updated = get_garmin_client(
-            str(garmin_email), str(garmin_password), session_data=creds.garmin_session
+            str(garmin_email), str(garmin_password), 
+            session_data=creds.garmin_session,
+            user_id=str(user_id)
         )
         if not client:
             return False
 
-        if session_updated and session_updated is not True:
+        # ✅ Corregido: Persistir sesión siempre que sea un string JSON válido
+        if session_updated and isinstance(session_updated, str) and session_updated:
             creds.garmin_session = session_updated
+            creds.last_session_update = datetime.now()
             db.commit()
+            logger.info("Garmin session persisted to database")
 
         success = True
         for date_str in date_range:

@@ -37,7 +37,7 @@ if not user:
     user = User(id=USER_ID, name="Atleta ATLAS")
     db.add(user)
     db.commit()
-    print(f"✅ Usuario creado: {USER_ID}")
+    print(f"Usuario creado: {USER_ID}")
 
 # Save credentials
 token = db.query(Token).filter(Token.user_id == USER_ID).first()
@@ -48,19 +48,23 @@ if not token:
 token.garmin_email = GARMIN_EMAIL
 token.garmin_password = GARMIN_PASSWORD
 db.commit()
-print(f"✅ Credenciales guardadas para {GARMIN_EMAIL}")
+print(f"Credenciales guardadas para {GARMIN_EMAIL}")
 
 # Connect to Garmin
-print("\n🔄 Conectando con Garmin...")
-client, session_updated = get_garmin_client(GARMIN_EMAIL, GARMIN_PASSWORD)
+print("\nConectando con Garmin...")
+client, session_updated = get_garmin_client(GARMIN_EMAIL, GARMIN_PASSWORD, session_data=token.garmin_session)
 
 if not client:
-    print("❌ Error: No se pudo conectar a Garmin")
+    print("Error: No se pudo conectar a Garmin")
     sys.exit(1)
 
-print(f"✅ Conectado a Garmin!")
-if session_updated:
-    print("  Session actualizada")
+print(f"Conectado a Garmin!")
+if session_updated and session_updated is not True:
+    print("  Session actualizada y persistida en DB")
+    token.garmin_session = session_updated
+    db.commit()
+elif session_updated:
+    print("  Session actualizada localmente")
 
 # Get user profile
 try:
@@ -70,7 +74,7 @@ except:
     pass
 
 # Sync health data (Jan 1, 2025 to today)
-print("\n🔄 Sincronizando datos de salud...")
+print("\nSincronizando datos de salud...")
 start_date = datetime(2025, 1, 1)
 end_date = datetime.now()
 date_range = [(end_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_date - start_date).days + 1)]
@@ -78,20 +82,20 @@ print(f"  Fechas: {date_range[-1]} a {date_range[0]} ({len(date_range)} días)")
 
 success = SyncService.sync_garmin_health(db, USER_ID, date_range)
 if success:
-    print("✅ Datos de salud sincronizados")
+    print("Datos de salud sincronizados")
 else:
-    print("⚠️ Error en sincronización de salud")
+    print("Error en sincronización de salud")
 
 # Sync activities (Jan 1, 2025 to today)
-print("\n🔄 Sincronizando actividades...")
+print("\nSincronizando actividades...")
 date_range_activities = [(end_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_date - start_date).days + 1)]
 print(f"  Fechas: {date_range_activities[-1]} a {date_range_activities[0]} ({len(date_range_activities)} días)")
 
 success = SyncService.sync_garmin_activities(db, USER_ID, date_range_activities)
 if success:
-    print("✅ Actividades sincronizadas")
+    print("Actividades sincronizadas")
 else:
-    print("⚠️ Error en sincronización de actividades")
+    print("Error en sincronización de actividades")
 
 # Show results
 print("\n" + "=" * 60)
