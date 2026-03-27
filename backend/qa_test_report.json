@@ -1,0 +1,60 @@
+{
+  "passed": 6,
+  "failed": 3,
+  "tests": [
+    {
+      "name": "TEST 1",
+      "passed": false,
+      "details": "Rate limited: Garmin rate limit detectado (429) (retry after: 2026-03-27 19:07:24.587163)",
+      "timestamp": "2026-03-27T19:52:24.587163"
+    },
+    {
+      "name": "TEST 2",
+      "passed": false,
+      "details": "No existing session from TEST 1",
+      "timestamp": "2026-03-27T19:52:24.591667"
+    },
+    {
+      "name": "TEST 3",
+      "passed": true,
+      "details": "Exception handled: GarminRateLimitError",
+      "timestamp": "2026-03-27T19:52:24.596762"
+    },
+    {
+      "name": "TEST 4",
+      "passed": true,
+      "details": "Rate limit exception raised correctly",
+      "timestamp": "2026-03-27T19:52:24.603280"
+    },
+    {
+      "name": "TEST 5",
+      "passed": true,
+      "details": "Blocked quickly (0.00s)",
+      "timestamp": "2026-03-27T19:52:24.605320"
+    },
+    {
+      "name": "TEST 6",
+      "passed": true,
+      "details": "Anti-spam enforced - no client returned",
+      "timestamp": "2026-03-27T19:52:24.610683"
+    },
+    {
+      "name": "TEST 7",
+      "passed": true,
+      "details": "Rate limit triggered after max attempts",
+      "timestamp": "2026-03-27T19:52:24.619696"
+    },
+    {
+      "name": "TEST 8",
+      "passed": false,
+      "details": "GARMIN tag: \u2717 | Session refs: \u2713 | Login refs: \u2713",
+      "timestamp": "2026-03-27T19:52:24.632030"
+    },
+    {
+      "name": "TEST 9",
+      "passed": true,
+      "details": "Fields exist: garmin_session: \u2713 | garmin_rate_limited_until: \u2713 | last_login_attempt: \u2713 | login_attempts_count: \u2713",
+      "timestamp": "2026-03-27T19:52:24.635180"
+    }
+  ]
+}
