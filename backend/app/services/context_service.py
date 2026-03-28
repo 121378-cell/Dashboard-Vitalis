@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.biometrics import Biometrics
 from app.models.workout import Workout
 from app.services.analytics_service import AnalyticsService
+from app.services.athlete_profile_service import AthleteProfileService
 
 logger = logging.getLogger("app.services.context_service")
 
@@ -109,10 +110,16 @@ class ContextService:
         
         workouts_narrative = ContextService.translate_recent_workouts(recent_workouts)
         
+        # Perfil de atleta
+        profile_summary = AthleteProfileService.get_profile_summary(user_id, db)
+        
         full_context = [
             "Actúa como ATLAS, un Coach de Salud de IA experto.",
             "A continuación tienes los datos REALES del usuario sincronizados desde su Garmin.",
             "Usa esta información para dar consejos personalizados, ajustar su entrenamiento y detectar fatiga.",
+            "",
+            f"--- PERFIL DEL ATLETA ---",
+            profile_summary,
             "",
             biometrics_narrative,
             "",
