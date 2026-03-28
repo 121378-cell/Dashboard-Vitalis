@@ -13,7 +13,7 @@ class ContextService:
     def translate_biometrics(data: dict, readiness: dict) -> str:
         """Translates raw biometric numbers into a narrative for the AI."""
         hr = data.get("heartRate", 0)
-        hrv = data.get("hrv", 0)
+        hrv = data.get("hrv") or 0
         sleep = data.get("sleep", 0)
         steps = data.get("steps", 0)
         stress = data.get("stress", 0)
