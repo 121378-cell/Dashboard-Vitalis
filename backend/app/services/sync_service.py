@@ -29,20 +29,9 @@ class SyncService:
             logger.warning(f"No Garmin credentials for user {user_id}")
             return False
 
-        client, session_updated = get_garmin_client(
-            str(garmin_email), str(garmin_password), 
-            session_data=creds.garmin_session,
-            user_id=str(user_id)
-        )
+        client, _ = get_garmin_client()
         if not client:
             return False
-
-        # ✅ Corregido: Persistir sesión siempre que sea un string JSON válido
-        if session_updated and isinstance(session_updated, str) and session_updated:
-            creds.garmin_session = session_updated
-            creds.last_session_update = datetime.now()
-            db.commit()
-            logger.info("Garmin session persisted to database")
 
         success = True
         for date_str in date_range:
@@ -147,15 +136,9 @@ class SyncService:
         if not (creds and creds.garmin_email):
             return False
 
-        client, session_update = get_garmin_client(
-            creds.garmin_email, creds.garmin_password, session_data=creds.garmin_session
-        )
+        client, _ = get_garmin_client()
         if not client:
             return False
-
-        if session_update and session_update is not True:
-            creds.garmin_session = session_update
-            db.commit()
 
         try:
             # Fetch activities for the date range

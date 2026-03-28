@@ -131,7 +131,7 @@ class AnalyticsService:
         Wrapper que usa el ReadinessEngine consolidado.
         Mantiene compatibilidad con endpoints existentes.
         """
-        from app.core.readiness_engine import ReadinessEngine, AthleteProfile
+        from app.core.readiness_engine import ReadinessEngine
         
         # Obtener datos de hoy
         today_str = date.today().isoformat()
@@ -149,9 +149,8 @@ class AnalyticsService:
             return {"score": 0, "status": "error", "message": "Invalid data format"}
         
         # Crear engine y calcular
-        engine = ReadinessEngine(user_id, db, AthleteProfile.HYBRID)
-        engine.calculate_personal_baseline(days_of_history=90)
-        
+        engine = ReadinessEngine(user_id, db)
+
         input_data = {
             "heart_rate": today_data.get("heartRate", 60),
             "hrv": today_data.get("hrv"),
@@ -175,8 +174,8 @@ class AnalyticsService:
         return {
             "score": int(score),
             "status": status_map.get("high" if score >= 71 else "medium" if score >= 41 else "low", "good"),
-            "hrv_baseline": engine.baseline.hrv_avg if engine.baseline else 55,
-            "rhr_baseline": engine.baseline.hr_resting_avg if engine.baseline else 60,
+            "hrv_baseline": engine.baselines.get("hrv_avg", 55),
+            "rhr_baseline": engine.baselines.get("hr_resting_avg", 60),
             "hrv_today": today_data.get("hrv", 0),
             "rhr_today": today_data.get("heartRate", 0)
         }
