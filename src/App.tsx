@@ -325,6 +325,27 @@ const App: React.FC = () => {
     // Ahora usamos WebSocket en tiempo real via BiometricsWidget
   }, [checkAuthStatus, fetchServiceSettings]);
 
+  // Load user profile on startup
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const response = await axios.get(
+          `${BACKEND_URL}/settings/profile`,
+          { headers: { "x-user-id": "default_user" } }
+        );
+        if (response.data.exists && response.data.name !== "Atleta ATLAS") {
+          setProfile(prev => ({
+            ...prev,
+            name: response.data.name
+          }));
+        }
+      } catch (e) {
+        console.log("Profile not loaded:", e);
+      }
+    };
+    loadProfile();
+  }, []);
+
   // Handle OAuth callback in URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

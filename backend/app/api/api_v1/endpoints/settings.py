@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.models.token import Token
+from app.models.user import User
 from pydantic import BaseModel
 from typing import Optional
 
@@ -35,3 +36,36 @@ def save_services(settings: ServiceSettings, db: Session = Depends(get_db), user
         
     db.commit()
     return {"success": True}
+
+@router.get("/profile")
+def get_profile(db: Session = Depends(get_db), user_id: str = "default_user"):
+    """Devuelve el perfil guardado del usuario."""
+    user = db.query(User).filter(User.id == user_id).first()
+    token = db.query(Token).filter(Token.user_id == user_id).first()
+    
+    if not user:
+        return {"exists": False}
+    
+    return {
+        "exists": True,
+        "user_id": user_id,
+        "name": user.name or "Atleta ATLAS",
+        "garmin_connected": bool(token and token.garmin_email),
+        "garmin_email": token.garmin_email if token else None,
+    }
+
+@router.post("/profile")
+def save_profile(
+    name: str = Body(...),
+    db: Session = Depends(get_db),
+    user_id: str = "default_user"
+):
+    """Guarda el nombre del perfil del usuario."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        user = User(id=user_id, name=name)
+        db.add(user)
+    else:
+        user.name = name
+    db.commit()
+    return {"success": True, "name": name}

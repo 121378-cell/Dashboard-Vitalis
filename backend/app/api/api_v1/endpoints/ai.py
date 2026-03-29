@@ -26,13 +26,16 @@ class ChatRequest(BaseModel):
 @router.post("/chat")
 def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "default_user"):
     """Enhanced coaching chat with real-time context injection and session generation."""
-    
-    # Detectar si el usuario pide un entreno
-    last_message = request.messages[-1].content.lower() if request.messages else ""
-    workout_keywords = ["entreno", "sesión", "workout", "entrena", "ejercicio hoy", 
-                        "hacer ejercicio", "hacer deporte", "gym hoy", "entrenar"]
-    
-    is_workout_request = any(kw in last_message for kw in workout_keywords)
+    try:
+        # Detectar si el usuario pide un entreno
+        last_message = request.messages[-1].content.lower() if request.messages else ""
+        workout_keywords = ["entreno", "sesión", "workout", "entrena", "ejercicio hoy", 
+                            "hacer ejercicio", "hacer deporte", "gym hoy", "entrenar"]
+        
+        is_workout_request = any(kw in last_message for kw in workout_keywords)
+    except Exception as e:
+        logger.error(f"Error detecting workout request: {e}")
+        is_workout_request = False
     
     # Si pide entreno, generar sesión automáticamente
     if is_workout_request:
@@ -99,12 +102,12 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
             coach_context += session_context
     except Exception:
         pass  # No crítico si falla
-    
+
     full_system_prompt = f"{coach_context}\n\n{request.system_prompt or ''}"
-    
+        
     # Convert Pydantic messages to list of dicts for AIService
     messages_list = [{"role": m.role, "content": m.content} for m in request.messages]
-    
+        
     try:
         # Pass the enriched context to the LLM
         result = AIService.chat(messages_list, full_system_prompt)
@@ -113,7 +116,12 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
             "provider": result["provider"]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI Service failed: {e}")
+        return {
+            "content": "Lo siento, el servicio de IA no está disponible en este momento. Por favor, inténtalo de nuevo más tarde.",
+            "provider": "error",
+            "error": str(e)
+        }
 
 @router.post("/generate-plan")
 def generate_plan(

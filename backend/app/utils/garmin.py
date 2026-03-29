@@ -28,9 +28,21 @@ def get_garmin_client(
     """
     Returns a Garmin client using saved tokens (no login required).
     email and password are accepted for compatibility but not used.
+    NEVER attempts login with credentials - only token-based auth.
     """
     if token_dir is None:
         token_dir = ".garth"
+
+    # Check if tokens exist before attempting anything
+    oauth1_path = os.path.join(token_dir, "oauth1_token.json")
+    oauth2_path = os.path.join(token_dir, "oauth2_token.json")
+    
+    if not os.path.exists(oauth1_path) or not os.path.exists(oauth2_path):
+        logger.error(
+            f"Garmin tokens not found in '{token_dir}'. "
+            "Required: oauth1_token.json and oauth2_token.json"
+        )
+        return None, False
 
     try:
         garth.resume(token_dir)
@@ -50,12 +62,6 @@ def get_garmin_client(
         logger.info("Garmin session resumed successfully from tokens")
         return client, False
 
-    except FileNotFoundError:
-        logger.error(
-            f"Garmin tokens not found in '{token_dir}'. "
-            "Copy oauth1_token.json and oauth2_token.json to the .garth directory."
-        )
-        return None, False
     except Exception as e:
-        logger.error(f"Error connecting to Garmin: {e}")
+        logger.error(f"Error resuming Garmin session: {e}")
         return None, False

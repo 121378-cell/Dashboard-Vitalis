@@ -2,10 +2,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.api_v1 import api
+from contextlib import asynccontextmanager
+import logging
+
+logger = logging.getLogger("app.main")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("ATLAS starting up...")
+    try:
+        from app.core.health_check import check_all_services
+        check_all_services()
+    except Exception as e:
+        logger.warning(f"Health check failed during startup: {e}")
+    yield
+    # Shutdown
+    logger.info("ATLAS shutting down...")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 app.add_middleware(

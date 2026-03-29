@@ -99,7 +99,12 @@ class SyncService:
                     )
                     or 0,
                     "steps": safe_get(stats, "totalSteps") or 0,
-                    "calories": safe_get(stats, "totalCalories") or 0,
+                    "calories": (
+                        safe_get(stats, "totalKilocalories") or
+                        safe_get(stats, "activeKilocalories") or  
+                        safe_get(stats, "bmrKilocalories") or
+                        0
+                    ),
                     "respiration": respiration or 0,
                     "vo2max": vo2max or 0,
                     "spo2": safe_get(stats, "averageSpo2") or None,

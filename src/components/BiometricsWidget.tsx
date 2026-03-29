@@ -2,6 +2,14 @@ import React from 'react';
 import { Heart, Activity, Zap, Wind, Footprints, Moon, Flame, AlertCircle, ArrowUp, ArrowDown, Clock, Dumbbell } from 'lucide-react';
 import { Biometrics } from '../types';
 
+// Helper function to safely display values
+function displayValue(value: any, decimals: number = 0, fallback: string = "N/D"): string {
+  if (value === null || value === undefined || value === 0 || isNaN(Number(value))) {
+    return fallback;
+  }
+  return decimals > 0 ? Number(value).toFixed(decimals) : String(Math.round(Number(value)));
+}
+
 interface Props {
   data: Biometrics | null;
   userId?: string;
@@ -102,22 +110,22 @@ export const BiometricsWidget: React.FC<Props> = ({ data, userId = 'default_user
 
       {/* 8 Key Metrics Grid with Trends */}
       <div className="grid grid-cols-2 gap-2">
-        <MetricCard icon={Heart} label="FC Reposo" value={data.heartRate} unit="bpm" color={getMetricColor(data.heartRate, 'heartRate')}>
-          {renderTrend(data.heartRate, data.rhr_baseline, true)}
+        <MetricCard icon={Heart} label="FC Reposo" value={displayValue(data.heartRate, 0, "--")} unit="bpm" color={getMetricColor(Number(data.heartRate) || 0, 'heartRate')}>
+          {renderTrend(Number(data.heartRate) || 0, data.rhr_baseline, true)}
         </MetricCard>
         
-        <MetricCard icon={Activity} label="HRV" value={data.hrv} unit="ms" color={getMetricColor(data.hrv, 'hrv')}>
-          {renderTrend(data.hrv, data.hrv_baseline)}
+        <MetricCard icon={Activity} label="HRV" value={displayValue(data.hrv, 0, "N/D")} unit="ms" color={getMetricColor(Number(data.hrv) || 0, 'hrv')}>
+          {renderTrend(Number(data.hrv) || 0, data.hrv_baseline)}
         </MetricCard>
 
-        <MetricCard icon={Moon} label="Sueño" value={data.sleep} unit="h" color={getMetricColor(data.sleep, 'sleep')} />
-        <MetricCard icon={AlertCircle} label="Estrés" value={data.stress} unit="" color={getMetricColor(data.stress, 'stress')} />
+        <MetricCard icon={Moon} label="Sueño" value={displayValue(data.sleep, 1, "N/D")} unit="h" color={getMetricColor(Number(data.sleep) || 0, 'sleep')} />
+        <MetricCard icon={AlertCircle} label="Estrés" value={displayValue(data.stress, 0, "N/D")} unit="" color={getMetricColor(Number(data.stress) || 0, 'stress')} />
         
-        <MetricCard icon={Zap} label="SpO2" value={data.spo2} unit="%" color={getMetricColor(data.spo2, 'spo2')} />
-        <MetricCard icon={Footprints} label="Pasos" value={data.steps} unit="" color="text-on-surface" />
+        <MetricCard icon={Zap} label="SpO2" value={displayValue(data.spo2, 0, "N/D")} unit="%" color={getMetricColor(Number(data.spo2) || 0, 'spo2')} />
+        <MetricCard icon={Footprints} label="Pasos" value={displayValue(data.steps, 0, "N/D")} unit="" color="text-on-surface" />
         
-        <MetricCard icon={Flame} label="Calorías" value={data.calories} unit="kcal" color="text-on-surface" />
-        <MetricCard icon={Wind} label="Respiración" value={data.respiration} unit="rpm" color="text-on-surface" />
+        <MetricCard icon={Flame} label="Calorías" value={displayValue(data.calories, 0, "N/D")} unit="kcal" color="text-on-surface" />
+        <MetricCard icon={Wind} label="Respiración" value={displayValue(data.respiration, 0, "N/D")} unit="rpm" color="text-on-surface" />
       </div>
     </div>
   );
@@ -126,7 +134,7 @@ export const BiometricsWidget: React.FC<Props> = ({ data, userId = 'default_user
 const MetricCard: React.FC<{ 
   icon: any, 
   label: string, 
-  value: number, 
+  value: string | number, 
   unit: string, 
   color: string,
   children?: React.ReactNode 
