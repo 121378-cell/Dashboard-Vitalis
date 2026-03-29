@@ -58,9 +58,9 @@ function Disable-ServerTS {
 }
 
 function Start-Backend {
-    $backendPath = Join-Path -Path (Get-Location) -ChildPath "app/main.py"
+    $backendPath = Join-Path -Path (Get-Location) -ChildPath "backend/app/main.py"
     if (-not (Test-Path $backendPath)) {
-        Write-Host "[❌] app/main.py no encontrado. Backend FastAPI no se inicia" -ForegroundColor Red
+        Write-Host "[❌] backend/app/main.py no encontrado. Backend FastAPI no se inicia" -ForegroundColor Red
         return
     }
 
@@ -73,7 +73,9 @@ function Start-Backend {
         Write-Host "[INFO] Backend FastAPI reiniciado" -ForegroundColor Cyan
     }
 
-    Start-Process powershell -ArgumentList "uvicorn app.main:app --reload --port 8001" -NoNewWindow
+    # Cambiar al directorio backend y ejecutar uvicorn desde allí
+    $backendDir = Join-Path -Path (Get-Location) -ChildPath "backend"
+    Start-Process powershell -ArgumentList "cd `"$backendDir`"; uvicorn app.main:app --reload --port 8001" -NoNewWindow
     Start-Sleep -Seconds 3
     Write-Host "[✅] Backend FastAPI iniciado en http://localhost:8001" -ForegroundColor Green
 }

@@ -1,13 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Send, Loader2, Zap, Brain, Heart, Target, Dumbbell, History } from 'lucide-react';
-import { Message } from '../types';
+import { Message, SessionPlan } from '../types';
+import { SessionTable } from './SessionTable';
 
 interface Props {
   messages: Message[];
   onSendMessage: (content: string) => void;
   loading: boolean;
   quickActions: { label: string, prompt: string }[];
+}
+
+function extractSessionPlan(content: string): SessionPlan | null {
+  try {
+    // Intentar parsear directamente
+    const parsed = JSON.parse(content);
+    if (parsed.exercises && parsed.session_name) return parsed;
+  } catch {}
+  
+  // Buscar JSON embebido en texto (con bloques markdown code)
+  const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    try {
+      const parsed = JSON.parse(codeBlockMatch[1]);
+      if (parsed.exercises && parsed.session_name) return parsed;
+    } catch {}
+  }
+  
+  // Buscar JSON embebido directamente en texto
+  const jsonMatch = content.match(/\{[\s\S]*"exercises"[\s\S]*"session_name"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.exercises) return parsed;
+    } catch {}
+  }
+  return null;
 }
 
 export const Chat: React.FC<Props> = ({ messages, onSendMessage, loading, quickActions }) => {
@@ -62,24 +90,47 @@ export const Chat: React.FC<Props> = ({ messages, onSendMessage, loading, quickA
           </div>
         )}
         
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-2xl ${
-              m.role === 'user' 
-                ? 'bg-primary text-on-primary rounded-tr-none' 
-                : 'bg-surface-container-high text-on-surface rounded-tl-none border border-outline-variant/10'
-            }`}>
-              <div className="prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{m.content}</ReactMarkdown>
-              </div>
-              {m.provider && (
-                <div className="mt-2 text-[8px] uppercase tracking-widest opacity-50 font-bold">
-                  Respondido por: {m.provider}
+        {messages.map((m, i) => {
+          // Check if message contains a session plan
+          const sessionPlan = m.role === 'assistant' ? extractSessionPlan(m.content) : null;
+          
+          if (sessionPlan) {
+            return (
+              <div key={i} className="flex justify-start w-full">
+                <div className="w-full max-w-[95%]">
+                  <SessionTable 
+                    plan={sessionPlan} 
+                    sessionId={sessionPlan.session_id}
+                  />
+                  {m.provider && (
+                    <div className="mt-2 text-[8px] uppercase tracking-widest opacity-50 font-bold text-on-surface-variant">
+                      Respondido por: {m.provider}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            );
+          }
+          
+          return (
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] p-4 rounded-2xl ${
+                m.role === 'user' 
+                  ? 'bg-primary text-on-primary rounded-tr-none' 
+                  : 'bg-surface-container-high text-on-surface rounded-tl-none border border-outline-variant/10'
+              }`}>
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                </div>
+                {m.provider && (
+                  <div className="mt-2 text-[8px] uppercase tracking-widest opacity-50 font-bold">
+                    Respondido por: {m.provider}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {loading && (
           <div className="flex justify-start">

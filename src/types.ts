@@ -54,3 +54,37 @@ export interface Workout {
   duration: number;
   calories: number;
 }
+
+// Session Plan Types for ATLAS Training
+export interface ExerciseSet {
+  set_number: number;
+  reps: number;
+  weight_kg: number;
+  rpe_target: number;
+  rest_seconds: number;
+  tempo: string;
+  notes: string;
+  // Editable fields by user:
+  actual_reps?: number;
+  actual_weight_kg?: number;
+  actual_rpe?: number;
+  status?: 'completed' | 'partial' | 'failed' | 'pending';
+}
+
+export interface Exercise {
+  name: string;
+  muscle_group: string;
+  sets: ExerciseSet[];
+}
+
+export interface SessionPlan {
+  session_id?: string;
+  session_name: string;
+  date?: string;
+  estimated_duration_min: number;
+  warmup: string;
+  exercises: Exercise[];
+  cooldown: string;
+  coach_notes: string;
+  readiness: number;
+}
