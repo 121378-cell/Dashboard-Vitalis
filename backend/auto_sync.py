@@ -44,6 +44,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from app.db.session import SessionLocal
 from app.services.athlete_profile_service import AthleteProfileService
+from app.services.session_service import SessionService
 
 # ============================================================================
 # CONFIGURACIÓN DE LOGGING
@@ -504,6 +505,87 @@ def run_daily_sync(user_id: str = DEFAULT_USER_ID) -> int:
             db.close()
     except Exception as e:
         logger.error(f"❌ Error actualizando perfil: {e}")
+        stats["errors"] += 1
+    
+    # ============================================================================
+    # INTEGRACIÓN CON SISTEMA DE SESIONES
+    # ============================================================================
+    logger.info("\n" + "=" * 60)
+    logger.info("SISTEMA DE SESIONES — PROCESAMIENTO")
+    logger.info("=" * 60)
+    
+    try:
+        db = SessionLocal()
+        try:
+            # 1. Verificar si debe entrenar hoy
+            should_train = SessionService.should_train_today(user_id, db)
+            logger.info(f"📊 Should train today: {should_train['train']} ({should_train['reason']})")
+            
+            # 2. Si debe entrenar y no hay sesión para hoy → generar una
+            if should_train["train"]:
+                today_str = date.today().isoformat()
+                from app.models.session import TrainingSession
+                existing_today = db.query(TrainingSession).filter(
+                    TrainingSession.user_id == user_id,
+                    TrainingSession.date == today_str
+                ).first()
+                
+                if not existing_today:
+                    logger.info("📝 Generando sesión para hoy...")
+                    plan = SessionService.generate_session_plan(user_id, db, date.today())
+                    
+                    session = TrainingSession(
+                        user_id=user_id,
+                        date=today_str,
+                        status="planned",
+                        generated_by="atlas",
+                        plan_json=json.dumps(plan)
+                    )
+                    db.add(session)
+                    db.commit()
+                    logger.info(f"✅ Sesión generada: {plan['session_name']} ({plan['estimated_duration_min']} min)")
+                else:
+                    logger.info(f"ℹ️ Ya existe sesión para hoy: {existing_today.id[:8]}")
+            
+            # 3. Si hay sesión completada de ayer sin informe → analizarla
+            yesterday_str = (date.today() - timedelta(days=1)).isoformat()
+            from app.models.session import TrainingSession
+            yesterday_session = db.query(TrainingSession).filter(
+                TrainingSession.user_id == user_id,
+                TrainingSession.date == yesterday_str,
+                TrainingSession.status == "completed",
+                TrainingSession.session_report.is_(None)
+            ).first()
+            
+            if yesterday_session:
+                logger.info("🔍 Analizando sesión de ayer...")
+                report = SessionService.analyze_session(yesterday_session.id, db)
+                yesterday_session.session_report = report
+                db.commit()
+                logger.info("✅ Informe de sesión generado")
+            
+            # 4. Si es domingo → generar informe semanal
+            if date.today().weekday() == 6:  # Sunday
+                logger.info("📅 Es domingo — Generando informe semanal...")
+                report_data = SessionService.generate_weekly_report(user_id, db)
+                
+                from app.models.session import WeeklyReport
+                weekly = WeeklyReport(
+                    user_id=user_id,
+                    week_start=report_data["week_start"],
+                    week_end=report_data["week_end"],
+                    report_text=report_data["report_text"],
+                    metrics_json=json.dumps(report_data["metrics"]),
+                    next_week_plan=json.dumps(report_data["next_week_plan"])
+                )
+                db.add(weekly)
+                db.commit()
+                logger.info("✅ Informe semanal generado y guardado")
+            
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"❌ Error en sistema de sesiones: {e}")
         stats["errors"] += 1
     
     # Resumen

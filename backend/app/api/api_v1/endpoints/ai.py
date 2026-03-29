@@ -3,11 +3,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.services.ai_service import AIService
 from app.services.context_service import ContextService
+from app.services.session_service import SessionService
 from app.models.biometrics import Biometrics
+from app.models.session import TrainingSession
 from pydantic import BaseModel
-from datetime import date
+from datetime import date, timedelta
 from typing import List, Optional
 import json
+import re
 
 router = APIRouter()
 ai_service = AIService()
@@ -22,9 +25,81 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "default_user"):
-    """Enhanced coaching chat with real-time context injection."""
+    """Enhanced coaching chat with real-time context injection and session generation."""
+    
+    # Detectar si el usuario pide un entreno
+    last_message = request.messages[-1].content.lower() if request.messages else ""
+    workout_keywords = ["entreno", "sesión", "workout", "entrena", "ejercicio hoy", 
+                        "hacer ejercicio", "hacer deporte", "gym hoy", "entrenar"]
+    
+    is_workout_request = any(kw in last_message for kw in workout_keywords)
+    
+    # Si pide entreno, generar sesión automáticamente
+    if is_workout_request:
+        try:
+            # Verificar si ya hay sesión para hoy
+            today_str = date.today().isoformat()
+            existing_session = db.query(TrainingSession).filter(
+                TrainingSession.user_id == user_id,
+                TrainingSession.date == today_str
+            ).first()
+            
+            if existing_session and existing_session.status in ["planned", "active"]:
+                # Devolver sesión existente
+                plan = json.loads(existing_session.plan_json) if existing_session.plan_json else {}
+                return {
+                    "content": json.dumps(plan),
+                    "provider": "atlas_session",
+                    "session_id": existing_session.id,
+                    "type": "session_plan"
+                }
+            else:
+                # Generar nueva sesión
+                plan = SessionService.generate_session_plan(user_id, db, date.today())
+                
+                # Guardar en BD
+                session = TrainingSession(
+                    user_id=user_id,
+                    date=today_str,
+                    status="planned",
+                    generated_by="atlas",
+                    plan_json=json.dumps(plan)
+                )
+                db.add(session)
+                db.commit()
+                
+                return {
+                    "content": json.dumps(plan),
+                    "provider": "atlas_session",
+                    "session_id": session.id,
+                    "type": "session_plan"
+                }
+        except Exception as e:
+            # Si falla la generación de sesión, continuar con chat normal
+            pass
+    
     # REQ-B25: Inject coach context from ContextService
     coach_context = ContextService.get_full_coach_context(db, user_id)
+    
+    # Añadir sesión planificada al contexto si existe
+    try:
+        today_str = date.today().isoformat()
+        today_session = db.query(TrainingSession).filter(
+            TrainingSession.user_id == user_id,
+            TrainingSession.date == today_str,
+            TrainingSession.status.in_(["planned", "active"])
+        ).first()
+        
+        if today_session and today_session.plan_json:
+            plan = json.loads(today_session.plan_json)
+            session_context = f"\n\n📅 SESIÓN PLANIFICADA PARA HOY ({today_str}):\n"
+            session_context += f"Nombre: {plan.get('session_name', 'N/A')}\n"
+            session_context += f"Duración estimada: {plan.get('estimated_duration_min', 0)} min\n"
+            session_context += f"Ejercicios: {len(plan.get('exercises', []))}\n"
+            coach_context += session_context
+    except Exception:
+        pass  # No crítico si falla
+    
     full_system_prompt = f"{coach_context}\n\n{request.system_prompt or ''}"
     
     # Convert Pydantic messages to list of dicts for AIService
