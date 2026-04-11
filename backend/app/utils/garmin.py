@@ -51,7 +51,7 @@ def get_garmin_client(
         try:
             logger.info("Attempting to resume Garmin session...")
             garth.resume(token_dir)
-            client = Garmin(email or "dummy", password or "dummy")
+            client = Garmin()
             client.garth = garth.client
             
             # Verificar si la sesión sigue siendo válida intentando una operación ligera
@@ -62,6 +62,10 @@ def get_garmin_client(
                 return client, False
             except Exception as e:
                 logger.warning(f"Saved tokens expired or invalid: {e}. Attempting re-login...")
+                # Si tenemos credenciales, intentar login fresco
+                if not (email and password):
+                    logger.error("Session expired and no credentials provided for re-login")
+                    return None, False
         except Exception as e:
             logger.error(f"Error resuming Garmin session: {e}")
 
@@ -72,12 +76,15 @@ def get_garmin_client(
             garth.login(email, password)
             garth.save(token_dir)
             
-            client = Garmin(email, password)
+            client = Garmin()
             client.garth = garth.client
-            client.display_name = garth.client.profile.get("displayName", "Unknown")
+            try:
+                client.display_name = garth.client.profile.get("displayName", "Unknown")
+            except Exception:
+                client.display_name = "Unknown"
             
             logger.info(f"Garmin login successful. Tokens saved to {token_dir}")
-            return client, False
+            return client, True
         except Exception as e:
             logger.error(f"Fresh Garmin login failed: {e}")
             return None, False

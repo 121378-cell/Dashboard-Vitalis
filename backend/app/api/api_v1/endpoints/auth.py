@@ -27,7 +27,7 @@ def garmin_login(
             db.commit()
 
         # Attempt Garmin Login
-        client = get_garmin_client(email, password)
+        client, _ = get_garmin_client(email=email, password=password)
         if not client:
             raise HTTPException(status_code=401, detail="Invalid Garmin credentials")
         
