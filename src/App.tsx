@@ -201,7 +201,7 @@ const App: React.FC = () => {
 
   const fetchWorkouts = async () => {
     try {
-      const res = await axios.get(`${BACKEND_URL}/workouts`, {
+      const res = await axios.get(`${BACKEND_URL}/workouts/`, {
         headers: { "x-user-id": "default_user" }
       });
       setWorkouts(res.data);

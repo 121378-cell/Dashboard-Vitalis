@@ -34,15 +34,22 @@ def get_garmin_client(
         # Usar /data/.garth en Fly.io por defecto para persistencia
         token_dir = os.getenv("GARMIN_TOKEN_DIR", ".garth")
 
+    abs_token_dir = os.path.abspath(token_dir)
+    logger.info(f"Checking Garmin tokens in: {abs_token_dir}")
+
     # Asegurar que el directorio existe
     os.makedirs(token_dir, exist_ok=True)
 
     oauth1_path = os.path.join(token_dir, "oauth1_token.json")
     oauth2_path = os.path.join(token_dir, "oauth2_token.json")
     
+    logger.info(f"OAuth1 file exists: {os.path.exists(oauth1_path)}")
+    logger.info(f"OAuth2 file exists: {os.path.exists(oauth2_path)}")
+
     # Intento de RESUMIR sesión existente
     if os.path.exists(oauth1_path) and os.path.exists(oauth2_path):
         try:
+            logger.info("Attempting to resume Garmin session...")
             garth.resume(token_dir)
             client = Garmin(email or "dummy", password or "dummy")
             client.garth = garth.client
@@ -53,8 +60,8 @@ def get_garmin_client(
                 client.display_name = profile.get("displayName", "Unknown")
                 logger.info("Garmin session resumed successfully from tokens")
                 return client, False
-            except Exception:
-                logger.warning("Saved tokens expired or invalid, attempting re-login...")
+            except Exception as e:
+                logger.warning(f"Saved tokens expired or invalid: {e}. Attempting re-login...")
         except Exception as e:
             logger.error(f"Error resuming Garmin session: {e}")
 

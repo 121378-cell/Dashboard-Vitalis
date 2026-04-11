@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.api_v1 import api
@@ -7,6 +7,7 @@ from app.db.session import engine, Base
 import app.db.base 
 from contextlib import asynccontextmanager
 import logging
+import os
 
 logger = logging.getLogger("app.main")
 
@@ -14,6 +15,7 @@ logger = logging.getLogger("app.main")
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("ATLAS starting up...")
+    logger.info(f"Database URL: {settings.DATABASE_URL}")
     
     # 1. Crear tablas si no existen (Indispensable para nuevos volúmenes en Fly.io)
     try:
@@ -32,6 +34,13 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Middleware para corregir Mixed Content en redirecciones (Detrás de Fly.io)
+@app.middleware("http")
+async def fix_https_redirect(request: Request, call_next):
+    if request.headers.get("x-forwarded-proto") == "https":
+        request.scope["scheme"] = "https"
+    return await call_next(request)
 
 # Configuración de CORS refinada para Producción
 # Incluimos la URL de Vercel y localhost para desarrollo
