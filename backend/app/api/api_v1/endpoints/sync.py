@@ -16,12 +16,18 @@ def sync_garmin(
     """Sync Garmin health and activity data."""
     if days > 7:
         days = 7
-    
+
     date_range = [(date.today() - timedelta(days=i)).isoformat() for i in range(days)]
-    
-    health_success = SyncService.sync_garmin_health(db, user_id, date_range)
-    acts_success = SyncService.sync_garmin_activities(db, user_id, date_range)
-    
+
+    try:
+        health_success = SyncService.sync_garmin_health(db, user_id, date_range)
+        acts_success = SyncService.sync_garmin_activities(db, user_id, date_range)
+    except Exception as e:
+        error_msg = str(e)
+        if "rate limit" in error_msg.lower():
+            raise HTTPException(status_code=429, detail="Garmin rate limit exceeded. Please try again in 30-60 minutes.")
+        raise HTTPException(status_code=500, detail=f"Garmin sync error: {error_msg}")
+
     if not health_success and not acts_success:
         raise HTTPException(status_code=500, detail="Failed to sync Garmin data")
     

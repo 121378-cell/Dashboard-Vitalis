@@ -91,17 +91,22 @@ def get_garmin_client(
             logger.info(f"Attempting fresh Garmin login for {email}...")
             garth.login(email, password)
             garth.save(token_dir)
-            
+
             client = Garmin()
             client.garth = garth.client
             try:
                 client.display_name = garth.client.profile.get("displayName", "Unknown")
             except Exception:
                 client.display_name = "Unknown"
-            
+
             logger.info(f"Garmin login successful. Tokens saved to {token_dir}")
             return client, True
         except Exception as e:
+            error_msg = str(e)
+            # Detectar rate limit (429) de Garmin
+            if "429" in error_msg or "Too Many Requests" in error_msg:
+                logger.error("Garmin rate limit (429) hit. User needs to wait ~30-60 minutes before retrying.")
+                return None, "rate_limited"  # Return special indicator for rate limit
             logger.error(f"Fresh Garmin login failed: {e}")
             return None, False
 

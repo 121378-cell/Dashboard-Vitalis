@@ -29,8 +29,11 @@ class SyncService:
             logger.warning(f"No Garmin credentials for user {user_id}")
             return False
 
-        client, _ = get_garmin_client(email=garmin_email, password=garmin_password)
+        client, login_result = get_garmin_client(email=garmin_email, password=garmin_password)
         if not client:
+            # Check if rate limited
+            if login_result == "rate_limited":
+                raise Exception("Garmin rate limit exceeded. Please try again in 30-60 minutes.")
             return False
 
         success = True
@@ -136,10 +139,13 @@ class SyncService:
         if not (creds and creds.garmin_email):
             return False
 
-        client, _ = get_garmin_client(
+        client, login_result = get_garmin_client(
             email=creds.garmin_email, password=creds.garmin_password
         )
         if not client:
+            # Check if rate limited
+            if login_result == "rate_limited":
+                raise Exception("Garmin rate limit exceeded. Please try again in 30-60 minutes.")
             return False
 
         try:
