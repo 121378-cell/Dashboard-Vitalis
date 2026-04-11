@@ -22,8 +22,34 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing database tables...")
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables initialized successfully.")
+        
+        # 2. Bootstrap de credenciales (Plan B para Fly.io)
+        from app.db.session import SessionLocal
+        from app.models.token import Token
+        from app.models.user import User
+        
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.id == "default_user").first()
+            if not user:
+                logger.info("Creating default_user...")
+                user = User(id="default_user", email="sergi.marquez.al@gmail.com", full_name="Atleta ATLAS")
+                db.add(user)
+                db.commit()
+            
+            token = db.query(Token).filter(Token.user_id == "default_user").first()
+            if not token:
+                logger.info("Bootstrapping Garmin credentials from Environment Variables...")
+                token = Token(
+                    user_id="default_user",
+                    garmin_email=os.getenv("GARMIN_EMAIL"),
+                    garmin_password=os.getenv("GARMIN_PASSWORD")
+                )
+                db.add(token)
+                db.commit()
+                logger.info("Garmin credentials bootstrapped successfully.")
+                
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"Error during bootstrap: {e}")
 
     yield
     # Shutdown
