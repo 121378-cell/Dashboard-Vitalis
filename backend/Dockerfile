@@ -25,6 +25,7 @@ EXPOSE 8080
 # Importante: Esto concuerda con nuestro nuevo os.getenv("DATABASE_URL") en config.py
 ENV DATABASE_URL="sqlite:////data/atlas_v2.db"
 ENV KNOWLEDGE_DB_PATH="/data/knowledge.db"
+ENV GARMIN_TOKEN_DIR="/data/.garth"
 
 # Comando de arranque. 
 # Usamos uvicorn directamente para simplificar o gunicorn con el worker adecuado.

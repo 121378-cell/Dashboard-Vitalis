@@ -42,7 +42,7 @@ def check_all_services() -> Dict[str, Any]:
     # 2. Check Garmin tokens
     try:
         logger.info("Checking Garmin tokens...")
-        token_dir = ".garth"
+        token_dir = os.getenv("GARMIN_TOKEN_DIR", ".garth")
         oauth1_exists = os.path.exists(os.path.join(token_dir, "oauth1_token.json"))
         oauth2_exists = os.path.exists(os.path.join(token_dir, "oauth2_token.json"))
         

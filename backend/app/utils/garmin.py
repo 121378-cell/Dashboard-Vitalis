@@ -26,42 +26,54 @@ def get_garmin_client(
     email: str = None, password: str = None, token_dir: str = None
 ) -> Tuple[Optional[Garmin], bool]:
     """
-    Returns a Garmin client using saved tokens (no login required).
-    email and password are accepted for compatibility but not used.
-    NEVER attempts login with credentials - only token-based auth.
+    Returns a Garmin client. 
+    1. Tries to resume from existing tokens.
+    2. If tokens are missing and credentials are provided, attempts fresh login.
     """
     if token_dir is None:
-        token_dir = ".garth"
+        # Usar /data/.garth en Fly.io por defecto para persistencia
+        token_dir = os.getenv("GARMIN_TOKEN_DIR", ".garth")
 
-    # Check if tokens exist before attempting anything
+    # Asegurar que el directorio existe
+    os.makedirs(token_dir, exist_ok=True)
+
     oauth1_path = os.path.join(token_dir, "oauth1_token.json")
     oauth2_path = os.path.join(token_dir, "oauth2_token.json")
     
-    if not os.path.exists(oauth1_path) or not os.path.exists(oauth2_path):
-        logger.error(
-            f"Garmin tokens not found in '{token_dir}'. "
-            "Required: oauth1_token.json and oauth2_token.json"
-        )
-        return None, False
-
-    try:
-        garth.resume(token_dir)
-        client = Garmin("dummy", "dummy")
-        client.garth = garth.client
-
-        # Set display_name required by some endpoints
+    # Intento de RESUMIR sesión existente
+    if os.path.exists(oauth1_path) and os.path.exists(oauth2_path):
         try:
-            client.display_name = garth.client.profile["displayName"]
-        except (AttributeError, KeyError):
+            garth.resume(token_dir)
+            client = Garmin(email or "dummy", password or "dummy")
+            client.garth = garth.client
+            
+            # Verificar si la sesión sigue siendo válida intentando una operación ligera
             try:
                 profile = client.get_user_profile()
                 client.display_name = profile.get("displayName", "Unknown")
+                logger.info("Garmin session resumed successfully from tokens")
+                return client, False
             except Exception:
-                client.display_name = "Unknown"
+                logger.warning("Saved tokens expired or invalid, attempting re-login...")
+        except Exception as e:
+            logger.error(f"Error resuming Garmin session: {e}")
 
-        logger.info("Garmin session resumed successfully from tokens")
-        return client, False
+    # Intento de LOGIN fresco si tenemos credenciales
+    if email and password:
+        try:
+            logger.info(f"Attempting fresh Garmin login for {email}...")
+            garth.login(email, password)
+            garth.save(token_dir)
+            
+            client = Garmin(email, password)
+            client.garth = garth.client
+            client.display_name = garth.client.profile.get("displayName", "Unknown")
+            
+            logger.info(f"Garmin login successful. Tokens saved to {token_dir}")
+            return client, False
+        except Exception as e:
+            logger.error(f"Fresh Garmin login failed: {e}")
+            return None, False
 
-    except Exception as e:
-        logger.error(f"Error resuming Garmin session: {e}")
-        return None, False
+    logger.error("No valid Garmin session tokens found and no credentials provided.")
+    return None, False
