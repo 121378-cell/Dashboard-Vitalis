@@ -26,5 +26,8 @@ EXPOSE 8080
 ENV DATABASE_URL="sqlite:////data/atlas_v2.db"
 ENV KNOWLEDGE_DB_PATH="/data/knowledge.db"
 
-# Comando de arranque. Asumimos que application.py y app.main:app son válidos.
-CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "application:app", "--bind", "0.0.0.0:8080", "--timeout", "120"]
+# Comando de arranque. 
+# Usamos uvicorn directamente para simplificar o gunicorn con el worker adecuado.
+# Añadimos el directorio actual al PYTHONPATH.
+ENV PYTHONPATH=/app
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8080", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]

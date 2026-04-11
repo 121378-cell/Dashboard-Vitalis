@@ -11,11 +11,12 @@ logger = logging.getLogger("app.main")
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("ATLAS starting up...")
-    try:
-        from app.core.health_check import check_all_services
-        check_all_services()
-    except Exception as e:
-        logger.warning(f"Health check failed during startup: {e}")
+    # Desactivamos el check bloqueante en el arranque para despliegue fluido en Fly.io
+    # try:
+    #     from app.core.health_check import check_all_services
+    #     check_all_services()
+    # except Exception as e:
+    #     logger.warning(f"Health check failed during startup: {e}")
     yield
     # Shutdown
     logger.info("ATLAS shutting down...")
