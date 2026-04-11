@@ -53,7 +53,7 @@ def get_garmin_client(
             garth.resume(token_dir)
             client = Garmin()
             client.garth = garth.client
-            
+
             # Verificar si la sesión sigue siendo válida intentando una operación ligera
             try:
                 profile = client.get_user_profile()
@@ -62,12 +62,28 @@ def get_garmin_client(
                 return client, False
             except Exception as e:
                 logger.warning(f"Saved tokens expired or invalid: {e}. Attempting re-login...")
+                # Limpiar tokens corruptos/inválidos antes de re-login
+                try:
+                    os.remove(oauth1_path)
+                    os.remove(oauth2_path)
+                    logger.info("Removed invalid token files")
+                except Exception as remove_err:
+                    logger.warning(f"Could not remove invalid tokens: {remove_err}")
                 # Si tenemos credenciales, intentar login fresco
                 if not (email and password):
                     logger.error("Session expired and no credentials provided for re-login")
                     return None, False
         except Exception as e:
             logger.error(f"Error resuming Garmin session: {e}")
+            # Limpiar tokens corruptos antes de reintentar
+            try:
+                if os.path.exists(oauth1_path):
+                    os.remove(oauth1_path)
+                if os.path.exists(oauth2_path):
+                    os.remove(oauth2_path)
+                logger.info("Removed corrupt token files after resume failure")
+            except Exception as remove_err:
+                logger.warning(f"Could not remove corrupt tokens: {remove_err}")
 
     # Intento de LOGIN fresco si tenemos credenciales
     if email and password:
