@@ -10,7 +10,7 @@ export interface Biometrics {
   readiness: number;
   status: 'excellent' | 'good' | 'poor' | 'high' | 'medium' | 'low';
   overtraining: boolean;
-  source: 'garmin_api' | 'cache' | 'demo';
+  source: 'garmin_api' | 'garmin' | 'cache' | 'demo' | 'none';
   // Optional fields from backend
   training_status?: string;
   recovery_time?: number;

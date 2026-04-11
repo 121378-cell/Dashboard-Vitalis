@@ -56,8 +56,18 @@ export const BiometricsWidget: React.FC<Props> = ({ data, userId = 'default_user
       {/* REQ-F14: Data source indicator */}
       <div className="flex items-center justify-between text-[10px] uppercase tracking-widest font-bold">
         <span className="text-on-surface-variant">Vitalis Coach Core</span>
-        <span className={data.source === 'garmin_api' ? 'text-green-400' : (data.source === 'cache' ? 'text-blue-400' : 'text-orange-400')}>
-          {data.source === 'garmin_api' ? '🟢 REAL' : (data.source === 'cache' ? '📦 CACHÉ' : '⚙️ DEMO')}
+        <span className={
+          data.source === 'garmin_api' ? 'text-green-400' : 
+          data.source === 'garmin' ? 'text-green-400' : 
+          data.source === 'cache' ? 'text-blue-400' : 
+          data.source === 'none' ? 'text-gray-500' : 
+          'text-orange-400'
+        }>
+          {data.source === 'garmin_api' ? '🟢 REAL' : 
+           data.source === 'garmin' ? '🟢 REAL' : 
+           data.source === 'cache' ? '📦 CACHÉ' : 
+           data.source === 'none' ? '⭕ SIN DATOS' : 
+           '⚙️ DEMO'}
         </span>
       </div>
 

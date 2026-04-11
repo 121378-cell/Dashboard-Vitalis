@@ -29,7 +29,7 @@ class SyncService:
             logger.warning(f"No Garmin credentials for user {user_id}")
             return False
 
-        client, _ = get_garmin_client()
+        client, _ = get_garmin_client(email=garmin_email, password=garmin_password)
         if not client:
             return False
 
@@ -85,29 +85,24 @@ class SyncService:
 
                 # Combine into a single JSON blob for the 'data' field
                 biometric_data = {
-                    "heartRate": safe_get(stats, "restingHeartRate") or 0,
-                    "hrv": hrv_val or None,
-                    "stress": safe_get(stats, "averageStressLevel") or 0,
-                    "sleep": safe_get(
-                        sleep, "dailySleepDTO", "sleepTimeSeconds", default=0
-                    )
-                    / 3600
+                    "heartRate": safe_get(stats, "restingHeartRate"),
+                    "hrv": hrv_val,
+                    "stress": safe_get(stats, "averageStressLevel"),
+                    "sleep": safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds") / 3600
                     if safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds")
-                    else 0,
+                    else None,
                     "sleepScore": safe_get(
                         sleep, "dailySleepDTO", "sleepScores", "overall", "value"
-                    )
-                    or 0,
-                    "steps": safe_get(stats, "totalSteps") or 0,
-                    "calories": (
-                        safe_get(stats, "totalKilocalories") or
-                        safe_get(stats, "activeKilocalories") or  
-                        safe_get(stats, "bmrKilocalories") or
-                        0
                     ),
-                    "respiration": respiration or 0,
-                    "vo2max": vo2max or 0,
-                    "spo2": safe_get(stats, "averageSpo2") or None,
+                    "steps": safe_get(stats, "totalSteps"),
+                    "calories": (
+                        safe_get(stats, "totalKilocalories")
+                        or safe_get(stats, "activeKilocalories")
+                        or safe_get(stats, "bmrKilocalories")
+                    ),
+                    "respiration": respiration,
+                    "vo2max": vo2max,
+                    "spo2": safe_get(stats, "averageSpo2"),
                 }
 
                 # Update or create Biometrics record
@@ -141,7 +136,9 @@ class SyncService:
         if not (creds and creds.garmin_email):
             return False
 
-        client, _ = get_garmin_client()
+        client, _ = get_garmin_client(
+            email=creds.garmin_email, password=creds.garmin_password
+        )
         if not client:
             return False
 
@@ -243,7 +240,13 @@ class SyncService:
                     db.add(workout)
                 workout.name = workout_data.get("comment") or "Wger Workout"
                 workout.description = workout_data.get("description") or ""
-                workout.date = datetime.now()
+                # Use actual workout date from wger API
+                if workout_data.get("creation_date"):
+                    workout.date = datetime.strptime(
+                        workout_data["creation_date"], "%Y-%m-%d"
+                    )
+                else:
+                    workout.date = datetime.now()
             db.commit()
             return True
         except Exception as e:
@@ -252,25 +255,13 @@ class SyncService:
 
     @staticmethod
     def sync_hevy_workouts(db: Session, user_id: str) -> bool:
-        """Mock Hevy sync."""
+        """Hevy sync - Not implemented yet."""
         creds = db.query(Token).filter(Token.user_id == user_id).first()
         if not creds or not creds.hevy_username:
             return False
-        try:
-            external_id = f"hevy_mock_{random.randint(1000, 9999)}"
-            workout = Workout(
-                user_id=user_id,
-                source="hevy",
-                external_id=external_id,
-                name="Hevy Strength Session (Mock)",
-                description="Push/Pull/Legs",
-                date=datetime.now(),
-                duration=3600,
-                calories=450,
-            )
-            db.add(workout)
-            db.commit()
-            return True
-        except Exception as e:
-            logger.error(f"Hevy mock sync failed: {e}")
-            return False
+
+        logger.warning(
+            "Hevy integration is not implemented yet. No real data will be synced."
+        )
+        # Return False to indicate no data was synced
+        return False
