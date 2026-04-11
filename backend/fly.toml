@@ -1,0 +1,36 @@
+# fly.toml - Configuración de Fly.io para el Backend de Atlas Vitalis
+app = "atlas-vitalis-backend"
+primary_region = "mad"  # Datacenter en Madrid, España
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  PYTHONUNBUFFERED = "1"
+
+# Variables secretas (como API Keys) deben configurarse con:
+# fly secrets set GEMINI_API_KEY="tu-clave" GROQ_API_KEY="tu-clave"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true    # Ahorra créditos cuando no hay tráfico
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+# Volumen persistente para guardar la base de datos y tokens de Garmin
+# Este volumen NUNCA se borra aunque la instancia se detenga o reinicie
+[[mounts]]
+  source = "atlas_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
