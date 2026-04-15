@@ -154,8 +154,12 @@ const App: React.FC = () => {
             headers: { 'x-user-id': 'default_user' }
           });
           results.push("Garmin ✅");
-        } catch (e) {
-          results.push("Garmin ❌");
+        } catch (e: any) {
+          const isRateLimit = e.response?.status === 429;
+          results.push(isRateLimit ? "Garmin (Bloqueo Temporal) ⏳" : "Garmin ❌");
+          if (isRateLimit) {
+            alert("Garmin ha bloqueado las solicitudes temporalmente (Rate Limit). Por favor, espera 30-60 minutos antes de intentar sincronizar de nuevo.");
+          }
         }
       }
       

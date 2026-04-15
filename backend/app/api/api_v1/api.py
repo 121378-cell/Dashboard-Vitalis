@@ -1,9 +1,10 @@
 from fastapi import APIRouter
-from app.api.api_v1.endpoints import auth, workouts, biometrics, ai, sync, settings, readiness, readiness_ws, sessions
+from app.api.api_v1.endpoints import auth, workouts, biometrics, ai, sync, settings, readiness, readiness_ws, sessions, strava
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(strava.router, prefix="/strava", tags=["strava"])
 api_router.include_router(workouts.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(biometrics.router, prefix="/biometrics", tags=["biometrics"])
 api_router.include_router(readiness.router, prefix="/readiness", tags=["readiness"])

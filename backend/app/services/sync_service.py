@@ -2,7 +2,9 @@ import requests
 import json
 import logging
 import random
+import time
 from datetime import datetime, date, timedelta
+from typing import Optional, Any
 from sqlalchemy.orm import Session
 from app.models.workout import Workout
 from app.models.token import Token
@@ -14,37 +16,42 @@ logger = logging.getLogger("app.services.sync_service")
 
 class SyncService:
     @staticmethod
-    def sync_garmin_health(db: Session, user_id: str, date_range: list) -> bool:
+    def sync_garmin_health(db: Session, user_id: str, date_range: list, client: Optional[Any] = None) -> bool:
         """Fetch Garmin health stats and save to Biometrics table."""
-        creds = db.query(Token).filter(Token.user_id == user_id).first()
-        if not creds:
-            logger.warning(f"No credentials found for user {user_id}")
-            return False
-
-        # Verificamos que existan las credenciales de Garmin
-        garmin_email = creds.garmin_email
-        garmin_password = creds.garmin_password
-
-        if not garmin_email or not garmin_password:
-            logger.warning(f"No Garmin credentials for user {user_id}")
-            return False
-
-        client, login_result = get_garmin_client(email=garmin_email, password=garmin_password)
         if not client:
-            # Check if rate limited
-            if login_result == "rate_limited":
-                raise Exception("Garmin rate limit exceeded. Please try again in 30-60 minutes.")
-            return False
+            creds = db.query(Token).filter(Token.user_id == user_id).first()
+            if not creds or not creds.garmin_email or not creds.garmin_password:
+                logger.warning(f"No Garmin credentials for user {user_id}")
+                return False
+
+            client, login_result = get_garmin_client(
+                email=creds.garmin_email, 
+                password=creds.garmin_password,
+                db=db,
+                user_id=user_id
+            )
+            if not client:
+                if login_result == "rate_limited":
+                    raise Exception(
+                        "Garmin ha bloqueado la sincronizacion automatica (rate limit persistente). "
+                        "Soluciones: 1) Exporta manualmente desde https://connect.garmin.com/modern/export "
+                        "2) Espera 48-72h sin intentar login 3) Usa Strava como intermediario"
+                    )
+                return False
 
         success = True
         for date_str in date_range:
             try:
                 # Fetch various stats with fallbacks similar to AI_Fitness
+                # Add delays to avoid rate limiting (429)
                 stats = client.get_stats(date_str)
+                time.sleep(1.5)  # Delay entre llamadas
                 sleep = client.get_sleep_data(date_str)
+                time.sleep(1.5)
                 hrv = client.get_hrv_data(date_str)
+                time.sleep(1.5)
 
-                # Recovery and Training Status (often in training status endpoint)
+                # Recovery and Training Status
                 training_status_data = client.get_training_status(date_str)
                 recovery_time = safe_get(
                     training_status_data,
@@ -61,22 +68,26 @@ class SyncService:
                 # Respiration fallback
                 respiration = safe_get(stats, "averageRespirationValue")
                 if not respiration:
-                    resp_data = client.get_respiration_data(date_str)
-                    respiration = safe_get(
-                        resp_data, "avgWakingRespirationValue"
-                    ) or safe_get(resp_data, "avgSleepRespirationValue")
+                    try:
+                        resp_data = client.get_respiration_data(date_str)
+                        respiration = safe_get(
+                            resp_data, "avgWakingRespirationValue"
+                        ) or safe_get(resp_data, "avgSleepRespirationValue")
+                    except: respiration = None
 
                 # VO2 Max fallback
                 vo2max = safe_get(stats, "vo2Max")
                 if not vo2max:
-                    max_metrics = client.get_max_metrics(date_str)
-                    for metric in max_metrics or []:
-                        vo2max_precise = safe_get(
-                            metric, "generic", "vo2MaxPreciseValue"
-                        )
-                        if vo2max_precise:
-                            vo2max = vo2max_precise
-                            break
+                    try:
+                        max_metrics = client.get_max_metrics(date_str)
+                        for metric in max_metrics or []:
+                            vo2max_precise = safe_get(
+                                metric, "generic", "vo2MaxPreciseValue"
+                            )
+                            if vo2max_precise:
+                                vo2max = vo2max_precise
+                                break
+                    except: vo2max = None
 
                 # HRV fallback
                 hrv_val = (
@@ -86,7 +97,6 @@ class SyncService:
                 )
                 hrv_status = safe_get(hrv, "hrvSummary", "status")
 
-                # Combine into a single JSON blob for the 'data' field
                 biometric_data = {
                     "heartRate": safe_get(stats, "restingHeartRate"),
                     "hrv": hrv_val,
@@ -108,7 +118,6 @@ class SyncService:
                     "spo2": safe_get(stats, "averageSpo2"),
                 }
 
-                # Update or create Biometrics record
                 biometric = (
                     db.query(Biometrics)
                     .filter(Biometrics.user_id == user_id, Biometrics.date == date_str)
@@ -133,24 +142,29 @@ class SyncService:
         return success
 
     @staticmethod
-    def sync_garmin_activities(db: Session, user_id: str, date_range: list) -> bool:
-        """Fetch Garmin activities and save to Workouts table with detailed metrics."""
-        creds = db.query(Token).filter(Token.user_id == user_id).first()
-        if not (creds and creds.garmin_email):
-            return False
-
-        client, login_result = get_garmin_client(
-            email=creds.garmin_email, password=creds.garmin_password
-        )
+    def sync_garmin_activities(db: Session, user_id: str, date_range: list, client: Optional[Any] = None) -> bool:
+        """Fetch Garmin activities and save to Workouts table."""
         if not client:
-            # Check if rate limited
-            if login_result == "rate_limited":
-                raise Exception("Garmin rate limit exceeded. Please try again in 30-60 minutes.")
-            return False
+            creds = db.query(Token).filter(Token.user_id == user_id).first()
+            if not (creds and creds.garmin_email):
+                return False
+
+            client, login_result = get_garmin_client(
+                email=creds.garmin_email, 
+                password=creds.garmin_password,
+                db=db,
+                user_id=user_id
+            )
+            if not client:
+                if login_result == "rate_limited":
+                    raise Exception(
+                        "Garmin ha bloqueado la sincronizacion automatica (rate limit persistente). "
+                        "Soluciones: 1) Exporta manualmente desde https://connect.garmin.com/modern/export "
+                        "2) Espera 48-72h sin intentar login 3) Usa Strava como intermediario"
+                    )
+                return False
 
         try:
-            # Fetch activities for the date range
-            # Garmin API can fetch by date range, which is more efficient
             start_date = min(date_range)
             end_date = max(date_range)
             activities = client.get_activities_by_date(start_date, end_date)
@@ -178,18 +192,15 @@ class SyncService:
                     )
                     db.add(workout)
 
-                # Extract detailed metrics like AI_Fitness
                 metrics = {
                     "distance": safe_get(act, "distance"),
                     "avgSpeed": safe_get(act, "averageSpeed"),
                     "maxSpeed": safe_get(act, "maxSpeed"),
                     "avgHR": safe_get(act, "averageHR"),
                     "maxHR": safe_get(act, "maxHR"),
-                    "avgPower": safe_get(act, "avgPower")
-                    or safe_get(act, "averagePower"),
+                    "avgPower": safe_get(act, "avgPower") or safe_get(act, "averagePower"),
                     "maxPower": safe_get(act, "maxPower"),
-                    "avgCadence": safe_get(act, "averageCadence")
-                    or safe_get(act, "avgCadence"),
+                    "avgCadence": safe_get(act, "averageCadence") or safe_get(act, "avgCadence"),
                     "hrZones": {
                         "z1": safe_get(act, "hrTimeInZone_1"),
                         "z2": safe_get(act, "hrTimeInZone_2"),
@@ -202,7 +213,6 @@ class SyncService:
                 }
 
                 workout.name = act.get("activityName") or "Garmin Activity"
-                # Store detailed metrics in description as JSON for extensibility
                 workout.description = json.dumps(metrics)
                 workout.date = datetime.strptime(act_date_time, "%Y-%m-%d %H:%M:%S")
                 workout.duration = int(act.get("duration") or 0)
@@ -246,7 +256,6 @@ class SyncService:
                     db.add(workout)
                 workout.name = workout_data.get("comment") or "Wger Workout"
                 workout.description = workout_data.get("description") or ""
-                # Use actual workout date from wger API
                 if workout_data.get("creation_date"):
                     workout.date = datetime.strptime(
                         workout_data["creation_date"], "%Y-%m-%d"
@@ -265,9 +274,5 @@ class SyncService:
         creds = db.query(Token).filter(Token.user_id == user_id).first()
         if not creds or not creds.hevy_username:
             return False
-
-        logger.warning(
-            "Hevy integration is not implemented yet. No real data will be synced."
-        )
-        # Return False to indicate no data was synced
+        logger.warning("Hevy integration is not implemented yet.")
         return False

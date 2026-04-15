@@ -126,6 +126,25 @@ class AnalyticsService:
         }
 
     @staticmethod
+    def get_biometrics_for_range(db: Session, user_id: str, start_date: str, end_date: str) -> list:
+        """Fetch biometrics data for a specific date range."""
+        bios = db.query(Biometrics).filter(
+            Biometrics.user_id == user_id,
+            Biometrics.date >= start_date,
+            Biometrics.date <= end_date
+        ).order_by(Biometrics.date).all()
+        
+        result = []
+        for bio in bios:
+            try:
+                data = json.loads(bio.data)
+                data['date'] = bio.date
+                result.append(data)
+            except:
+                continue
+        return result
+
+    @staticmethod
     def get_readiness_score(db: Session, user_id: str) -> dict:
         """
         Wrapper que usa el ReadinessEngine consolidado.

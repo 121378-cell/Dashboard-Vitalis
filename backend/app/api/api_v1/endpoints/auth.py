@@ -27,9 +27,9 @@ def garmin_login(
             db.commit()
 
         # Attempt Garmin Login
-        client, _ = get_garmin_client(email=email, password=password)
+        client, _ = get_garmin_client(email=email, password=password, db=db, user_id=user_id)
         if not client:
-            raise HTTPException(status_code=401, detail="Invalid Garmin credentials")
+            raise HTTPException(status_code=401, detail="Invalid Garmin credentials or rate limit exceeded")
         
         # Store or Update tokens
         token_entry = db.query(Token).filter(Token.user_id == user_id).first()
@@ -39,8 +39,6 @@ def garmin_login(
         
         token_entry.garmin_email = email
         token_entry.garmin_password = password
-        # Simplified: storing a placeholder for session as garth handles it on disk
-        token_entry.garmin_session = "garth_managed" 
         
         db.commit()
         return {"success": True}

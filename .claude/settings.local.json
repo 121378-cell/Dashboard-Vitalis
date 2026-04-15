@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(fly deploy:*)",
+      "Bash(fly status:*)",
+      "Bash(fly logs:*)",
+      "Bash(fly ssh:*)",
+      "Bash(pip show:*)",
+      "Bash(python generate_garmin_tokens.py)",
+      "Bash(python upload_tokens_to_fly.py)"
+    ]
+  }
+}

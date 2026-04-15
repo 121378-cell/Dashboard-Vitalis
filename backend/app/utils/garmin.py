@@ -1,10 +1,44 @@
 import garth
 from garminconnect import Garmin
 from typing import Any, Optional, Tuple
+from sqlalchemy.orm import Session
 import os
 import logging
+import json
+import time
+import re
+from app.utils.garmin_exceptions import (
+    GarminRateLimitError,
+    GarminSessionError,
+    GarminAuthError,
+)
 
 logger = logging.getLogger("app.utils.garmin")
+
+# Rate limiting del lado del cliente
+MIN_LOGIN_INTERVAL = 300  # 5 minutos entre logins
+_last_login_attempt = 0
+
+
+def _parse_retry_after(error_msg: str) -> int:
+    """Extrae tiempo de espera del mensaje de error 429."""
+    patterns = [
+        r"retry after (\d+) seconds?",
+        r"Retry-After[:\s]*(\d+)",
+        r"try again in (\d+) seconds?",
+        r"wait (\d+) seconds?",
+        r"(\d+)\s*seconds?",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, error_msg, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return 1800  # Default: 30 minutos
+
+
+def _is_rate_limit_error(error_msg: str) -> bool:
+    """Detecta error 429 en mensaje de error."""
+    return any(x in error_msg for x in ["429", "Too Many Requests", "rate limit", "Rate limit"])
 
 
 def safe_get(data: Any, *keys: str, default: Any = None) -> Any:
@@ -23,92 +57,141 @@ def safe_get(data: Any, *keys: str, default: Any = None) -> Any:
 
 
 def get_garmin_client(
-    email: str = None, password: str = None, token_dir: str = None
-) -> Tuple[Optional[Garmin], bool]:
+    email: str = None,
+    password: str = None,
+    token_dir: str = None,
+    db: Optional[Session] = None,
+    user_id: str = "default_user",
+) -> Tuple[Optional[Garmin], Any]:
     """
-    Returns a Garmin client. 
-    1. Tries to resume from existing tokens.
-    2. If tokens are missing and credentials are provided, attempts fresh login.
+    Returns a Garmin client.
+    Priority: DB session -> Disk tokens -> Fresh login (with rate limiting)
     """
+    global _last_login_attempt
+    
     if token_dir is None:
-        # Usar /data/.garth en Fly.io por defecto para persistencia
         token_dir = os.getenv("GARMIN_TOKEN_DIR", ".garth")
 
     abs_token_dir = os.path.abspath(token_dir)
-    logger.info(f"Checking Garmin tokens in: {abs_token_dir}")
+    logger.info(f"Using Garmin token directory: {abs_token_dir}")
 
-    # Asegurar que el directorio existe
-    os.makedirs(token_dir, exist_ok=True)
+    # Crear directorio con fallback Windows-compatible
+    try:
+        os.makedirs(token_dir, exist_ok=True)
+        test_file = os.path.join(token_dir, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+    except Exception as e:
+        logger.error(f"Token directory not writable: {e}")
+        if os.name == 'nt':
+            fallback_dir = os.path.join(os.environ.get('TEMP', 'C:\\temp'), '.garth')
+        else:
+            fallback_dir = "/tmp/.garth"
+        
+        if token_dir != fallback_dir:
+            logger.info(f"Falling back to {fallback_dir}")
+            token_dir = fallback_dir
+            os.makedirs(token_dir, exist_ok=True)
 
     oauth1_path = os.path.join(token_dir, "oauth1_token.json")
     oauth2_path = os.path.join(token_dir, "oauth2_token.json")
-    
-    logger.info(f"OAuth1 file exists: {os.path.exists(oauth1_path)}")
-    logger.info(f"OAuth2 file exists: {os.path.exists(oauth2_path)}")
 
-    # Intento de RESUMIR sesión existente
+    # 1. Restaurar desde DB si disponible
+    if db and user_id:
+        from app.models.token import Token
+        token_record = db.query(Token).filter(Token.user_id == user_id).first()
+        if token_record and token_record.garmin_session and len(token_record.garmin_session) > 50:
+            try:
+                logger.info("Restoring session from Database...")
+                session_data = json.loads(token_record.garmin_session)
+                with open(oauth1_path, "w") as f:
+                    json.dump(session_data.get("oauth1"), f)
+                with open(oauth2_path, "w") as f:
+                    json.dump(session_data.get("oauth2"), f)
+                logger.info("Tokens restored from DB to disk.")
+            except Exception as e:
+                logger.warning(f"Failed to restore from DB: {e}")
+
+    # 2. Resumir sesión existente (SIN VERIFICACIÓN HTTP)
     if os.path.exists(oauth1_path) and os.path.exists(oauth2_path):
         try:
-            logger.info("Attempting to resume Garmin session...")
+            logger.info("Resuming session from disk...")
             garth.resume(token_dir)
             client = Garmin()
             client.garth = garth.client
-
-            # Verificar si la sesión sigue siendo válida intentando una operación ligera
-            try:
-                profile = client.get_user_profile()
-                client.display_name = profile.get("displayName", "Unknown")
-                logger.info("Garmin session resumed successfully from tokens")
-                return client, False
-            except Exception as e:
-                logger.warning(f"Saved tokens expired or invalid: {e}. Attempting re-login...")
-                # Limpiar tokens corruptos/inválidos antes de re-login
+            
+            # Verificación local sin HTTP request
+            if garth.client.oauth1_token and garth.client.oauth2_token:
                 try:
-                    os.remove(oauth1_path)
-                    os.remove(oauth2_path)
-                    logger.info("Removed invalid token files")
-                except Exception as remove_err:
-                    logger.warning(f"Could not remove invalid tokens: {remove_err}")
-                # Si tenemos credenciales, intentar login fresco
-                if not (email and password):
-                    logger.error("Session expired and no credentials provided for re-login")
-                    return None, False
-        except Exception as e:
-            logger.error(f"Error resuming Garmin session: {e}")
-            # Limpiar tokens corruptos antes de reintentar
-            try:
-                if os.path.exists(oauth1_path):
-                    os.remove(oauth1_path)
-                if os.path.exists(oauth2_path):
-                    os.remove(oauth2_path)
-                logger.info("Removed corrupt token files after resume failure")
-            except Exception as remove_err:
-                logger.warning(f"Could not remove corrupt tokens: {remove_err}")
-
-    # Intento de LOGIN fresco si tenemos credenciales
-    if email and password:
-        try:
-            logger.info(f"Attempting fresh Garmin login for {email}...")
-            garth.login(email, password)
-            garth.save(token_dir)
-
-            client = Garmin()
-            client.garth = garth.client
-            try:
-                client.display_name = garth.client.profile.get("displayName", "Unknown")
-            except Exception:
-                client.display_name = "Unknown"
-
-            logger.info(f"Garmin login successful. Tokens saved to {token_dir}")
-            return client, True
+                    client.display_name = garth.client.profile.get("displayName", "Unknown")
+                except:
+                    client.display_name = "Unknown"
+                
+                logger.info(f"Session resumed: {client.display_name}")
+                return client, False
+            else:
+                raise GarminSessionError("Invalid tokens")
+                
         except Exception as e:
             error_msg = str(e)
-            # Detectar rate limit (429) de Garmin
-            if "429" in error_msg or "Too Many Requests" in error_msg:
-                logger.error("Garmin rate limit (429) hit. User needs to wait ~30-60 minutes before retrying.")
-                return None, "rate_limited"  # Return special indicator for rate limit
-            logger.error(f"Fresh Garmin login failed: {e}")
-            return None, False
+            if _is_rate_limit_error(error_msg):
+                retry_after = _parse_retry_after(error_msg)
+                raise GarminRateLimitError(f"Rate limit. Wait {retry_after//60} min.")
+            
+            logger.warning(f"Session invalid: {e}. Clearing tokens.")
+            for path in [oauth1_path, oauth2_path]:
+                if os.path.exists(path):
+                    os.remove(path)
 
-    logger.error("No valid Garmin session tokens found and no credentials provided.")
-    return None, False
+    # 3. Fresh login con rate limiting del lado del cliente
+    if email and password:
+        time_since_last = time.time() - _last_login_attempt
+        if time_since_last < MIN_LOGIN_INTERVAL:
+            wait = MIN_LOGIN_INTERVAL - time_since_last
+            logger.info(f"Self rate-limit: waiting {wait:.0f}s...")
+            time.sleep(wait)
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    wait_time = (5 ** attempt)  # 5, 25, 125s
+                    logger.info(f"Retry {attempt + 1}/{max_retries}, waiting {wait_time}s...")
+                    time.sleep(wait_time)
+
+                logger.info(f"Login attempt {attempt + 1}/{max_retries} for {email}...")
+                _last_login_attempt = time.time()
+                
+                garth.login(email, password)
+                garth.save(token_dir)
+
+                client = Garmin()
+                client.garth = garth.client
+                try:
+                    client.display_name = garth.client.profile.get("displayName", "Unknown")
+                except:
+                    client.display_name = "Unknown"
+
+                logger.info(f"Login successful: {client.display_name}")
+                return client, True
+                
+            except Exception as e:
+                error_msg = str(e)
+                
+                if _is_rate_limit_error(error_msg):
+                    retry_after = _parse_retry_after(error_msg)
+                    
+                    if attempt == max_retries - 1:
+                        raise GarminRateLimitError(
+                            f"Rate limit persists. Wait {retry_after//60} min."
+                        )
+                    
+                    wait_time = max(5 ** attempt, min(retry_after, 300))
+                    logger.warning(f"429 detected. Waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                
+                raise GarminAuthError(f"Login failed: {e}")
+
+    raise GarminAuthError("No session tokens and no credentials available.")

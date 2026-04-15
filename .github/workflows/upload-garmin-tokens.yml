@@ -1,0 +1,47 @@
+name: Upload Garmin Tokens to Fly.io
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+        
+      - name: Wake up Fly.io app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          # Wake up the app by making a request
+          curl -s https://atlas-vitalis-backend.fly.dev/health || true
+          sleep 10
+          
+      - name: Create token directory
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          fly ssh console --app atlas-vitalis-backend --command "mkdir -p /data/.garth"
+          
+      - name: Upload OAuth1 token
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+        run: |
+          echo "$OAUTH1_TOKEN" | fly ssh console --app atlas-vitalis-backend --command "cat > /data/.garth/oauth1_token.json"
+          
+      - name: Upload OAuth2 token
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: |
+          echo "$OAUTH2_TOKEN" | fly ssh console --app atlas-vitalis-backend --command "cat > /data/.garth/oauth2_token.json"
+          
+      - name: Verify tokens
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          fly ssh console --app atlas-vitalis-backend --command "ls -la /data/.garth/"
