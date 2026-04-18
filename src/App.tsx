@@ -24,6 +24,7 @@ import { Chat } from './components/Chat';
 import { PDFManager } from './components/PDFManager';
 import { Setup } from './components/Setup';
 import { HealthConnectOnboarding } from './components/HealthConnectOnboarding';
+import { ExerciseSelector } from './components/ExerciseSelector';
 
 // Services & Types
 import { callAI } from './services/aiService';
@@ -41,7 +42,7 @@ const App: React.FC = () => {
   const [showHealthOnboarding, setShowHealthOnboarding] = useState(false);
 
   // --- UI State ---
-  const [activeTab, setActiveTab] = useState<'chat' | 'profile' | 'docs' | 'setup'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'profile' | 'docs' | 'setup' | 'routine'>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isGarminConnected, setIsGarminConnected] = useState(false);
   const [biometrics, setBiometrics] = useState<Biometrics | null>(null);
@@ -551,6 +552,7 @@ const App: React.FC = () => {
               {[
                 { id: 'chat', label: 'Chat', icon: MessageSquare },
                 { id: 'profile', label: 'Perfil', icon: User },
+                { id: 'routine', label: 'Entrenar', icon: Zap },
                 { id: 'docs', label: 'Documentos', icon: FileText },
                 { id: 'setup', label: 'Setup', icon: Settings },
               ].map((tab) => (
@@ -598,6 +600,9 @@ const App: React.FC = () => {
                   loading={loadingAI}
                   quickActions={quickActions}
                 />
+              )}
+              {activeTab === 'routine' && (
+                <ExerciseSelector />
               )}
               {activeTab === 'profile' && (
                 <ProfileForm 

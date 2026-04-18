@@ -125,6 +125,26 @@ export const SessionTable: React.FC<SessionTableProps> = ({
       }
 
       const analysisData = await analyzeResponse.json();
+
+      // ----------------------------------------------------
+      // Integración con Health Connect & Offline Logger
+      // ----------------------------------------------------
+      try {
+        const { workoutLogger } = await import('../services/workoutLogger');
+        // Estimamos la hora de inicio basándonos en la duración
+        const durationMin = plan.estimated_duration_min || 45;
+        const startedAt = new Date(Date.now() - durationMin * 60000);
+        
+        await workoutLogger.onWorkoutComplete({
+          sessionName: plan.session_name,
+          startedAt: startedAt,
+          completedAt: new Date(),
+          sessionType: 'Strength', // Por defecto para las tablas de musculación de ATLAS
+          totalCalories: durationMin * 7.5 // Estimación dinámica de calorías quemadas
+        });
+      } catch (logErr) {
+        console.warn('Error en el flujo paralelo de Workout Logger', logErr);
+      }
       
       // Call the onAnalyze callback with the analysis result
       if (onAnalyze) {
