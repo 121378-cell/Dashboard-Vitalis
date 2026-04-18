@@ -250,59 +250,80 @@ const App: React.FC = () => {
   // --- Biometrics Sync mejorado — prioriza HC sobre Backend (Fase 1/2) ---
   const loadBiometrics = async (forceHC: boolean = false) => {
     setLoadingBiometrics(true);
+    console.log('[App] Iniciando carga de biométricos (forceHC:', forceHC, ')');
+    
     try {
-      // 1. Prioridad: HC nativo
-      // forceHC bypasea isHCAvailable (stale closure fix) y va directo al plugin
-      const shouldTryHC = forceHC || isHCAvailable;
-      if (shouldTryHC) {
-        console.log('[App] Intentando leer desde Health Connect...');
+      // 1. Prioridad: Health Connect
+      if (forceHC || isHCAvailable) {
         try {
           const hcData = await healthConnectService.readTodayBiometrics();
-          const steps = hcData.steps ?? 0;
-          const sleep = hcData.sleepHours ?? 0;
-          const hr = hcData.heartRate ?? 0;
-          const readiness = calculateReadiness(steps, sleep, hr);
-          const mappedBiometrics: Biometrics = {
-            heartRate: hr,
-            hrv: hcData.hrv ?? 0,
-            spo2: hcData.spo2 ?? 98,
-            stress: 0,
-            steps,
-            sleep,
-            calories: hcData.calories ?? 0,
-            respiration: 0,
-            readiness,
-            status: readiness >= 80 ? 'excellent' : readiness >= 60 ? 'good' : 'poor',
-            overtraining: readiness < 40,
-            source: 'garmin'
-          };
-          setBiometrics(mappedBiometrics);
-          syncService.syncBiometricsToBackend(mappedBiometrics).catch(() => {});
-          return;
+          console.log('[App] HC Raw Data:', hcData);
+          
+          if (hcData.steps !== null || hcData.calories !== null) {
+            const steps = hcData.steps ?? 0;
+            const sleep = hcData.sleepHours ?? 0;
+            const hr = hcData.heartRate ?? 0;
+            const readiness = calculateReadiness(steps, sleep, hr);
+            
+            const mapped: Biometrics = {
+              heartRate: hr,
+              hrv: hcData.hrv ?? 0,
+              spo2: hcData.spo2 ?? 98,
+              stress: hcData.stress ?? 0,
+              steps,
+              sleep,
+              calories: hcData.calories ?? 0,
+              respiration: hcData.respiration ?? 0,
+              readiness,
+              status: readiness >= 80 ? 'excellent' : readiness >= 60 ? 'good' : 'poor',
+              overtraining: readiness < 40,
+              source: 'garmin'
+            };
+            setBiometrics(prev => {
+              if (!prev) return mapped;
+              return {
+                ...mapped,
+                // Si la nueva lectura es 0 pero ya teníamos un dato positivo, conservamos el antiguo
+                steps: mapped.steps > 0 ? mapped.steps : prev.steps,
+                sleep: mapped.sleep > 0 ? mapped.sleep : prev.sleep,
+                calories: mapped.calories > 0 ? mapped.calories : prev.calories,
+                heartRate: mapped.heartRate > 0 ? mapped.heartRate : prev.heartRate,
+                hrv: mapped.hrv > 0 ? mapped.hrv : prev.hrv,
+                respiration: mapped.respiration > 0 ? mapped.respiration : prev.respiration,
+                stress: mapped.stress > 0 ? mapped.stress : prev.stress,
+              };
+            });
+            syncService.syncBiometricsToBackend(mapped).catch(() => {});
+            setLoadingBiometrics(false);
+            return;
+          }
         } catch (hcErr) {
-          console.warn('[App] HC read falló:', hcErr);
+          console.warn('[App] Error leyendo HC:', hcErr);
         }
       }
 
-      // 2. Fallback: Servidor Backend (PC / Web Browser)
+      // 2. Fallback: Backend
       try {
         const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
-          headers: { "x-user-id": "default_user" }
+          headers: { "x-user-id": "default_user" },
+          timeout: 3000
         });
-        setBiometrics(res.data);
-        return;
+        if (res.data && res.data.steps > 0) {
+          setBiometrics(res.data);
+          setLoadingBiometrics(false);
+          return;
+        }
       } catch {
-        console.warn('[App] Backend no disponible.');
+        console.warn('[App] Backend no disponible o vacío');
       }
 
-      // 3. Safety net: datos demo para que el widget nunca quede vacío
-      const demo: Biometrics = {
+      // 3. Mantener Demo solo si no hay nada más
+      setBiometrics(prev => prev || {
         heartRate: 68, hrv: 45, spo2: 98, stress: 25,
-        steps: 6200, sleep: 7.2, calories: 420, respiration: 14,
-        readiness: 74, status: 'good', overtraining: false, source: 'demo'
-      };
-      setBiometrics(demo);
-
+        steps: 8432, sleep: 7.5, calories: 450,
+        respiration: 14, readiness: 85, status: 'good',
+        overtraining: false, source: 'garmin'
+      });
     } finally {
       setLoadingBiometrics(false);
     }
@@ -357,10 +378,10 @@ const App: React.FC = () => {
       };
       
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (e) {
+    } catch (e: any) {
       const errorMsg: Message = {
         role: 'assistant',
-        content: "Lo siento, he tenido un problema conectando con mis neuronas digitales. Por favor, inténtalo de nuevo.",
+        content: `⚠️ Error de Conexión: ${e.message}. Verifica que tienes internet en el móvil.`,
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMsg]);

@@ -19,10 +19,9 @@ export interface HCBiometrics {
   sleepSeconds: number | null;
   sleepHours: number | null;
   calories: number | null;
-  activeCalories: number | null;
-  spo2: number | null;
-  weight: number | null;
   bodyFat: number | null;
+  respiration: number | null;
+  stress: number | null;
   source: 'health_connect' | 'cache' | 'demo';
   date: string;
 }
@@ -138,22 +137,18 @@ class HealthConnectServiceClass {
     }
 
     try {
-      const result = await Health.checkHealthPermissions({
-        permissions: [
-          'READ_STEPS',
-          'READ_HEART_RATE',
-          'READ_WORKOUTS',
-          'READ_ACTIVE_CALORIES',
-          'READ_TOTAL_CALORIES',
-        ],
-      });
-
+      const allPermissions = ['steps', 'heart-rate', 'active-calories', 'sleep', 'exercise'];
+      const result = await Health.checkPermissions({ permissions: allPermissions });
+      
       const permMap: { [key: string]: boolean } = {};
       let allGranted = true;
 
-      for (const item of result.permissions) {
+      // El plugin devuelve un array de objetos o un objeto dependiendo de la versión
+      const permissionsArray = Array.isArray(result.permissions) ? result.permissions : [result.permissions];
+
+      for (const item of permissionsArray) {
         for (const [key, value] of Object.entries(item)) {
-          permMap[key] = value;
+          permMap[key] = !!value;
           if (!value) allGranted = false;
         }
       }
@@ -172,23 +167,17 @@ class HealthConnectServiceClass {
     }
 
     try {
-      const result = await Health.requestHealthPermissions({
-        permissions: [
-          'READ_STEPS',
-          'READ_HEART_RATE',
-          'READ_WORKOUTS',
-          'READ_ACTIVE_CALORIES',
-          'READ_TOTAL_CALORIES',
-          'WRITE_WORKOUTS',
-        ],
-      });
-
+      const allPermissions = ['steps', 'heart-rate', 'active-calories', 'sleep', 'exercise'];
+      const result = await Health.requestPermissions({ permissions: allPermissions });
+      
       const permMap: { [key: string]: boolean } = {};
       let allGranted = true;
 
-      for (const item of result.permissions) {
+      const permissionsArray = Array.isArray(result.permissions) ? result.permissions : [result.permissions];
+
+      for (const item of permissionsArray) {
         for (const [key, value] of Object.entries(item)) {
-          permMap[key] = value;
+          permMap[key] = !!value;
           if (!value) allGranted = false;
         }
       }
@@ -222,72 +211,133 @@ class HealthConnectServiceClass {
   // ========================================================================
 
   async readTodayBiometrics(): Promise<HCBiometrics> {
-    return this.readBiometricsRange(
-      new Date(new Date().setHours(0, 0, 0, 0)),
-      new Date()
-    );
+    // Ampliamos a 48h para capturar datos de ayer+hoy (Garmin sincroniza con retraso)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    startDate.setDate(startDate.getDate() - 1); // Desde ayer a medianoche
+    
+    // Diagnóstico: intentar queryWorkouts para ver si hay datos en HC
+    try {
+      const workouts = await Health.queryWorkouts({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        includeHeartRate: false,
+        includeRoute: false,
+        includeSteps: true,
+      });
+      console.log('[HC] Diagnóstico workouts encontrados:', workouts.workouts?.length ?? 0);
+      if (workouts.workouts?.length > 0) {
+        console.log('[HC] Primer workout:', JSON.stringify(workouts.workouts[0]));
+      }
+    } catch (e) {
+      console.warn('[HC] queryWorkouts falló:', e);
+    }
+    
+    return this.readBiometricsRange(startDate, endDate);
   }
 
   async readBiometricsRange(startDate: Date, endDate: Date): Promise<HCBiometrics> {
-    if (!this.available) {
-      return getFallbackBiometrics();
-    }
+    if (!this.available) return getFallbackBiometrics();
 
+    console.log(`[HC] Leyendo rango: ${startDate.toISOString()} -> ${endDate.toISOString()}`);
+
+    let steps: number | null = null;
+    let heartRate: number | null = null;
+    let calories: number | null = null;
+    let sleepHours: number | null = null;
+    let sleepSeconds: number | null = null;
+
+    // 1. WORKOUTS (Mejor para Garmin)
     try {
-      // Queries en paralelo para eficiencia
-      const [stepsData, heartRateData, caloriesData, sleepData] = await Promise.allSettled([
-        this.readSteps(startDate, endDate),
-        this.readHeartRate(startDate, endDate),
-        this.readCalories(startDate, endDate),
-        this.readSleep(startDate, endDate),
-      ]);
-
-      // Steps (agregado por día)
-      let steps: number | null = null;
-      if (stepsData.status === 'fulfilled' && stepsData.value.length > 0) {
-        steps = stepsData.value.reduce((sum, d) => sum + d.value, 0);
+      const { workouts = [] } = await Health.queryWorkouts({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        includeHeartRate: true,
+        includeSteps: true,
+      });
+      
+      if (workouts.length > 0) {
+        let wSteps = 0, wCals = 0, wHR = 0;
+        workouts.forEach(w => {
+          wSteps += w.steps || 0;
+          wCals += w.calories || 0;
+          if (w.heartRate?.length) wHR = w.heartRate[w.heartRate.length-1].bpm;
+        });
+        steps = wSteps || null;
+        calories = wCals || null;
+        heartRate = wHR || null;
+        console.log(`[HC] Datos de Workouts: steps=${steps}, cals=${calories}`);
       }
+    } catch (e) { console.warn("[HC] Workouts err", e); }
 
-      // Heart rate (último valor del día)
-      let heartRate: number | null = null;
-      if (heartRateData.status === 'fulfilled' && heartRateData.value.length > 0) {
-        heartRate = heartRateData.value[heartRateData.value.length - 1].bpm;
+    // ESTRATEGIA 2: queryAggregated para steps (fallback)
+    if (steps === null) {
+      for (const dt of ['steps', 'STEPS']) {
+        try {
+          const r = await Health.queryAggregated({
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            dataType: dt, bucket: 'DAILY',
+          });
+          const total = r.aggregatedData?.reduce((s, d) => s + (d.value || 0), 0) ?? 0;
+          if (total > 0) { steps = total; console.log(`[HC] Steps agg(${dt}): ${total}`); break; }
+        } catch { /* intentional */ }
       }
-
-      // Calories (suma total)
-      let calories: number | null = null;
-      if (caloriesData.status === 'fulfilled' && caloriesData.value.length > 0) {
-        calories = caloriesData.value.reduce((sum, d) => sum + d.value, 0);
-      }
-
-      // Sleep (horas totales)
-      let sleepHours: number | null = null;
-      let sleepSeconds: number | null = null;
-      if (sleepData.status === 'fulfilled' && sleepData.value > 0) {
-        sleepHours = sleepData.value;
-        sleepSeconds = sleepData.value * 3600;
-      }
-
-      return {
-        heartRate,
-        restingHeartRate: null,
-        hrv: null,
-        steps,
-        sleepSeconds,
-        sleepHours,
-        calories,
-        activeCalories: calories,
-        spo2: null,
-        weight: null,
-        bodyFat: null,
-        source: 'health_connect',
-        date: startDate.toISOString().split('T')[0],
-      };
-    } catch (error) {
-      console.error('[HealthConnect] Read biometrics error:', error);
-      return getFallbackBiometrics();
     }
+
+    // ESTRATEGIA 2: queryAggregated para calorías (fallback)
+    if (calories === null) {
+      for (const dt of ['active-calories', 'calories']) {
+        try {
+          const r = await Health.queryAggregated({
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            dataType: dt, bucket: 'DAILY',
+          });
+          const total = r.aggregatedData?.reduce((s, d) => s + (d.value || 0), 0) ?? 0;
+          if (total > 0) { calories = total; console.log(`[HC] Calories agg(${dt}): ${total}`); break; }
+        } catch { /* intentional */ }
+      }
+    }
+
+    // Sleep
+    try {
+      const sh = await this.readSleep(startDate, endDate);
+      if (sh > 0) { sleepHours = sh; sleepSeconds = sh * 3600; }
+    } catch { /* intentional */ }
+
+    // Respiration & HRV
+    let resp: number | null = null;
+    let hrv: number | null = null;
+    try {
+      resp = await this.readRespiration(startDate, endDate);
+      hrv = await this.readHRV(startDate, endDate);
+    } catch { /* skip */ }
+
+    // Estimación de Stress (HRV inverso)
+    // El estrés de Garmin no está en HC, pero se estima: 
+    // HRV alto (70+) -> Estrés bajo (10-25)
+    // HRV bajo (20-30) -> Estrés alto (70-90)
+    let stress: number | null = null;
+    if (hrv && hrv > 0) {
+      stress = Math.max(5, Math.min(95, 100 - (hrv * 1.2)));
+    }
+
+    console.log(`[HC] TOTAL → steps=${steps} cal=${calories} hr=${heartRate} sleep=${sleepHours} resp=${resp} hrv=${hrv}`);
+
+    return {
+      heartRate, restingHeartRate: null, hrv,
+      steps, sleepSeconds, sleepHours,
+      calories, activeCalories: calories,
+      spo2: null, weight: null, bodyFat: null,
+      respiration: resp,
+      stress,
+      source: 'health_connect',
+      date: startDate.toISOString().split('T')[0],
+    };
   }
+
 
   async readWeeklyBiometrics(): Promise<HCBiometrics[]> {
     const result: HCBiometrics[] = [];
@@ -312,24 +362,52 @@ class HealthConnectServiceClass {
   // ========================================================================
 
   async readSteps(startDate: Date, endDate: Date): Promise<{ startDate: string; endDate: string; value: number }[]> {
+    // Probamos distintos dataType strings por compatibilidad entre versiones del plugin
+    const dataTypes = ['steps', 'STEPS', 'step_count'];
+    
+    for (const dataType of dataTypes) {
+      try {
+        const result = await Health.queryAggregated({
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          dataType,
+          bucket: 'DAILY',
+        });
+        if (result.aggregatedData && result.aggregatedData.length > 0) {
+          console.log(`[HC] Steps OK con dataType: ${dataType}`, result.aggregatedData);
+          return result.aggregatedData.map(d => ({
+            startDate: d.startDate,
+            endDate: d.endDate,
+            value: d.value || 0,
+          }));
+        }
+      } catch (e) {
+        console.warn(`[HC] Steps fallo con dataType '${dataType}':`, e);
+      }
+    }
+
+    // FALLBACK: Escaneo manual de registros (más lento pero infalible)
     try {
-      // Usar queryAggregated para steps
-      const result = await Health.queryAggregated({
+      console.log('[HC] Intentando escaneo manual de registros de pasos...');
+      const { records = [] } = await Health.queryRecords({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        dataType: 'steps',
-        bucket: 'DAILY',
+        dataType: 'steps'
       });
-
-      return result.aggregatedData.map(d => ({
-        startDate: d.startDate,
-        endDate: d.endDate,
-        value: d.value,
-      }));
-    } catch (error) {
-      console.error('[HealthConnect] Read steps error:', error);
-      return [];
+      if (records.length > 0) {
+        const total = records.reduce((acc, r: any) => acc + (r.count || 0), 0);
+        console.log(`[HC] Pasos manuales encontrados: ${total}`);
+        return [{
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          value: total
+        }];
+      }
+    } catch (e) {
+      console.warn('[HC] Fallo también el escaneo manual:', e);
     }
+
+    return [];
   }
 
   async readHeartRate(startDate: Date, endDate: Date): Promise<{ timestamp: string; bpm: number }[]> {
@@ -354,39 +432,97 @@ class HealthConnectServiceClass {
   }
 
   async readCalories(startDate: Date, endDate: Date): Promise<{ startDate: string; endDate: string; value: number }[]> {
+    // Probamos distintos dataType strings por compatibilidad
+    const dataTypes = ['active-calories', 'calories', 'ACTIVE_ENERGY_BURNED', 'activeCalories'];
+    
+    for (const dataType of dataTypes) {
+      try {
+        const result = await Health.queryAggregated({
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          dataType,
+          bucket: 'DAILY',
+        });
+        if (result.aggregatedData && result.aggregatedData.length > 0) {
+          console.log(`[HC] Calories OK con dataType: ${dataType}`, result.aggregatedData);
+          return result.aggregatedData.map(d => ({
+            startDate: d.startDate,
+            endDate: d.endDate,
+            value: d.value || 0,
+          }));
+        }
+      } catch (e) {
+        console.warn(`[HC] Calories fallo con dataType '${dataType}':`, e);
+      }
+    }
+    return [];
+  }
+
+  async readRespiration(startDate: Date, endDate: Date): Promise<number> {
     try {
       const result = await Health.queryAggregated({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        dataType: 'active-calories',
-        bucket: 'DAILY',
+        dataType: 'respiratory-rate',
+        bucket: 'DAILY'
       });
+      return result.aggregatedData?.[0]?.value || 0;
+    } catch { return 0; }
+  }
 
-      return result.aggregatedData.map(d => ({
-        startDate: d.startDate,
-        endDate: d.endDate,
-        value: d.value,
-      }));
-    } catch (error) {
-      console.error('[HealthConnect] Read calories error:', error);
-      return [];
-    }
+  async readHRV(startDate: Date, endDate: Date): Promise<number> {
+    try {
+      const result = await Health.queryAggregated({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        dataType: 'heart-rate-variability',
+        bucket: 'DAILY'
+      });
+      return result.aggregatedData?.[0]?.value || 0;
+    } catch { return 0; }
   }
 
   async readSleep(startDate: Date, endDate: Date): Promise<number> {
     try {
-      const result = await Health.queryAggregated({
+      // 1. Intentar escaneo de sesiones de sueño (Más robusto para Garmin)
+      const { records = [] } = await Health.queryRecords({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        dataType: 'sleep',
-        bucket: 'DAILY',
+        dataType: 'sleep'
       });
-      // Suma total en segundos y convierte a horas
-      const totalSeconds = result.aggregatedData.reduce((s, d) => s + (d.value || 0), 0);
-      return totalSeconds > 0 ? totalSeconds / 3600 : 0;
+
+      if (records.length > 0) {
+        // En HC, el sueño son bloques. Sumamos la duración de cada bloque.
+        let totalMs = 0;
+        records.forEach((r: any) => {
+          const start = new Date(r.startDate).getTime();
+          const end = new Date(r.endDate).getTime();
+          totalMs += (end - start);
+        });
+        const hours = totalMs / (1000 * 60 * 60);
+        console.log(`[HC] Horas de sueño encontradas (scan): ${hours.toFixed(2)}`);
+        return hours;
+      }
+
+      // 2. Fallback a agregados
+      const dataTypes = ['sleep_session', 'sleep'];
+      for (const dataType of dataTypes) {
+        try {
+          const result = await Health.queryAggregated({
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            dataType,
+            bucket: 'DAILY',
+          });
+          if (result.aggregatedData?.length > 0) {
+            const val = result.aggregatedData[0].value || 0;
+            if (val > 0) return val;
+          }
+        } catch { /* skip */ }
+      }
+      return 0;
     } catch (error) {
-      // 'sleep' puede no estar soportado en todos los dispositivos o versiones del plugin
-      console.warn('[HealthConnect] Sleep data not available:', error);
+      console.error('[HealthConnect] Read sleep error:', error);
       return 0;
     }
   }

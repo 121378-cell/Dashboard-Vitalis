@@ -1,92 +1,60 @@
 import axios from "axios";
 import { Message } from "../types";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8001/api/v1";
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192"; // Rápido, gratuito, ideal para móvil
+const BACKEND_URL = "http://192.168.1.133:8005/api/v1";
+const GEMINI_API_KEY = "AIzaSyAOQLH9ys29PJK4-SxphRIsJmnXHZP-DvQ";
 
-// ─── Groq Directo (sin backend) ───────────────────────────────────────────────
-async function callGroqDirect(
-  messages: Message[],
-  systemPrompt: string
-): Promise<{ content: string; provider: string }> {
-  if (!GROQ_API_KEY) {
-    throw new Error("VITE_GROQ_API_KEY no configurada.");
+async function callGoogleGemini(model: string, messages: Message[]) {
+  // Probamos la v1beta que es la más amable con claves nuevas
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const lastMessage = messages[messages.length - 1]?.content || "Hola";
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: lastMessage }] }]
+    })
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Google ${model} dio ${response.status}: ${text.substring(0, 40)}`);
   }
 
-  const response = await axios.post(
-    GROQ_API_URL,
-    {
-      model: GROQ_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages
-          .filter((m) => m.role !== "system")
-          .map((m) => ({ role: m.role, content: m.content })),
-      ],
-      temperature: 0.7,
-      max_tokens: 1024,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      timeout: 30000, // Groq es muy rápido, 30s suficiente
-    }
-  );
-
-  return {
-    content: response.data.choices[0].message.content,
-    provider: "Groq · Llama 3",
-  };
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
-// ─── Backend FastAPI (cuando está disponible) ─────────────────────────────────
-async function callBackendAI(
-  messages: Message[],
-  systemPrompt: string
-): Promise<{ content: string; provider: string }> {
-  const response = await axios.post(
-    `${BACKEND_URL}/ai/chat`,
-    {
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      system_prompt: systemPrompt,
-    },
-    {
-      headers: { "x-user-id": "default_user" },
-      timeout: 120000,
-    }
-  );
+export async function callAI(messages: Message[], systemPrompt: string) {
+  let reports = [];
 
-  return {
-    content: response.data.content,
-    provider: response.data.provider || "ATLAS AI",
-  };
-}
-
-// ─── Función principal: Backend primero, Groq como fallback ───────────────────
-export async function callAI(
-  messages: Message[],
-  systemPrompt: string
-): Promise<{ content: string; provider: string }> {
-  // 1. Intentar el backend FastAPI (funciona en PC con servidor activo)
-  if (BACKEND_URL && navigator.onLine) {
-    try {
-      return await callBackendAI(messages, systemPrompt);
-    } catch (backendErr: any) {
-      // Si el backend no responde (offline móvil), caemos a Groq
-      const isNetworkError = !backendErr.response;
-      if (isNetworkError) {
-        console.info("[AI] Backend no accesible. Usando Groq directo...");
-      } else {
-        // Error del propio backend (4xx/5xx) → también intentamos Groq
-        console.warn("[AI] Backend error:", backendErr.response?.status, "→ fallback a Groq");
-      }
-    }
+  // INTENTO A: Gemini Flash
+  try {
+    const text = await callGoogleGemini("gemini-1.5-flash", messages);
+    if (text) return { content: text, provider: "Gemini Flash" };
+  } catch (e: any) {
+    reports.push(`G-Flash: ${e.message}`);
   }
 
-  // 2. Fallback: Llamada directa a Groq desde el cliente
-  return await callGroqDirect(messages, systemPrompt);
+  // INTENTO B: Gemini Pro (Más lento pero más compatible)
+  try {
+    const text = await callGoogleGemini("gemini-pro", messages);
+    if (text) return { content: text, provider: "Gemini Pro" };
+  } catch (e: any) {
+    reports.push(`G-Pro: ${e.message}`);
+  }
+
+  // INTENTO C: Backend PC
+  try {
+    const response = await axios.post(`${BACKEND_URL}/ai/chat`, {
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      system_prompt: systemPrompt
+    }, { timeout: 4000 });
+    return { content: response.data.content, provider: "ATLAS PC" };
+  } catch (e: any) {
+    reports.push(`PC (133): ${e.message}`);
+  }
+
+  throw new Error(`Sin conexión. Historial: ${reports.join(" | ")}`);
 }

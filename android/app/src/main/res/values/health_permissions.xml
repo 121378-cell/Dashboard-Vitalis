@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="health_permissions">
+        <item>steps</item>
+        <item>heart_rate</item>
+        <item>active_energy_burned</item>
+        <item>sleep</item>
+        <item>exercise</item>
+        <item>oxygen_saturation</item>
+        <item>body_fat</item>
+        <item>weight</item>
+    </array>
+</resources>
