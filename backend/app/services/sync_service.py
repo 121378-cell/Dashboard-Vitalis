@@ -39,20 +39,40 @@ class SyncService:
                     )
                 return False
 
+        today = date.today().isoformat()
+        three_days_ago = (date.today() - timedelta(days=3)).isoformat()
+
         success = True
+        consecutive_errors = 0
+        
         for date_str in date_range:
+            # Skip if already exists and not recent (avoid redundant API calls)
+            existing = db.query(Biometrics).filter(
+                Biometrics.user_id == user_id, 
+                Biometrics.date == date_str
+            ).first()
+            
+            if existing and date_str < three_days_ago:
+                logger.info(f"Skipping stable date: {date_str}")
+                continue
+
             try:
-                # Fetch various stats with fallbacks similar to AI_Fitness
-                # Add delays to avoid rate limiting (429)
+                logger.info(f"Fetching health data for {date_str}...")
+                
+                # Fetch various stats with fallbacks
                 stats = client.get_stats(date_str)
-                time.sleep(1.5)  # Delay entre llamadas
+                time.sleep(2.0)  # Aumentado para evitar 429
+                
                 sleep = client.get_sleep_data(date_str)
-                time.sleep(1.5)
+                time.sleep(2.0)
+                
                 hrv = client.get_hrv_data(date_str)
-                time.sleep(1.5)
+                time.sleep(2.0)
 
                 # Recovery and Training Status
                 training_status_data = client.get_training_status(date_str)
+                time.sleep(1.0) # Delay adicional
+                
                 recovery_time = safe_get(
                     training_status_data,
                     "mostRecentTerminatedTrainingStatus",
@@ -73,6 +93,7 @@ class SyncService:
                         respiration = safe_get(
                             resp_data, "avgWakingRespirationValue"
                         ) or safe_get(resp_data, "avgSleepRespirationValue")
+                        time.sleep(1.0)
                     except: respiration = None
 
                 # VO2 Max fallback
@@ -87,6 +108,7 @@ class SyncService:
                             if vo2max_precise:
                                 vo2max = vo2max_precise
                                 break
+                        time.sleep(1.0)
                     except: vo2max = None
 
                 # HRV fallback
@@ -118,27 +140,36 @@ class SyncService:
                     "spo2": safe_get(stats, "averageSpo2"),
                 }
 
-                biometric = (
-                    db.query(Biometrics)
-                    .filter(Biometrics.user_id == user_id, Biometrics.date == date_str)
-                    .first()
-                )
+                if not existing:
+                    existing = Biometrics(user_id=user_id, date=date_str)
+                    db.add(existing)
 
-                if not biometric:
-                    biometric = Biometrics(user_id=user_id, date=date_str)
-                    db.add(biometric)
-
-                biometric.data = json.dumps(biometric_data)
-                biometric.source = "garmin"
-                biometric.recovery_time = recovery_time
-                biometric.training_status = training_status
-                biometric.hrv_status = hrv_status
+                existing.data = json.dumps(biometric_data)
+                existing.source = "garmin"
+                existing.recovery_time = recovery_time
+                existing.training_status = training_status
+                existing.hrv_status = hrv_status
+                
+                db.commit() # Commit after each day to save progress
+                consecutive_errors = 0
 
             except Exception as e:
-                logger.error(f"Error syncing Garmin health for {date_str}: {e}")
+                error_msg = str(e)
+                logger.error(f"Error syncing Garmin health for {date_str}: {error_msg}")
+                
+                if "429" in error_msg or "Too Many Requests" in error_msg:
+                    logger.warning("Rate limit hit. Breaking loop to save progress.")
+                    success = False
+                    break
+                
+                consecutive_errors += 1
+                if consecutive_errors > 5:
+                    logger.error("Too many consecutive errors. Aborting.")
+                    success = False
+                    break
+                
                 success = False
 
-        db.commit()
         return success
 
     @staticmethod

@@ -29,7 +29,11 @@ async def strava_auth():
     Inicia el flujo OAuth2 de Strava.
     Redirige al usuario a Strava para autorización.
     """
-    scope = "read,activity:read_all,profile:read_all"
+    # DEBUG: Verificar configuración
+    logger.info(f"STRAVA_CLIENT_ID: {settings.STRAVA_CLIENT_ID}")
+    logger.info(f"STRAVA_CLIENT_SECRET: {'CONFIGURADO' if settings.STRAVA_CLIENT_SECRET and settings.STRAVA_CLIENT_SECRET != 'TU_SECRETO_AQUI' else 'NO CONFIGURADO - USANDO PLACEHOLDER'}")
+    
+    scope = "read"
     
     auth_url = (
         f"{STRAVA_AUTH_URL}?"

@@ -20,10 +20,15 @@ from app.models.workout import Workout
 from app.services.sync_service import SyncService
 from app.utils.garmin import get_garmin_client
 
-# Credentials
-GARMIN_EMAIL = "sergi.marquez.brugal@gmail.com"
-GARMIN_PASSWORD = "peluchE-1978.3*"
-USER_ID = "default_user"
+# Credentials from environment variables
+GARMIN_EMAIL = os.environ.get("GARMIN_EMAIL")
+GARMIN_PASSWORD = os.environ.get("GARMIN_PASSWORD")
+USER_ID = os.environ.get("USER_ID", "default_user")
+
+if not GARMIN_EMAIL or not GARMIN_PASSWORD:
+    print("Error: Las variables de entorno GARMIN_EMAIL y GARMIN_PASSWORD son obligatorias.")
+    print("Uso: GARMIN_EMAIL=usuario@ejemplo.com GARMIN_PASSWORD=tu_pass python run_sync.py")
+    sys.exit(1)
 
 db = SessionLocal()
 
@@ -52,46 +57,53 @@ print(f"Credenciales guardadas para {GARMIN_EMAIL}")
 
 # Connect to Garmin
 print("\nConectando con Garmin...")
-client, session_updated = get_garmin_client(GARMIN_EMAIL, GARMIN_PASSWORD, session_data=token.garmin_session)
+client, login_result = get_garmin_client(
+    email=GARMIN_EMAIL, 
+    password=GARMIN_PASSWORD, 
+    db=db, 
+    user_id=USER_ID
+)
 
 if not client:
-    print("Error: No se pudo conectar a Garmin")
+    print(f"Error: No se pudo conectar a Garmin: {login_result}")
     sys.exit(1)
 
 print(f"Conectado a Garmin!")
-if session_updated and session_updated is not True:
-    print("  Session actualizada y persistida en DB")
-    token.garmin_session = session_updated
-    db.commit()
-elif session_updated:
-    print("  Session actualizada localmente")
 
 # Get user profile
 try:
     profile = client.get_user_profile()
     print(f"  Usuario: {profile.get('displayName', 'Unknown')}")
-except:
-    pass
+except Exception as e:
+    print(f"  Aviso: No se pudo obtener el perfil: {e}")
 
-# Sync health data (Jan 1, 2025 to today)
+# Sync health data (Last 15 days by default to avoid 429)
 print("\nSincronizando datos de salud...")
-start_date = datetime(2025, 1, 1)
+days_to_sync = 15
+if len(sys.argv) > 1:
+    try:
+        days_to_sync = int(sys.argv[1])
+    except ValueError:
+        pass
+
 end_date = datetime.now()
-date_range = [(end_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_date - start_date).days + 1)]
+start_date = end_date - timedelta(days=days_to_sync)
+
+date_range = [(end_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days_to_sync + 1)]
 print(f"  Fechas: {date_range[-1]} a {date_range[0]} ({len(date_range)} días)")
 
-success = SyncService.sync_garmin_health(db, USER_ID, date_range)
+success = SyncService.sync_garmin_health(db, USER_ID, date_range, client=client)
 if success:
     print("Datos de salud sincronizados")
 else:
-    print("Error en sincronización de salud")
+    print("Error o limite de peticiones en sincronización de salud (parcialmente completado)")
 
-# Sync activities (Jan 1, 2025 to today)
+# Sync activities (Same range)
 print("\nSincronizando actividades...")
-date_range_activities = [(end_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_date - start_date).days + 1)]
+date_range_activities = date_range
 print(f"  Fechas: {date_range_activities[-1]} a {date_range_activities[0]} ({len(date_range_activities)} días)")
 
-success = SyncService.sync_garmin_activities(db, USER_ID, date_range_activities)
+success = SyncService.sync_garmin_activities(db, USER_ID, date_range_activities, client=client)
 if success:
     print("Actividades sincronizadas")
 else:

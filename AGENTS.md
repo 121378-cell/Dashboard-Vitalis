@@ -17,11 +17,11 @@ This project is a full-stack AI Fitness Dashboard integrating Garmin and wger da
 
 ## Build, Test, and Development Commands
 Commands are managed via `npm` in the root `package.json`:
-- `npm install`: Install both frontend and backend dependencies.
-- `npm run dev`: Start the Vite development server (frontend).
-- `npm run dev:backend`: Start the FastAPI backend server with hot reload (`uvicorn`).
-- `npm run build`: Build production assets.
-- `npm run lint`: Run TypeScript type checking (`tsc --noEmit`).
+- `npm install`: Installs all frontend and backend dependencies using the shared `package.json`.
+- `npm run dev`: Starts the Vite development server for the frontend (React/TypeScript/Tailwind).
+- `npm run dev:backend`: Starts the FastAPI backend server with hot reload, accessible via `uvicorn app.main:app --reload --app-dir backend`. Note: The API entry point is `backend/app/main.py`.
+- `npm run build`: Builds optimized production assets for the frontend.
+- `npm run lint`: Runs TypeScript type checking (`tsc --noEmit`). For backend linting, use dedicated Python tests/scripts within `backend/tests/` or `ruff`.
 
 ## Coding Style & Naming Conventions
 - **Frontend**: TypeScript (ESNext), Functional React components, Tailwind CSS. Aliases use `@/` for root.

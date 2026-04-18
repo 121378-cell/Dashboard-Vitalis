@@ -67,6 +67,29 @@ class StravaService:
                     timeout=30.0
                 )
                 
+                # Si 401, intentar refresh y reintentar una vez
+                if response.status_code == 401:
+                    logger.warning("Token de Strava retornó 401, intentando refresh...")
+                    refreshed = await StravaService._refresh_token(token, db)
+                    if refreshed:
+                        # Reintentar con nuevo token
+                        response = await client.get(
+                            f"{STRAVA_API_BASE}/athlete/activities",
+                            headers={"Authorization": f"Bearer {token.strava_access_token}"},
+                            params={
+                                "after": after_timestamp,
+                                "per_page": 100
+                            },
+                            timeout=30.0
+                        )
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Token expirado y no se pudo renovar",
+                            "synced_count": 0,
+                            "skipped_count": 0
+                        }
+                
                 response.raise_for_status()
                 activities = response.json()
             
