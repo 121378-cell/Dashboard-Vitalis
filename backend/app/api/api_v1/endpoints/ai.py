@@ -11,6 +11,9 @@ from datetime import date, timedelta
 from typing import List, Optional
 import json
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 ai_service = AIService()

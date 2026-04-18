@@ -1,60 +1,58 @@
-import axios from "axios";
+import { CapacitorHttp } from '@capacitor/core';
 import { Message } from "../types";
 
 const BACKEND_URL = "http://192.168.1.133:8005/api/v1";
 const GEMINI_API_KEY = "AIzaSyAOQLH9ys29PJK4-SxphRIsJmnXHZP-DvQ";
+const GROQ_API_KEY = "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";
 
-async function callGoogleGemini(model: string, messages: Message[]) {
-  // Probamos la v1beta que es la más amable con claves nuevas
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-  const lastMessage = messages[messages.length - 1]?.content || "Hola";
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: lastMessage }] }]
-    })
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Google ${model} dio ${response.status}: ${text.substring(0, 40)}`);
-  }
-
-  const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+async function callNative(url: string, data: any, headers: any = {}) {
+  const options = {
+    url,
+    headers: { 'Content-Type': 'application/json', ...headers },
+    data,
+    connectTimeout: 5000,
+    readTimeout: 10000
+  };
+  return await CapacitorHttp.post(options);
 }
 
 export async function callAI(messages: Message[], systemPrompt: string) {
-  let reports = [];
+  const lastMsg = messages[messages.length - 1]?.content || "Hola";
+  let logs = [];
 
-  // INTENTO A: Gemini Flash
+  // 1. INTENTO GROQ (El más rápido en móvil)
   try {
-    const text = await callGoogleGemini("gemini-1.5-flash", messages);
-    if (text) return { content: text, provider: "Gemini Flash" };
-  } catch (e: any) {
-    reports.push(`G-Flash: ${e.message}`);
-  }
+    const res = await callNative(
+      "https://api.groq.com/openai/v1/chat/completions",
+      { 
+        model: "llama-3.1-8b-instant", 
+        messages: [{ role: "user", content: lastMsg }] 
+      },
+      { 'Authorization': `Bearer ${GROQ_API_KEY}` }
+    );
+    if (res.status === 200) return { content: res.data.choices[0].message.content, provider: "Groq (Nativo)" };
+    logs.push(`Groq:${res.status}`);
+  } catch (e: any) { logs.push(`Groq:${e.message}`); }
 
-  // INTENTO B: Gemini Pro (Más lento pero más compatible)
+  // 2. INTENTO GEMINI (Flash Latest)
   try {
-    const text = await callGoogleGemini("gemini-pro", messages);
-    if (text) return { content: text, provider: "Gemini Pro" };
-  } catch (e: any) {
-    reports.push(`G-Pro: ${e.message}`);
-  }
+    const res = await callNative(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+      { contents: [{ parts: [{ text: lastMsg }] }] }
+    );
+    if (res.status === 200) return { content: res.data.candidates[0].content.parts[0].text, provider: "Gemini (Nativo)" };
+    logs.push(`Gemini:${res.status}`);
+  } catch (e: any) { logs.push(`Gemini:${e.message}`); }
 
-  // INTENTO C: Backend PC
+  // 3. INTENTO PC BACKEND
   try {
-    const response = await axios.post(`${BACKEND_URL}/ai/chat`, {
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      system_prompt: systemPrompt
-    }, { timeout: 4000 });
-    return { content: response.data.content, provider: "ATLAS PC" };
-  } catch (e: any) {
-    reports.push(`PC (133): ${e.message}`);
-  }
+    const res = await callNative(
+      `${BACKEND_URL}/ai/chat`,
+      { messages: messages.map(m => ({ role: m.role, content: m.content })), system_prompt: systemPrompt }
+    );
+    if (res.status === 200) return { content: res.data.content, provider: "ATLAS PC" };
+    logs.push(`PC:${res.status}`);
+  } catch (e: any) { logs.push(`PC:${e.message}`); }
 
-  throw new Error(`Sin conexión. Historial: ${reports.join(" | ")}`);
+  throw new Error(`Chat bloqueado. Logs: ${logs.join(" | ")}`);
 }
