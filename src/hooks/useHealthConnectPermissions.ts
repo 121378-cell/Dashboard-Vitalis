@@ -6,6 +6,8 @@ export function useHealthConnectPermissions() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
 
   const checkPermissions = async () => {
+    // Asegurarnos de que el plugin levantó el bridge nativo
+    await healthConnectService.initialize();
     const result = await healthConnectService.checkPermissions();
     setGranted(result.granted);
     setPermissions(result.permissions);

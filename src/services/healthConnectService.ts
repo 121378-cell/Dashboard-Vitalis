@@ -235,11 +235,11 @@ class HealthConnectServiceClass {
 
     try {
       // Queries en paralelo para eficiencia
-      const [stepsData, heartRateData, caloriesData, workoutsData] = await Promise.allSettled([
+      const [stepsData, heartRateData, caloriesData, sleepData] = await Promise.allSettled([
         this.readSteps(startDate, endDate),
         this.readHeartRate(startDate, endDate),
         this.readCalories(startDate, endDate),
-        this.readWorkouts(startDate, endDate),
+        this.readSleep(startDate, endDate),
       ]);
 
       // Steps (agregado por día)
@@ -260,15 +260,23 @@ class HealthConnectServiceClass {
         calories = caloriesData.value.reduce((sum, d) => sum + d.value, 0);
       }
 
+      // Sleep (horas totales)
+      let sleepHours: number | null = null;
+      let sleepSeconds: number | null = null;
+      if (sleepData.status === 'fulfilled' && sleepData.value > 0) {
+        sleepHours = sleepData.value;
+        sleepSeconds = sleepData.value * 3600;
+      }
+
       return {
         heartRate,
         restingHeartRate: null,
         hrv: null,
         steps,
-        sleepSeconds: null,
-        sleepHours: null,
+        sleepSeconds,
+        sleepHours,
         calories,
-        activeCalories: null,
+        activeCalories: calories,
         spo2: null,
         weight: null,
         bodyFat: null,
@@ -362,6 +370,24 @@ class HealthConnectServiceClass {
     } catch (error) {
       console.error('[HealthConnect] Read calories error:', error);
       return [];
+    }
+  }
+
+  async readSleep(startDate: Date, endDate: Date): Promise<number> {
+    try {
+      const result = await Health.queryAggregated({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        dataType: 'sleep',
+        bucket: 'DAILY',
+      });
+      // Suma total en segundos y convierte a horas
+      const totalSeconds = result.aggregatedData.reduce((s, d) => s + (d.value || 0), 0);
+      return totalSeconds > 0 ? totalSeconds / 3600 : 0;
+    } catch (error) {
+      // 'sleep' puede no estar soportado en todos los dispositivos o versiones del plugin
+      console.warn('[HealthConnect] Sleep data not available:', error);
+      return 0;
     }
   }
 

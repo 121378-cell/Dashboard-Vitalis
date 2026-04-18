@@ -75,6 +75,8 @@ origins = [
     "https://dashboard-vitalis-git-main-sergimarquezbrugal-2353.vercel.app", # URL de preview de Vercel
     "http://localhost:5173",
     "http://localhost:3000",
+    "http://localhost",       # Android Capacitor base origin
+    "capacitor://localhost"   # iOS Capacitor base origin
 ]
 
 app.add_middleware(

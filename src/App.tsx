@@ -40,6 +40,8 @@ const App: React.FC = () => {
   // --- Native & System State ---
   const { granted, checkPermissions } = useHealthConnectPermissions();
   const [showHealthOnboarding, setShowHealthOnboarding] = useState(false);
+  const [isHCAvailable, setIsHCAvailable] = useState(false);  // HC disponible en este dispositivo
+  const [hcPermissionsGranted, setHcPermissionsGranted] = useState(false); // Permisos confirmados
 
   // --- UI State ---
   const [activeTab, setActiveTab] = useState<'chat' | 'profile' | 'docs' | 'setup' | 'routine'>('chat');
@@ -85,7 +87,7 @@ const App: React.FC = () => {
         headers: { "x-user-id": "default_user" }
       });
       setIsGarminConnected(res.data.authenticated);
-      if (res.data.authenticated) fetchBiometrics();
+      if (res.data.authenticated) loadBiometrics();
     } catch (e) {
       console.error("Error checking auth status", e);
     }
@@ -104,11 +106,16 @@ const App: React.FC = () => {
         setIsGarminConnected(true);
         setGarminEmail("");
         setGarminPassword("");
-        fetchBiometrics();
+        loadBiometrics();
       }
     } catch (e: any) {
-      const msg = e.response?.data?.details || e.response?.data?.error || "Error al conectar con Garmin. Revisa tus credenciales.";
-      alert(msg);
+      if (!e.response) {
+         // Axios manda un error sin response cuando falla el servidor o es inaccesible (ej. fallo de red/localhost)
+         alert("Error de Conexión. Vigila que tu servidor Backend esté corriendo de fondo u offline.");
+      } else {
+         const msg = e.response?.data?.details || e.response?.data?.error || "Error al conectar con Garmin. Revisa tus credenciales.";
+         alert(msg);
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -198,7 +205,7 @@ const App: React.FC = () => {
       }
 
       setLastSync(new Date().toLocaleTimeString());
-      fetchBiometrics();
+      loadBiometrics();
       fetchWorkouts();
       if (results.length > 0) {
         alert(`Sincronización finalizada:\n${results.join('\n')}`);
@@ -224,16 +231,64 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Biometrics Sync (REQ-F07, F08) ---
-  const fetchBiometrics = async () => {
+  // Calcula readiness localmente desde métricas HC (Garmin no disponible en móvil)
+  const calculateReadiness = (steps: number, sleepHours: number, heartRate: number): number => {
+    let score = 50;
+    if (sleepHours >= 8) score += 20;
+    else if (sleepHours >= 7) score += 14;
+    else if (sleepHours >= 6) score += 6;
+    else if (sleepHours > 0) score -= 5;
+    if (steps >= 10000) score += 15;
+    else if (steps >= 8000) score += 10;
+    else if (steps >= 5000) score += 5;
+    if (heartRate > 0 && heartRate < 60) score += 15;
+    else if (heartRate < 70) score += 8;
+    else if (heartRate > 90) score -= 10;
+    return Math.min(100, Math.max(0, score));
+  };
+
+  // --- Biometrics Sync mejorado — prioriza HC sobre Backend (Fase 1/2) ---
+  const loadBiometrics = async (forceHC: boolean = false) => {
     setLoadingBiometrics(true);
     try {
+      // 1. Prioridad: Native Android Health Connect (si disponible Y permisos OK o forzado)
+      if (isHCAvailable && (hcPermissionsGranted || forceHC || granted)) {
+        console.log('[App] Leyendo desde Google Health Connect nativo...');
+        try {
+          const hcData = await healthConnectService.readTodayBiometrics();
+          const steps = hcData.steps ?? 0;
+          const sleep = hcData.sleepHours ?? 0;
+          const hr = hcData.heartRate ?? 0;
+          const readiness = calculateReadiness(steps, sleep, hr);
+          const mappedBiometrics: Biometrics = {
+            heartRate: hr,
+            hrv: hcData.hrv ?? 0,
+            spo2: hcData.spo2 ?? 98,
+            stress: 0,
+            steps,
+            sleep,
+            calories: hcData.calories ?? 0,
+            respiration: 0,
+            readiness,
+            status: readiness >= 80 ? 'excellent' : readiness >= 60 ? 'good' : 'poor',
+            overtraining: readiness < 40,
+            source: 'garmin'
+          };
+          setBiometrics(mappedBiometrics);
+          syncService.syncBiometricsToBackend(mappedBiometrics).catch(() => {});
+          return;
+        } catch (hcErr) {
+          console.warn('[App] HC read falló, intentando backend:', hcErr);
+        }
+      }
+
+      // 2. Fallback: Servidor Backend (PC / Web Browser)
       const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
         headers: { "x-user-id": "default_user" }
       });
       setBiometrics(res.data);
     } catch (e) {
-      console.error("Error fetching biometrics", e);
+      console.error("Error al cargar biométricos:", e);
     } finally {
       setLoadingBiometrics(false);
     }
@@ -335,9 +390,16 @@ const App: React.FC = () => {
     checkAuthStatus();
     fetchServiceSettings();
     fetchWorkouts();
-    // NOTA: El polling de biometrics cada 5 minutos ha sido eliminado
-    // Ahora usamos WebSocket en tiempo real via BiometricsWidget
+    loadBiometrics(); // Intenta cargar desde HC o Backend al arrancar
   }, [checkAuthStatus, fetchServiceSettings]);
+
+  // 🔑 Reactivo: cuando Health Connect concede permisos, cargamos biométricos
+  useEffect(() => {
+    if (granted) {
+      console.log('[App] Health Connect granted=true → Cargando biométricos nativos...');
+      loadBiometrics();
+    }
+  }, [granted]);
 
   // Load user profile on startup
   useEffect(() => {
@@ -374,7 +436,6 @@ const App: React.FC = () => {
   useEffect(() => {
     // 1. Set up Background Notifications
     notificationService.initialize().then(() => {
-      // Agenda notificación de Briefing diario a las 8:00 AM
       notificationService.scheduleMorningBriefing(8, 0);
     });
 
@@ -390,22 +451,54 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 3. Health Connect Onboarding Hook (Phase 2)
+  // 3. Health Connect — inicialización robusta independiente del parseo de permisos
   useEffect(() => {
     const initHealthConnect = async () => {
-      const isAvail = await healthConnectService.isAvailable();
-      const hasSeen = localStorage.getItem('hc_onboarding_seen');
-      if (isAvail && !granted && !hasSeen) {
-        setShowHealthOnboarding(true);
+      try {
+        await healthConnectService.initialize();
+        const avail = await healthConnectService.isAvailable();
+        setIsHCAvailable(avail);
+        console.log('[HC] isAvailable:', avail);
+
+        if (avail) {
+          // Intentar comprobar permisos con try/catch robusto
+          try {
+            const permStatus = await healthConnectService.checkPermissions();
+            console.log('[HC] Permisos:', JSON.stringify(permStatus));
+            setHcPermissionsGranted(permStatus.granted);
+
+            const hasSeen = localStorage.getItem('hc_onboarding_seen');
+            if (!permStatus.granted && !hasSeen) {
+              setShowHealthOnboarding(true);
+            } else {
+              // Ya tiene permisos — cargar ahora
+              loadBiometrics(true);
+            }
+          } catch (permErr) {
+            console.warn('[HC] Error comprobando permisos (asumimos que sí):', permErr);
+            // En caso de error al comprobar, intentamos leer igualmente
+            setHcPermissionsGranted(true);
+            loadBiometrics(true);
+          }
+        }
+      } catch (e) {
+        console.warn('[HC] No disponible en esta plataforma:', e);
       }
     };
     initHealthConnect();
-  }, [granted]);
+  }, []); // Solo al montar
 
-  const closeHealthOnboarding = () => {
+  const closeHealthOnboarding = async () => {
     localStorage.setItem('hc_onboarding_seen', 'true');
     setShowHealthOnboarding(false);
-    checkPermissions(); // Refrescar estado global de granted
+    // Intentar solicitar permisos y luego cargar datos
+    try {
+      const result = await healthConnectService.requestPermissions();
+      setHcPermissionsGranted(result.granted);
+    } catch (e) {
+      setHcPermissionsGranted(true); // Asumimos que sí si falla el check
+    }
+    loadBiometrics(true);
   };
 
   return (
@@ -460,19 +553,19 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 
-                {(isGarminConnected || biometrics) ? (
+                {(isGarminConnected || biometrics || isHCAvailable || granted) ? (
                   <BiometricsWidget data={biometrics} userId="default_user" />
                 ) : (
                   <div className="bg-surface-container-high p-6 rounded-xl border border-outline-variant/10 text-center space-y-4">
                     <div className="w-12 h-12 bg-surface-variant rounded-full flex items-center justify-center mx-auto text-on-surface-variant">
                       <LayoutDashboard size={24} />
                     </div>
-                    <p className="text-xs text-on-surface-variant">Conecta tu Garmin para ver tus métricas en tiempo real.</p>
+                    <p className="text-xs text-on-surface-variant">Conecta tu Garmin o activa Health Connect para ver tus métricas.</p>
                     <button 
                       onClick={() => setActiveTab('setup')}
                       className="w-full bg-primary text-on-primary py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:brightness-110 transition-all"
                     >
-                      Conectar Garmin
+                      Configurar
                     </button>
                   </div>
                 )}
