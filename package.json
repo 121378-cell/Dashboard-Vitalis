@@ -25,6 +25,7 @@
     "better-sqlite3": "^12.8.0",
     "capacitor-health": "^8.1.0",
     "cors": "^2.8.6",
+    "dexie": "^4.4.2",
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
     "express-async-handler": "^1.2.0",
