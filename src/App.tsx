@@ -251,9 +251,11 @@ const App: React.FC = () => {
   const loadBiometrics = async (forceHC: boolean = false) => {
     setLoadingBiometrics(true);
     try {
-      // 1. Prioridad: Native Android Health Connect (si disponible Y permisos OK o forzado)
-      if (isHCAvailable && (hcPermissionsGranted || forceHC || granted)) {
-        console.log('[App] Leyendo desde Google Health Connect nativo...');
+      // 1. Prioridad: HC nativo
+      // forceHC bypasea isHCAvailable (stale closure fix) y va directo al plugin
+      const shouldTryHC = forceHC || isHCAvailable;
+      if (shouldTryHC) {
+        console.log('[App] Intentando leer desde Health Connect...');
         try {
           const hcData = await healthConnectService.readTodayBiometrics();
           const steps = hcData.steps ?? 0;
@@ -278,17 +280,29 @@ const App: React.FC = () => {
           syncService.syncBiometricsToBackend(mappedBiometrics).catch(() => {});
           return;
         } catch (hcErr) {
-          console.warn('[App] HC read falló, intentando backend:', hcErr);
+          console.warn('[App] HC read falló:', hcErr);
         }
       }
 
       // 2. Fallback: Servidor Backend (PC / Web Browser)
-      const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
-        headers: { "x-user-id": "default_user" }
-      });
-      setBiometrics(res.data);
-    } catch (e) {
-      console.error("Error al cargar biométricos:", e);
+      try {
+        const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
+          headers: { "x-user-id": "default_user" }
+        });
+        setBiometrics(res.data);
+        return;
+      } catch {
+        console.warn('[App] Backend no disponible.');
+      }
+
+      // 3. Safety net: datos demo para que el widget nunca quede vacío
+      const demo: Biometrics = {
+        heartRate: 68, hrv: 45, spo2: 98, stress: 25,
+        steps: 6200, sleep: 7.2, calories: 420, respiration: 14,
+        readiness: 74, status: 'good', overtraining: false, source: 'demo'
+      };
+      setBiometrics(demo);
+
     } finally {
       setLoadingBiometrics(false);
     }
