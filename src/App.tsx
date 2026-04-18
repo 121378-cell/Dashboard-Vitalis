@@ -23,15 +23,24 @@ import { ProfileForm } from './components/ProfileForm';
 import { Chat } from './components/Chat';
 import { PDFManager } from './components/PDFManager';
 import { Setup } from './components/Setup';
+import { HealthConnectOnboarding } from './components/HealthConnectOnboarding';
 
 // Services & Types
 import { callAI } from './services/aiService';
+import { syncService } from './services/syncService';
+import { notificationService } from './services/notificationService';
+import { healthConnectService } from './services/healthConnectService';
+import { useHealthConnectPermissions } from './hooks/useHealthConnectPermissions';
 import { Biometrics, AthleteProfile, Message, PDFDocument, Workout } from './types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
 const App: React.FC = () => {
-  // --- State ---
+  // --- Native & System State ---
+  const { granted, checkPermissions } = useHealthConnectPermissions();
+  const [showHealthOnboarding, setShowHealthOnboarding] = useState(false);
+
+  // --- UI State ---
   const [activeTab, setActiveTab] = useState<'chat' | 'profile' | 'docs' | 'setup'>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isGarminConnected, setIsGarminConnected] = useState(false);
@@ -360,8 +369,53 @@ const App: React.FC = () => {
     }
   }, [checkAuthStatus]);
 
+  // --- Native Core & Initialization (REQ: Phase 3, 4, 5) ---
+  useEffect(() => {
+    // 1. Set up Background Notifications
+    notificationService.initialize().then(() => {
+      // Agenda notificación de Briefing diario a las 8:00 AM
+      notificationService.scheduleMorningBriefing(8, 0);
+    });
+
+    // 2. Set up Offline/Online Background Reconciliation (Phase 3)
+    const handleOnlineReconciliation = () => {
+      console.log("[App] Conexión detectada. Ejecutando syncService.syncAll...");
+      syncService.syncAll();
+    };
+    window.addEventListener('online', handleOnlineReconciliation);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineReconciliation);
+    };
+  }, []);
+
+  // 3. Health Connect Onboarding Hook (Phase 2)
+  useEffect(() => {
+    const initHealthConnect = async () => {
+      const isAvail = await healthConnectService.isAvailable();
+      const hasSeen = localStorage.getItem('hc_onboarding_seen');
+      if (isAvail && !granted && !hasSeen) {
+        setShowHealthOnboarding(true);
+      }
+    };
+    initHealthConnect();
+  }, [granted]);
+
+  const closeHealthOnboarding = () => {
+    localStorage.setItem('hc_onboarding_seen', 'true');
+    setShowHealthOnboarding(false);
+    checkPermissions(); // Refrescar estado global de granted
+  };
+
   return (
-    <div className="flex h-screen bg-background text-on-surface overflow-hidden font-body">
+    <div className="flex h-screen bg-background text-on-surface overflow-hidden font-body relative">
+      {/* Native Modals Layer */}
+      {showHealthOnboarding && (
+        <HealthConnectOnboarding 
+          onComplete={closeHealthOnboarding} 
+          onSkip={closeHealthOnboarding} 
+        />
+      )}
       {/* --- Sidebar (REQ-F01, F02) --- */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
