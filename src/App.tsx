@@ -441,19 +441,16 @@ const App: React.FC = () => {
 
   // --- Lifecycle ---
   useEffect(() => {
-    // Limpieza única de datos heredados
-    const currentVersion = "2.1";
-    if (localStorage.getItem('vitalis_version') !== currentVersion) {
-      console.log("[App] Limpiando memoria antigua para personalizar perfil...");
-      localStorage.clear();
-      localStorage.setItem('vitalis_version', currentVersion);
-    }
-    
-    checkAuthStatus();
-    fetchServiceSettings();
+    // Solo carga inicial de datos pesados
     fetchWorkouts();
     loadBiometrics();
     generateBriefing();
+  }, []); // Se ejecuta solo una vez al arrancar
+
+  useEffect(() => {
+    // Gestión de sesión y servicios
+    checkAuthStatus();
+    fetchServiceSettings();
   }, [checkAuthStatus, fetchServiceSettings]);
 
   const generateBriefing = async () => {
@@ -463,8 +460,9 @@ const App: React.FC = () => {
         headers: { "x-user-id": "default_user" }
       });
       setBriefing(res.data.briefing);
-    } catch (e) {
-      console.warn("No se pudo generar el briefing proactivo");
+    } catch (e: any) {
+      console.warn("No se pudo generar el briefing proactivo", e);
+      setBriefing("Error: ATLAS no pudo generar el briefing. Verifica la conexión con Groq/Gemini o reintenta con el botón superior.");
     } finally {
       setLoadingBriefing(false);
     }
@@ -779,28 +777,37 @@ const App: React.FC = () => {
               exit={{ opacity: 0, y: -10 }}
               className="h-full flex flex-col gap-4"
             >
-              {activeTab === 'chat' && briefing && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-primary/5 border border-primary/20 p-4 rounded-2xl relative overflow-hidden"
-                >
+              {activeTab === 'chat' && loadingBriefing && (
+                <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex items-center gap-4">
+                  <Loader2 size={20} className="animate-spin text-primary shrink-0" />
+                  <span className="text-xs text-primary font-bold uppercase tracking-widest">ATLAS analizando biométricos...</span>
+                </div>
+              )}
+
+              {activeTab === 'chat' && briefing && !loadingBriefing && (
+                <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl relative overflow-hidden">
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary shrink-0">
-                      <Brain size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Briefing Proactivo ATLAS</h4>
-                      <p className="text-sm leading-relaxed text-on-surface whitespace-pre-wrap">{briefing}</p>
+                    <Brain size={20} className="text-primary shrink-0 mt-1" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary">Briefing Proactivo ATLAS</h4>
+                        <button 
+                          onClick={generateBriefing}
+                          className="text-[9px] uppercase font-bold text-primary/60 hover:text-primary"
+                        >
+                          Actualizar
+                        </button>
+                      </div>
+                      <p className="text-sm leading-relaxed text-on-surface whitespace-pre-wrap">{String(briefing)}</p>
                     </div>
                   </div>
                   <button 
                     onClick={() => setBriefing(null)}
-                    className="absolute top-2 right-2 p-1 text-on-surface-variant/50 hover:text-on-surface"
+                    className="absolute top-2 right-2 p-1 text-on-surface-variant/30 hover:text-on-surface"
                   >
                     <X size={14} />
                   </button>
-                </motion.div>
+                </div>
               )}
               {activeTab === 'chat' && (
                 <Chat 

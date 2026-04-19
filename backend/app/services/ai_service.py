@@ -42,30 +42,28 @@ class AIService:
     def _generate_chat_response(self, messages: List[Dict[str, str]], system_instruction: Optional[str] = None) -> Dict[str, Any]:
         start_time = time.time()
         
-        # 1. Try Groq with 15s timeout
+        # 1. Try Groq with 30s timeout
         if self.groq_client:
             try:
-                logger.info("Trying Groq AI provider...")
-                content = self._generate_openai_compatible(self.groq_client, "llama-3.1-8b-instant", messages, system_instruction, timeout=15)
+                logger.info("Trying Groq AI provider for Briefing...")
+                content = self._generate_openai_compatible(self.groq_client, "llama-3.1-8b-instant", messages, system_instruction, timeout=30)
                 logger.info(f"Groq responded successfully in {time.time() - start_time:.1f}s")
                 return {"content": content, "provider": "Groq"}
             except Exception as e:
                 logger.warning(f"Groq failed: {e}")
 
-        # 2. Check Ollama availability before trying (2s quick check)
+        # 2. Check Ollama availability before trying
         ollama_available = self._check_ollama_available()
         if ollama_available:
             try:
                 logger.info("Trying Ollama (local) AI provider...")
-                content = self._generate_openai_compatible(self.ollama_client, "llama3", messages, system_instruction, timeout=10)
+                content = self._generate_openai_compatible(self.ollama_client, "llama3", messages, system_instruction, timeout=15)
                 logger.info(f"Ollama responded successfully in {time.time() - start_time:.1f}s")
                 return {"content": content, "provider": "Ollama (Local)"}
             except Exception as e:
                 logger.warning(f"Ollama failed: {e}")
-        else:
-            logger.info("Ollama not available, skipping...")
 
-        # 3. Fallback to Gemini with 15s timeout
+        # 3. Fallback to Gemini with 30s timeout
         if self.gemini_client:
             try:
                 logger.info("Trying Gemini AI provider...")

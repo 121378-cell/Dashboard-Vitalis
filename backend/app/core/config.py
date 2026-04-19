@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    PORT: int = 8001
+    PORT: int = 8005
     
     # Strava OAuth2
     STRAVA_CLIENT_ID: Optional[str] = None
