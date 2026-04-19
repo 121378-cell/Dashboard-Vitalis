@@ -49,7 +49,11 @@ def get_profile(db: Session = Depends(get_db), user_id: str = "default_user"):
     return {
         "exists": True,
         "user_id": user_id,
-        "name": user.name or "Atleta ATLAS",
+        "name": user.name if user and user.name else "Sergi",
+        "age": 47,
+        "goal": "Proyecto 31/07 - Definición y Fuerza",
+        "bench_press_max": 50,
+        "leg_press_max": 100,
         "garmin_connected": bool(token and token.garmin_email),
         "garmin_email": token.garmin_email if token else None,
     }

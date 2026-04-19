@@ -89,66 +89,64 @@ export const WorkoutLogger: React.FC<Props> = ({ session: initialSession, onSave
               >
                 <Plus size={14} /> AÑADIR SERIE
               </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container-low/50">
+            </div>            <div className="overflow-x-auto scrollbar-none">
+              <table className="w-full text-left min-w-[320px]">
+                <thead className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container-low/50">
                   <tr>
-                    <th className="px-4 py-3 w-16 text-center">Serie</th>
-                    <th className="px-4 py-3">Peso (kg)</th>
-                    <th className="px-4 py-3">Reps</th>
-                    <th className="px-4 py-3 w-20">RPE</th>
-                    <th className="px-4 py-3 w-16 text-center">Status</th>
-                    <th className="px-4 py-3 w-12"></th>
+                    <th className="px-3 py-2 w-10 text-center">Set</th>
+                    <th className="px-3 py-2 text-center">Kg</th>
+                    <th className="px-3 py-2 text-center">Reps</th>
+                    <th className="px-3 py-2 w-16">RPE</th>
+                    <th className="px-3 py-2 w-14 text-center">Status</th>
+                    <th className="px-2 py-2 w-8"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/5">
                   {exercise.sets.map((set, setIdx) => (
                     <tr key={set.id} className={`${set.completed ? 'bg-green-500/5' : ''} transition-colors`}>
-                      <td className="px-4 py-3 text-center font-bold text-on-surface-variant">{set.set_number}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center font-bold text-on-surface-variant text-xs">{set.set_number}</td>
+                      <td className="px-3 py-3 text-center">
                         <input 
                           type="number" 
                           value={set.weight_kg}
                           onChange={(e) => updateSet(exIdx, setIdx, { weight_kg: parseFloat(e.target.value) })}
-                          className="w-20 bg-surface-container-high border border-outline-variant/20 rounded-lg px-2 py-1 text-center font-bold focus:ring-1 focus:ring-primary outline-none"
+                          className="w-14 bg-surface-container-high border border-outline-variant/20 rounded-lg px-1 py-1 text-center font-bold focus:ring-1 focus:ring-primary outline-none text-sm"
                         />
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center">
                         <input 
                           type="number" 
                           value={set.reps}
                           onChange={(e) => updateSet(exIdx, setIdx, { reps: parseInt(e.target.value) })}
-                          className="w-16 bg-surface-container-high border border-outline-variant/20 rounded-lg px-2 py-1 text-center font-bold focus:ring-1 focus:ring-primary outline-none"
+                          className="w-12 bg-surface-container-high border border-outline-variant/20 rounded-lg px-1 py-1 text-center font-bold focus:ring-1 focus:ring-primary outline-none text-sm"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                         <div className="flex items-center gap-1">
-                           <span className="text-[10px] text-on-surface-variant">Tgt: {set.rpe_target}</span>
+                      <td className="px-3 py-3">
+                         <div className="flex flex-col items-center">
+                           <span className="text-[8px] text-on-surface-variant">Obj: {set.rpe_target}</span>
                            <input 
                              type="number" 
                              placeholder="Real"
                              value={set.rpe_real || ''}
                              onChange={(e) => updateSet(exIdx, setIdx, { rpe_real: parseFloat(e.target.value) })}
-                             className="w-12 bg-transparent border-b border-outline-variant/20 text-xs text-center outline-none"
+                             className="w-10 bg-transparent border-b border-outline-variant/20 text-[10px] text-center outline-none"
                            />
                          </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center">
                         <button 
                           onClick={() => updateSet(exIdx, setIdx, { completed: !set.completed })}
-                          className={`p-2 rounded-full transition-all ${set.completed ? 'text-green-400 bg-green-400/10' : 'text-on-surface-variant/30 hover:bg-surface-variant'}`}
+                          className={`p-1 rounded-full transition-all ${set.completed ? 'text-green-400 bg-green-400/10' : 'text-on-surface-variant/30 animate-pulse'}`}
                         >
                           <CheckCircle2 size={24} />
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         <button 
                           onClick={() => deleteSet(exIdx, setIdx)}
-                          className="text-on-surface-variant/20 hover:text-red-400 transition-colors"
+                          className="text-on-surface-variant/10 hover:text-red-400 transition-colors"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>

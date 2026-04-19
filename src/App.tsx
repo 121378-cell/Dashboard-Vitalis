@@ -55,13 +55,13 @@ const App: React.FC = () => {
   const [loadingAI, setLoadingAI] = useState(false);
   const [documents, setDocuments] = useState<PDFDocument[]>([]);
   const [profile, setProfile] = useState<AthleteProfile>({
-    name: "Atleta ATLAS",
-    age: 30,
+    name: "Sergi",
+    age: 47,
     weight: 75,
     height: 180,
-    goal: "Rendimiento deportivo",
-    experience: "intermedio",
-    daysPerWeek: 4,
+    goal: "Proyecto 31/07 - Definición",
+    experience: "avanzado",
+    daysPerWeek: 5,
     medicalHistory: "Ninguna relevante"
   });
 
@@ -476,10 +476,12 @@ const App: React.FC = () => {
           `${BACKEND_URL}/settings/profile`,
           { headers: { "x-user-id": "default_user" } }
         );
-        if (response.data.exists && response.data.name !== "Atleta ATLAS") {
+        if (response.data.exists) {
           setProfile(prev => ({
             ...prev,
-            name: response.data.name
+            name: response.data.name || "Sergi",
+            age: response.data.age || 47,
+            goal: response.data.goal || "Proyecto 31/07 - Definición"
           }));
         }
       } catch (e) {
@@ -569,7 +571,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-background text-on-surface overflow-hidden font-body relative">
+    <div className="flex mobile-h-screen bg-background text-on-surface overflow-hidden font-body relative">
       {/* Native Modals Layer */}
       {showHealthOnboarding && (
         <HealthConnectOnboarding 
@@ -577,6 +579,20 @@ const App: React.FC = () => {
           onSkip={closeHealthOnboarding} 
         />
       )}
+      
+      {/* Mobile Drawer Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* --- Sidebar (REQ-F01, F02) --- */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
@@ -584,7 +600,7 @@ const App: React.FC = () => {
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            className="w-80 bg-surface-container border-r border-outline-variant/10 flex flex-col z-20"
+            className="fixed lg:relative w-[85%] lg:w-80 h-full bg-surface-container border-r border-outline-variant/10 flex flex-col z-40 lg:z-20"
           >
             {/* Header */}
             <div className="p-6 flex items-center justify-between">
@@ -701,7 +717,7 @@ const App: React.FC = () => {
       {/* --- Main Content --- */}
       <main className="flex-1 flex flex-col relative">
         {/* Top Navigation (REQ-F01) */}
-        <header className="h-16 bg-surface-container/50 backdrop-blur-md border-b border-outline-variant/10 flex items-center justify-between px-6 z-10">
+        <header className="h-16 bg-surface-container/50 backdrop-blur-md border-b border-outline-variant/10 flex items-center justify-between px-4 lg:px-6 z-10 shrink-0">
           <div className="flex items-center gap-4">
             {!isSidebarOpen && (
               <button onClick={() => setIsSidebarOpen(true)} className="p-2 hover:bg-surface-variant rounded-lg">
@@ -744,7 +760,7 @@ const App: React.FC = () => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden p-6">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
