@@ -3,7 +3,7 @@ import { offlineStorage, SyncQueueItem } from './offlineStorage';
 import { HCBiometrics, HCWorkout } from './healthConnectService';
 
 // Fallback al URL de FastAPI dependiendo del entorno (usamos VITE_API_URL si está disponible)
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
 
 export class SyncService {
   
@@ -24,7 +24,7 @@ export class SyncService {
   // Obtener plan de entrenamiento del backend
   async fetchTodayPlan() {
     try {
-      const response = await axios.get(`${BACKEND_URL}/vitalis/today`, {
+      const response = await axios.get(`${BACKEND_URL}/sessions/today`, {
         headers: { 'x-user-id': 'default_user' }
       });
       return response.data;

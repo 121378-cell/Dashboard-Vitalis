@@ -22,7 +22,7 @@ export default defineConfig(({mode}) => {
       allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', 'localhost'],
       proxy: {
         '/api/v1': {
-          target: 'http://localhost:9000',
+          target: 'http://localhost:8005',
           changeOrigin: true,
           secure: false,
         },
