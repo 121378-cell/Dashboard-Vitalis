@@ -22,8 +22,9 @@ def garmin_login(
         # Ensure user exists
         db_user = db.query(User).filter(User.id == user_id).first()
         if not db_user:
-            db_user = User(id=user_id, name="Atleta ATLAS")
+            db_user = User(id=user_id, name="Sergi")
             db.add(db_user)
+            db_user.full_name = "Sergi"
             db.commit()
 
         # Attempt Garmin Login

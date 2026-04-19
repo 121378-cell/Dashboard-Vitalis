@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
             user = db.query(User).filter(User.id == "default_user").first()
             if not user:
                 logger.info("Creating default_user...")
-                user = User(id="default_user", email="sergi.marquez.al@gmail.com", full_name="Atleta ATLAS")
+                user = User(id="default_user", email="sergi.marquez.al@gmail.com", full_name="Sergi")
                 db.add(user)
                 db.commit()
             
