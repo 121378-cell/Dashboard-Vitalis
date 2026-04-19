@@ -619,14 +619,15 @@ class AthleteProfileService:
             sueno_estado = "óptimo" if sueno_medio >= 7.5 else "aceptable" if sueno_medio >= 6.5 else "mejorable"
             estres_estado = "bajo" if estres_medio < 30 else "moderado" if estres_medio < 60 else "alto"
             
-            summary = f"""PERFIL DEL ATLETA (basado en {len(rows)} días de datos reales Garmin):
-- Tipo de atleta: {tipo} | {sesiones_semana} sesiones/semana | {dur_media} min/sesión media
-- FC reposo: {fc_media} bpm ({fc_estado})
-- Sueño: {sueno_medio}h media ({sueno_estado})
-- Estrés: {estres_medio}/100 ({estres_estado})
-- Actividad diaria: {pasos_medio:,} pasos/día
-- VO2max: {vo2max if vo2max else 'No disponible (Forerunner 245)'}
-- Datos desde: historial de {len(rows)} días analizados"""
+            summary = f"""PERFIL DEL ATLETA (VITALIS PROYECTO 31/07):
+- Nombre: Sergi (47 años)
+- Objetivo: Definición estética y salud funcional (Meta: 31 de Julio)
+- Hitos de Fuerza: Press Banca 50kg (RPE 7) | Prensa 100kg (Estable)
+- Capacidad Cardiovascular: {fc_media} bpm (FCR real: 47-50 bpm - Rango Élite)
+- Motor NEAT: {pasos_medio:,} pasos/día (Media real: 20,000 pasos)
+- Recuperación: {sueno_medio}h/noche ({sueno_estado}) | HRV Baseline: 47-50ms
+- Metodología: Sobrecarga Progresiva + Protocolos McGill + Intensidad Stoppani
+- Estado del Plan: SOBRESALIENTE (Zona óptima de progresión)"""
             
             return summary
             
