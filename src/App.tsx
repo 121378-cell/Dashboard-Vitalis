@@ -25,6 +25,7 @@ import { PDFManager } from './components/PDFManager';
 import { Setup } from './components/Setup';
 import { HealthConnectOnboarding } from './components/HealthConnectOnboarding';
 import { ExerciseSelector } from './components/ExerciseSelector';
+import { WorkoutLogger } from './components/WorkoutLogger';
 
 // Services & Types
 import { callAI } from './services/aiService';
@@ -64,6 +65,7 @@ const App: React.FC = () => {
     medicalHistory: "Ninguna relevante"
   });
 
+  const [currentSession, setCurrentSession] = useState<any | null>(null);
   const [briefing, setBriefing] = useState<string | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
 
@@ -375,6 +377,18 @@ const App: React.FC = () => {
 
       const result = await callAI(newMessages, systemPrompt);
       
+      // REQ: Detect if AI generated a JSON session plan
+      if (result.content.includes("json_session_start")) {
+        try {
+          const jsonStr = result.content.split("json_session_start")[1].split("json_session_end")[0];
+          const sessionData = JSON.parse(jsonStr);
+          setCurrentSession(sessionData);
+          setActiveTab('routine');
+        } catch (e) {
+          console.error("Error parsing AI session plan", e);
+        }
+      }
+
       const assistantMsg: Message = {
         role: 'assistant',
         content: result.content,
@@ -771,7 +785,18 @@ const App: React.FC = () => {
                 />
               )}
               {activeTab === 'routine' && (
-                <ExerciseSelector />
+                currentSession ? (
+                  <WorkoutLogger 
+                    session={currentSession} 
+                    onSave={(updated) => {
+                      alert("¡Sesión Guardada! Los datos se han enviado a tu historial.");
+                      setCurrentSession(null);
+                      setActiveTab('chat');
+                    }} 
+                  />
+                ) : (
+                  <ExerciseSelector />
+                )
               )}
               {activeTab === 'profile' && (
                 <ProfileForm 

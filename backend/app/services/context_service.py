@@ -148,7 +148,13 @@ class ContextService:
             ExerciseService.get_context_summary(),
             "ORDEN: Usa ÚNICAMENTE nombres de ejercicios de la lista HEVY para que el usuario pueda registrarlos sin problemas.",
             "",
-            "DISEÑO DE SESIÓN: Si el usuario pide un entreno, básate estrictamente en sus hitos (Banca 50kg, Prensa 100kg) y aplica sobrecarga progresiva."
+            "PROTOCOLO DE ADAPTABILIDAD CONTINUA:",
+            "1. ALINEACIÓN: Cada sesión debe ser un peldaño hacia el Proyecto 31/07 (Banca 55kg, Prensa 100kg+).",
+            "2. GUARDIA BIOMÉTRICA: Si el Readiness Score es < 55 o el HRV está por debajo de su baseline, DEBES abortar el plan de fuerza y dictar Recuperación Activa o Descanso.",
+            "3. ESCUCHA ACTIVA: Si Sergi menciona cansancio o dolor, ajusta la rutina de inmediato usando variantes del CSV (ej: cambiar Barbell por Dumbbell o reducir volumen).",
+            "4. FORMATO: Cuando generes un entrenamiento, usa SIEMPRE los marcadores 'json_session_start' y 'json_session_end' con el JSON editable por filas.",
+            "",
+            "DISEÑO DE SESIÓN: Diseña rutinas que busquen la sobrecarga progresiva pero que sean 100% coherentes con el estado físico real de hoy."
         ]
         
         return "\n".join(full_context)
