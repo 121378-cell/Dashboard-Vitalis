@@ -322,11 +322,11 @@ const App: React.FC = () => {
         console.warn('[App] Backend no disponible o vacío');
       }
 
-      // 3. Mantener Demo solo si no hay nada más
+      // 3. Mantener Baselines de Sergi (Proyecto 31/07) como punto de partida real
       setBiometrics(prev => prev || {
-        heartRate: 68, hrv: 45, spo2: 98, stress: 25,
-        steps: 8432, sleep: 7.5, calories: 450,
-        respiration: 14, readiness: 85, status: 'good',
+        heartRate: 48, hrv: 49, spo2: 98, stress: 22,
+        steps: 20000, sleep: 7.0, calories: 2400,
+        respiration: 13, readiness: 88, status: 'excellent',
         overtraining: false, source: 'garmin'
       });
     } finally {
@@ -441,6 +441,16 @@ const App: React.FC = () => {
 
   // --- Lifecycle ---
   useEffect(() => {
+    // Limpieza única de datos heredados
+    const currentVersion = "2.1";
+    if (localStorage.getItem('vitalis_version') !== currentVersion) {
+      console.log("[App] Limpiando memoria antigua para personalizar perfil...");
+      localStorage.clear();
+      localStorage.setItem('vitalis_version', currentVersion);
+    }
+    
+    checkAuthStatus();
+    fetchServiceSettings();
     fetchWorkouts();
     loadBiometrics();
     generateBriefing();
