@@ -64,6 +64,9 @@ const App: React.FC = () => {
     medicalHistory: "Ninguna relevante"
   });
 
+  const [briefing, setBriefing] = useState<string | null>(null);
+  const [loadingBriefing, setLoadingBriefing] = useState(false);
+
   // --- Quick Actions (REQ-F22) ---
   const quickActions = [
     { label: "Análisis Hoy", prompt: "¿Cómo están mis biométricos hoy y qué entrenamiento me recomiendas?" },
@@ -424,11 +427,24 @@ const App: React.FC = () => {
 
   // --- Lifecycle ---
   useEffect(() => {
-    checkAuthStatus();
-    fetchServiceSettings();
     fetchWorkouts();
-    loadBiometrics(); // Intenta cargar desde HC o Backend al arrancar
+    loadBiometrics();
+    generateBriefing();
   }, [checkAuthStatus, fetchServiceSettings]);
+
+  const generateBriefing = async () => {
+    setLoadingBriefing(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/ai/daily-briefing`, {
+        headers: { "x-user-id": "default_user" }
+      });
+      setBriefing(res.data.briefing);
+    } catch (e) {
+      console.warn("No se pudo generar el briefing proactivo");
+    } finally {
+      setLoadingBriefing(false);
+    }
+  };
 
   // 🔑 Reactivo: cuando Health Connect concede permisos, cargamos biométricos
   useEffect(() => {
@@ -721,8 +737,31 @@ const App: React.FC = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="h-full"
+              className="h-full flex flex-col gap-4"
             >
+              {activeTab === 'chat' && briefing && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-primary/5 border border-primary/20 p-4 rounded-2xl relative overflow-hidden"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary shrink-0">
+                      <Brain size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Briefing Proactivo ATLAS</h4>
+                      <p className="text-sm leading-relaxed text-on-surface whitespace-pre-wrap">{briefing}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setBriefing(null)}
+                    className="absolute top-2 right-2 p-1 text-on-surface-variant/50 hover:text-on-surface"
+                  >
+                    <X size={14} />
+                  </button>
+                </motion.div>
+              )}
               {activeTab === 'chat' && (
                 <Chat 
                   messages={messages} 
