@@ -1,0 +1,58 @@
+================================================================================
+PERSONAL TRAINING HISTORY REPORT
+================================================================================
+
+TRAINING OVERVIEW
+----------------------------------------
+Total Training Sessions: 17
+Date Range: 2026-02-01 to 2026-03-05
+
+EXERCISES PERFORMED
+----------------------------------------
+- Bench Press
+- Squat
+- Deadlift
+- Overhead Press
+- Pull-ups
+- Barbell Row
+
+MUSCLE GROUPS TRAINED
+----------------------------------------
+- Chest
+- Legs
+- Back
+- Shoulders
+
+PERSONAL RECORDS (Max Weight)
+----------------------------------------
+Deadlift: 190 kg
+Squat: 165 kg
+Barbell Row: 140 kg
+Bench Press: 115 kg
+Overhead Press: 90 kg
+Pull-ups: 10 kg
+
+TRAINING VOLUME
+----------------------------------------
+Total Training Volume: 41705 kg
+Average Volume per Session: 2453 kg
+
+TRAINING FREQUENCY BY MUSCLE GROUP
+----------------------------------------
+Back: 6 sessions
+Chest: 4 sessions
+Legs: 4 sessions
+Shoulders: 3 sessions
+
+MOST TRAINED EXERCISES
+----------------------------------------
+Bench Press: 4 times
+Squat: 4 times
+Deadlift: 3 times
+Overhead Press: 3 times
+Pull-ups: 2 times
+Barbell Row: 1 times
+
+================================================================================
+Report Generated: 2026-03-07 00:57:15
+================================================================================

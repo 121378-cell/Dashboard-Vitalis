@@ -1,0 +1,50 @@
+# PERSONAL TRAINING REPORT
+Generated: 2026-03-07 00:48:25
+
+## TRAINING SUMMARY
+- Total Workouts: 17
+- Training Period: 2026-02-01 to 2026-03-05
+- Duration: 32 days
+- Average Workouts per Week: 2.8
+
+## EXERCISES PERFORMED (6)
+- Bench Press
+- Squat
+- Deadlift
+- Overhead Press
+- Pull-ups
+- Barbell Row
+
+## MUSCLE GROUPS TRAINED (4)
+- Chest
+- Legs
+- Back
+- Shoulders
+
+## STRENGTH LEVELS BY EXERCISE
+- Bench Press: 140.0 kg
+- Squat: 115.0 kg
+- Deadlift: 190.0 kg
+- Overhead Press: 90.0 kg
+- Pull-ups: 10.0 kg
+- Barbell Row: 165.0 kg
+
+## TOTAL VOLUME BY MUSCLE GROUP
+- Back: 3,785 kg
+- Chest: 2,770 kg
+- Legs: 3,455 kg
+- Shoulders: 1,775 kg
+
+## KEY ACHIEVEMENTS
+- Most Trained Muscle Group: Back
+- Strongest Exercise: Deadlift
+
+## TRAINING RECOMMENDATIONS
+Based on your training history:
+- Increase training frequency to 3-4 times per week for better results
+- Maintain consistent weekly training schedule
+- Track progressive overload on key exercises
+- Ensure adequate recovery between sessions
+
+---
+This report should be used as context for AI-generated training plans.

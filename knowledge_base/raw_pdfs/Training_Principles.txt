@@ -1,0 +1,63 @@
+# Training Principles Guide
+
+## 1. Progressive Overload
+Progressive overload is the fundamental principle of strength training. It refers to the constant, small incremental increase of stress placed upon the body during exercise training. This involves gradually increasing the weight, frequency, or intensity of your workouts.
+
+### Methods of Progressive Overload:
+- **Increasing Weight**: Add more weight to your lifts each week or month
+- **Increasing Reps**: Perform more repetitions with the same weight
+- **Increasing Sets**: Add an additional set to your workout
+- **Decreasing Rest**: Reduce rest periods between sets
+- **Improving Form**: Better technique can increase effectiveness
+
+## 2. Exercise Categories
+
+### Compound Movements (Primary Focus)
+Compound movements work multiple muscle groups and joints. These should form the foundation of your training:
+- **Squats**: Leg and core development
+- **Deadlifts**: Full body strength and posterior chain
+- **Bench Press**: Chest, shoulders, and triceps
+- **Rows**: Back, shoulders, and arms
+- **Overhead Press**: Shoulders, chest, and core
+
+### Isolation Movements (Secondary)
+Isolation exercises target specific muscles:
+- **Leg Curls**: Hamstrings
+- **Leg Extensions**: Quadriceps
+- **Bicep Curls**: Biceps
+- **Tricep Extensions**: Triceps
+- **Lateral Raises**: Shoulders
+
+## 3. Training Frequency
+Training frequency is how many times per week you train a specific muscle group.
+
+- **Once per week**: Good for beginners, requires perfect execution
+- **Twice per week**: Optimal for most people, allows adequate recovery
+- **Three times per week**: Advanced, requires careful programming
+
+## 4. Rep Ranges and Adaptations
+Different rep ranges produce different adaptations:
+
+- **1-5 Reps**: Strength (high weight, low reps)
+- **6-12 Reps**: Hypertrophy (muscle growth)
+- **12-20 Reps**: Muscular endurance
+- **20+ Reps**: Metabolic stress and conditioning
+
+## 5. Rest and Recovery
+Recovery is essential for progress:
+- **Sleep**: 7-9 hours per night for optimal recovery
+- **Between Sets**: 2-3 minutes for compound lifts, 1-2 minutes for isolation
+- **Between Workouts**: 48-72 hours for the same muscle group
+- **Deload Weeks**: 1 week every 4-8 weeks at 50-60% intensity
+
+## 6. Variable Loading
+For compound movements, using different weights across sets:
+- **Classic Strength Training**: Pyramid sets (heavy to light)
+- **Cluster Sets**: Multiple heavy singles with short rest
+- **Double Progressive Training**: Increase reps first, then weight
+
+## 7. Exercise Pairing and Antagonists
+Understanding muscle antagonists helps in efficient programming:
+- **Chest/Back**: Push/Pull pairing
+- **Quadriceps/Hamstrings**: Front/Rear pairing
+- **Biceps/Triceps**: Flexor/Extensor pairing
