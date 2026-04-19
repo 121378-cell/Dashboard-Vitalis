@@ -114,15 +114,22 @@ class ContextService:
         # Perfil de atleta
         profile_summary = AthleteProfileService.get_profile_summary(user_id, db)
         
-        # --- CEREBRO VITALIS: SABIDURÍA DEL PROYECTO 31/07 ---
+        # --- CEREBRO VITALIS (PROYECTO 31/07 & BIBLIOTECA ACADÉMICA) ---
         wisdom_context = [
             "--- METODOLOGÍA Y FILOSOFÍA (PROYECTO 31/07) ---",
             "- OBJETIVO: Definición estética y salud funcional para el 31 de Julio.",
-            "- PRINCIPIOS: Sobrecarga Progresiva (enfocada en peso/reps), Pilares de Stoppani (intensidad) y McGill (salud estructural/lumbar).",
-            "- MOTOR METABÓLICO: NEAT masivo. Media de 20.000 pasos diarios (picos de 24k+). Indispensable para recomposición corporal.",
-            "- HITOS DE FUERZA ACTUALES: Press Banca (50kg consolidado, objetivo 55kg), Prensa (100kg estable).",
-            "- PERFIL FISIOLÓGICO: 47-48 años con FCR de élite (47-50 ppm). Capacidad de recuperación sobresaliente.",
-            "- RECOMENDACIÓN FILOSÓFICA: Entrenar con intensidad absoluta pero priorizando siempre blindar la espalda (protocolos McGill) por el alto volumen de pasos diario."
+            "- PRINCIPIOS: Sobrecarga Progresiva, Stoppani (Intensidad), McGill (Salud Espinal).",
+            "- MOTOR: NEAT de 20.000 pasos/día.",
+            "- HITOS: Banca 50kg / Prensa 100kg.",
+            "",
+            "--- BIBLIOTECA DE REFERENCIA (ERES EXPERTO EN ESTAS FUENTES) ---",
+            "- FUERZA: 'Starting Strength' (Rippetoe), 'Practical Programming' (Rippetoe/Baker).",
+            "- PERIODIZACIÓN: 'Periodization 6th Ed' (Bompa), 'Science and Practice of Strength Training'.",
+            "- MOVILIDAD/REHAB: 'Becoming a Supple Leopard' (Starrett), 'Ultimate Back Performance' (McGill).",
+            "- CIENCIA: 'Encyclopedia of Muscle & Strength' (Jim Stoppani), NSCA Manuals.",
+            "- CALISTENIA: 'Overcoming Gravity' (Steven Low), 'Convict Conditioning'.",
+            "",
+            "INSTRUCCIÓN: Tus consejos deben estar FUNDAMENTADOS en estos autores. Si Sergi tiene una duda técnica, cítales (ej: 'Según Rippetoe...' o 'Aplicando la periodización de Bompa...')."
         ]
 
         full_context = [
