@@ -113,10 +113,23 @@ class ContextService:
         # Perfil de atleta
         profile_summary = AthleteProfileService.get_profile_summary(user_id, db)
         
+        # --- CEREBRO VITALIS: SABIDURÍA DEL PROYECTO 31/07 ---
+        wisdom_context = [
+            "--- METODOLOGÍA Y FILOSOFÍA (PROYECTO 31/07) ---",
+            "- OBJETIVO: Definición estética y salud funcional para el 31 de Julio.",
+            "- PRINCIPIOS: Sobrecarga Progresiva (enfocada en peso/reps), Pilares de Stoppani (intensidad) y McGill (salud estructural/lumbar).",
+            "- MOTOR METABÓLICO: NEAT masivo. Media de 20.000 pasos diarios (picos de 24k+). Indispensable para recomposición corporal.",
+            "- HITOS DE FUERZA ACTUALES: Press Banca (50kg consolidado, objetivo 55kg), Prensa (100kg estable).",
+            "- PERFIL FISIOLÓGICO: 47-48 años con FCR de élite (47-50 ppm). Capacidad de recuperación sobresaliente.",
+            "- RECOMENDACIÓN FILOSÓFICA: Entrenar con intensidad absoluta pero priorizando siempre blindar la espalda (protocolos McGill) por el alto volumen de pasos diario."
+        ]
+
         full_context = [
-            "Actúa como ATLAS, un Coach de Salud de IA experto.",
-            "A continuación tienes los datos REALES del usuario sincronizados desde su Garmin.",
-            "Usa esta información para dar consejos personalizados, ajustar su entrenamiento y detectar fatiga.",
+            "Actúa como ATLAS, el Coach de Salud de IA experto para Sergi.",
+            "Eres el guardián del 'PROYECTO 31/07'. Tu tono es técnico, motivador y directo.",
+            "\n".join(wisdom_context),
+            "",
+            "A continuación tienes los datos REALES de hoy sincronizados desde Garmin/Health Connect:",
             "",
             f"--- PERFIL DEL ATLETA ---",
             profile_summary,
@@ -127,7 +140,7 @@ class ContextService:
             "",
             workouts_narrative,
             "",
-            "Prioriza SIEMPRE la salud y longevidad del atleta. Si los datos sugieren fatiga, no dudes en recomendar un día de descanso total o actividad muy ligera (Z1)."
+            "DISEÑO DE SESIÓN: Si el usuario pide un entreno, básate estrictamente en sus hitos (Banca 50kg, Prensa 100kg) y aplica sobrecarga progresiva."
         ]
         
         return "\n".join(full_context)
