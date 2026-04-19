@@ -6,6 +6,7 @@ from app.models.biometrics import Biometrics
 from app.models.workout import Workout
 from app.services.analytics_service import AnalyticsService
 from app.services.athlete_profile_service import AthleteProfileService
+from app.services.exercise_service import ExerciseService
 
 logger = logging.getLogger("app.services.context_service")
 
@@ -139,6 +140,10 @@ class ContextService:
             acwr_narrative,
             "",
             workouts_narrative,
+            "",
+            f"--- BIBLIA DE EJERCICIOS HEVY ---",
+            ExerciseService.get_context_summary(),
+            "ORDEN: Usa ÚNICAMENTE nombres de ejercicios de la lista HEVY para que el usuario pueda registrarlos sin problemas.",
             "",
             "DISEÑO DE SESIÓN: Si el usuario pide un entreno, básate estrictamente en sus hitos (Banca 50kg, Prensa 100kg) y aplica sobrecarga progresiva."
         ]
