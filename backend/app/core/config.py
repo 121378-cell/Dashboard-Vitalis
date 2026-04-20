@@ -5,9 +5,9 @@ from typing import Optional
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Fitness Coach"
     API_V1_STR: str = "/api/v1"
-    
+
     # Database
-    DATABASE_URL: str = "sqlite:///c:/Users/sergi/Nueva carpeta/Dashboard-Vitalis/atlas.db"
+    DATABASE_URL: str = "sqlite:///atlas.db"
     
     # Auth
     GARMIN_EMAIL: Optional[str] = None

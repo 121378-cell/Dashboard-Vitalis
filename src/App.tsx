@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   Brain,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
@@ -273,7 +274,7 @@ const App: React.FC = () => {
             const mapped: Biometrics = {
               heartRate: hr,
               hrv: hcData.hrv ?? 0,
-              spo2: hcData.spo2 ?? 98,
+              spo2: 98, // Health Connect doesn't provide SpO2 directly, use default
               stress: hcData.stress ?? 0,
               steps,
               sleep,

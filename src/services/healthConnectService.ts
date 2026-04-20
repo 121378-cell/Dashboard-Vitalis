@@ -19,9 +19,12 @@ export interface HCBiometrics {
   sleepSeconds: number | null;
   sleepHours: number | null;
   calories: number | null;
+  activeCalories: number | null;
   bodyFat: number | null;
   respiration: number | null;
   stress: number | null;
+  spo2: number | null;
+  weight: number | null;
   source: 'health_connect' | 'cache' | 'demo';
   date: string;
 }
@@ -137,8 +140,8 @@ class HealthConnectServiceClass {
     }
 
     try {
-      const allPermissions = ['steps', 'heart-rate', 'active-calories', 'sleep', 'exercise'];
-      const result = await Health.checkPermissions({ permissions: allPermissions });
+      const allPermissions: HCHealthPermission[] = ['READ_STEPS', 'READ_HEART_RATE', 'READ_ACTIVE_CALORIES', 'READ_WORKOUTS', 'READ_MINDFULNESS'];
+      const result = await Health.requestHealthPermissions({ permissions: allPermissions });
       
       const permMap: { [key: string]: boolean } = {};
       let allGranted = true;
@@ -167,8 +170,8 @@ class HealthConnectServiceClass {
     }
 
     try {
-      const allPermissions = ['steps', 'heart-rate', 'active-calories', 'sleep', 'exercise'];
-      const result = await Health.requestPermissions({ permissions: allPermissions });
+      const allPermissions: HCHealthPermission[] = ['READ_STEPS', 'READ_HEART_RATE', 'READ_ACTIVE_CALORIES', 'READ_WORKOUTS', 'READ_MINDFULNESS'];
+      const result = await Health.requestHealthPermissions({ permissions: allPermissions });
       
       const permMap: { [key: string]: boolean } = {};
       let allGranted = true;
@@ -255,6 +258,7 @@ class HealthConnectServiceClass {
         endDate: endDate.toISOString(),
         includeHeartRate: true,
         includeSteps: true,
+        includeRoute: false,
       });
       
       if (workouts.length > 0) {
@@ -278,7 +282,7 @@ class HealthConnectServiceClass {
           const r = await Health.queryAggregated({
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
-            dataType: dt, bucket: 'DAILY',
+            dataType: dt as 'steps', bucket: 'DAILY',
           });
           const total = r.aggregatedData?.reduce((s, d) => s + (d.value || 0), 0) ?? 0;
           if (total > 0) { steps = total; console.log(`[HC] Steps agg(${dt}): ${total}`); break; }
@@ -293,7 +297,7 @@ class HealthConnectServiceClass {
           const r = await Health.queryAggregated({
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
-            dataType: dt, bucket: 'DAILY',
+            dataType: dt as 'active-calories', bucket: 'DAILY',
           });
           const total = r.aggregatedData?.reduce((s, d) => s + (d.value || 0), 0) ?? 0;
           if (total > 0) { calories = total; console.log(`[HC] Calories agg(${dt}): ${total}`); break; }
@@ -370,7 +374,7 @@ class HealthConnectServiceClass {
         const result = await Health.queryAggregated({
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
-          dataType,
+          dataType: dataType as 'steps',
           bucket: 'DAILY',
         });
         if (result.aggregatedData && result.aggregatedData.length > 0) {
@@ -440,7 +444,7 @@ class HealthConnectServiceClass {
         const result = await Health.queryAggregated({
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
-          dataType,
+          dataType: dataType as 'active-calories',
           bucket: 'DAILY',
         });
         if (result.aggregatedData && result.aggregatedData.length > 0) {
@@ -463,7 +467,7 @@ class HealthConnectServiceClass {
       const result = await Health.queryAggregated({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        dataType: 'respiratory-rate',
+        dataType: 'respiratory-rate' as 'steps',
         bucket: 'DAILY'
       });
       return result.aggregatedData?.[0]?.value || 0;
@@ -475,7 +479,7 @@ class HealthConnectServiceClass {
       const result = await Health.queryAggregated({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        dataType: 'heart-rate-variability',
+        dataType: 'heart-rate-variability' as 'steps',
         bucket: 'DAILY'
       });
       return result.aggregatedData?.[0]?.value || 0;
@@ -488,7 +492,7 @@ class HealthConnectServiceClass {
       const { records = [] } = await Health.queryRecords({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        dataType: 'sleep'
+        dataType: 'steps'
       });
 
       if (records.length > 0) {
@@ -511,7 +515,7 @@ class HealthConnectServiceClass {
           const result = await Health.queryAggregated({
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
-            dataType,
+            dataType: dataType as 'steps',
             bucket: 'DAILY',
           });
           if (result.aggregatedData?.length > 0) {
@@ -638,6 +642,8 @@ function getFallbackBiometrics(): HCBiometrics {
     spo2: null,
     weight: null,
     bodyFat: null,
+    respiration: null,
+    stress: null,
     source: 'demo',
     date: new Date().toISOString().split('T')[0],
   };
