@@ -118,7 +118,7 @@ class ContextService:
         wisdom_context = [
             "--- METODOLOGÍA Y FILOSOFÍA (PROYECTO 31/07) ---",
             "- OBJETIVO: Definición estética y salud funcional para el 31 de Julio.",
-            "- PRINCIPIOS: Sobrecarga Progresiva, Stoppani (Intensidad), McGill (Salud Espinal).",
+            "- PRINCIPIOS: Sobrecarga Progresiva, Stoppani (Intensidad), McGill (Salud Espinal), Bompa (Periodización).",
             "- MOTOR: NEAT de 20.000 pasos/día.",
             "- HITOS: Banca 50kg / Prensa 100kg.",
             "",

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useReadinessWebSocket } from '../useReadinessWebSocket';
 
 // Mock WebSocket with proper event handler typing
@@ -11,6 +11,32 @@ const mockWebSocket = {
   onmessage: null as ((event: MessageEvent) => void) | null,
   onerror: null as ((event: Event) => void) | null,
   onclose: null as (() => void) | null,
+};
+
+const triggerOpen = () => {
+  act(() => {
+    mockWebSocket.onopen?.(new Event('open'));
+  });
+};
+
+const triggerMessage = (payload: unknown) => {
+  act(() => {
+    mockWebSocket.onmessage?.(new MessageEvent('message', {
+      data: JSON.stringify(payload)
+    }));
+  });
+};
+
+const triggerError = () => {
+  act(() => {
+    mockWebSocket.onerror?.(new Event('error'));
+  });
+};
+
+const triggerClose = () => {
+  act(() => {
+    mockWebSocket.onclose?.();
+  });
 };
 
 describe('useReadinessWebSocket', () => {
@@ -46,7 +72,7 @@ describe('useReadinessWebSocket', () => {
     }));
 
     // Simulate open
-    mockWebSocket.onopen?.(new Event('open'));
+    triggerOpen();
     
     await waitFor(() => expect(onConnect).toHaveBeenCalled());
   });
@@ -60,7 +86,7 @@ describe('useReadinessWebSocket', () => {
     }));
 
     // Simulate connection
-    mockWebSocket.onopen?.(new Event('open'));
+    triggerOpen();
     
     // Simulate data message
     const mockData = {
@@ -74,9 +100,7 @@ describe('useReadinessWebSocket', () => {
       version: '2.0'
     };
 
-    mockWebSocket.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ type: 'readiness_update', data: mockData, change: 5 })
-    }));
+    triggerMessage({ type: 'readiness_update', data: mockData, change: 5 });
 
     await waitFor(() => {
       expect(result.current.data?.readiness_score).toBe(75);
@@ -92,11 +116,9 @@ describe('useReadinessWebSocket', () => {
       onStatusChange 
     }));
 
-    mockWebSocket.onopen?.(new Event('open'));
+    triggerOpen();
     
-    mockWebSocket.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ type: 'status_change', from: 'high', to: 'low' })
-    }));
+    triggerMessage({ type: 'status_change', from: 'high', to: 'low' });
 
     await waitFor(() => {
       expect(onStatusChange).toHaveBeenCalledWith('high', 'low');
@@ -111,7 +133,7 @@ describe('useReadinessWebSocket', () => {
       onError 
     }));
 
-    mockWebSocket.onerror?.(new Event('error'));
+    triggerError();
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(false);
@@ -127,13 +149,15 @@ describe('useReadinessWebSocket', () => {
   it('allows manual reconnect', async () => {
     const { result } = renderHook(() => useReadinessWebSocket({ userId: 'test-user' }));
 
-    mockWebSocket.onopen?.(new Event('open'));
+    triggerOpen();
     
     await waitFor(() => expect(result.current.isConnected).toBe(true));
 
     // Manually trigger close event before testing disconnect
-    mockWebSocket.onclose?.();
-    result.current.disconnect();
+    triggerClose();
+    act(() => {
+      result.current.disconnect();
+    });
     
     // Note: isConnected may still be true due to async state updates in jsdom
     // Just verify disconnect was called
@@ -143,16 +167,14 @@ describe('useReadinessWebSocket', () => {
   it('updates lastUpdate timestamp on data receive', async () => {
     const { result } = renderHook(() => useReadinessWebSocket({ userId: 'test-user' }));
 
-    mockWebSocket.onopen?.(new Event('open'));
+    triggerOpen();
     
     const beforeUpdate = result.current.lastUpdate;
 
-    mockWebSocket.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ 
-        type: 'readiness_update', 
-        data: { readiness_score: 80, status: 'high' } 
-      })
-    }));
+    triggerMessage({ 
+      type: 'readiness_update', 
+      data: { readiness_score: 80, status: 'high' } 
+    });
 
     await waitFor(() => {
       expect(result.current.lastUpdate).not.toEqual(beforeUpdate);

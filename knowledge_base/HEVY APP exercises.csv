@@ -431,3 +431,5 @@ Wrist Roller,forearms,machine,shoulders,0E4523F4,weight_reps
 Yoga,full_body,none,[],8C9D2928,duration
 Zercher Squat,quadriceps,barbell,"hamstrings, glutes, biceps",40C6A9FC,weight_reps
 Zottman Curl (Dumbbell),biceps,dumbbell,forearms,123EE239,weight_reps
+Incline Dumbbell Curl,biceps,dumbbell,[],VTL5A1C2,weight_reps
+Dumbbell Pullover,lats,dumbbell,"[""chest""]",VTL5A1C4,weight_reps

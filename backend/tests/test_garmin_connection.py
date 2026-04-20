@@ -1,83 +1,62 @@
 #!/usr/bin/env python3
-"""
-Test script for Garmin connection
-"""
+"""Pytest validation for Garmin connectivity."""
 
-import sys
-import os
 import logging
+import os
+import sys
+from datetime import date
+
+import pytest
 from dotenv import load_dotenv
 
-# Add the backend directory to the path
+# Add the backend/app directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "app"))
 
 from utils.garmin import get_garmin_client
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-
 logger = logging.getLogger(__name__)
 
 
-def test_garmin_connection():
-    """Test Garmin connection with provided credentials"""
-    # Load environment variables
+def test_garmin_connection() -> None:
+    """Test Garmin connection with provided credentials."""
     load_dotenv()
 
-    # Get credentials from environment variables
     email = os.getenv("GARMIN_EMAIL")
     password = os.getenv("GARMIN_PASSWORD")
 
     if not email or not password:
-        logger.error("Missing GARMIN_EMAIL or GARMIN_PASSWORD environment variables")
-        return False
+        pytest.skip("Missing GARMIN_EMAIL or GARMIN_PASSWORD environment variables")
 
-    logger.info(f"Testing Garmin connection for user: {email}")
+    logger.info("Testing Garmin connection for user: %s", email)
+
+    client, session_updated = get_garmin_client(email, password)
+    assert client is not None, "Failed to create Garmin client"
+
+    logger.info("Successfully connected to Garmin. Session updated: %s", session_updated)
 
     try:
-        client, session_updated = get_garmin_client(email, password)
+        profile = client.get_user_profile()
+        logger.info("User profile: %s", profile.get("displayName", "Unknown"))
+    except Exception as exc:  # pragma: no cover - external API variability
+        logger.warning("Could not fetch user profile: %s", exc)
 
-        if not client:
-            logger.error("Failed to create Garmin client")
-            return False
-
-        logger.info(
-            f"Successfully connected to Garmin. Session updated: {session_updated}"
-        )
-
-        # Test getting user profile
-        try:
-            profile = client.get_user_profile()
-            logger.info(f"User profile: {profile.get('displayName', 'Unknown')}")
-        except Exception as e:
-            logger.warning(f"Could not fetch user profile: {e}")
-
-        # Test getting today's stats
-        try:
-            from datetime import date
-
-            today = date.today().isoformat()
-            stats = client.get_stats(today)
-            logger.info(f"Today's stats retrieved successfully")
-        except Exception as e:
-            logger.warning(f"Could not fetch today's stats: {e}")
-
-        return True
-
-    except Exception as e:
-        logger.error(f"Error testing Garmin connection: {e}")
-        import traceback
-
-        logger.error(traceback.format_exc())
-        return False
+    try:
+        today = date.today().isoformat()
+        client.get_stats(today)
+        logger.info("Today's stats retrieved successfully")
+    except Exception as exc:  # pragma: no cover - external API variability
+        logger.warning("Could not fetch today's stats: %s", exc)
 
 
 if __name__ == "__main__":
-    if test_garmin_connection():
+    # Keep script-style execution behavior for manual debugging
+    try:
+        test_garmin_connection()
         logger.info("Garmin connection test passed!")
         sys.exit(0)
-    else:
-        logger.error("Garmin connection test failed!")
+    except Exception:
+        logger.exception("Garmin connection test failed!")
         sys.exit(1)
