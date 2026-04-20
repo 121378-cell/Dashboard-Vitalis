@@ -489,27 +489,44 @@ class HealthConnectServiceClass {
   async readSleep(startDate: Date, endDate: Date): Promise<number> {
     try {
       // 1. Intentar escaneo de sesiones de sueño (Más robusto para Garmin)
-      const { records = [] } = await Health.queryRecords({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        dataType: 'steps'
-      });
+      // Probamos los tipos de datos correctos para sleep
+      const sleepDataTypes = ['sleep_session', 'sleep', 'SLEEP_SESSION'];
+      let totalMs = 0;
+      
+      for (const dataType of sleepDataTypes) {
+        try {
+          const { records = [] } = await Health.queryRecords({
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            dataType: dataType as 'steps'
+          });
 
-      if (records.length > 0) {
-        // En HC, el sueño son bloques. Sumamos la duración de cada bloque.
-        let totalMs = 0;
-        records.forEach((r: any) => {
-          const start = new Date(r.startDate).getTime();
-          const end = new Date(r.endDate).getTime();
-          totalMs += (end - start);
-        });
+          if (records.length > 0) {
+            records.forEach((r: any) => {
+              const start = new Date(r.startDate).getTime();
+              const end = new Date(r.endDate).getTime();
+              const duration = end - start;
+              
+              // Validación: No aceptar sesiones de > 24h (evitar datos corruptos)
+              if (duration > 0 && duration < 24 * 60 * 60 * 1000) {
+                totalMs += duration;
+              }
+            });
+            
+            if (totalMs > 0) break;
+          }
+        } catch { /* continue to next dataType */ }
+      }
+
+      if (totalMs > 0) {
         const hours = totalMs / (1000 * 60 * 60);
         console.log(`[HC] Horas de sueño encontradas (scan): ${hours.toFixed(2)}`);
-        return hours;
+        // Segunda validación: Limitar máximo 16h por día (valor fisiológicamente imposible de superar)
+        return Math.min(hours, 16);
       }
 
       // 2. Fallback a agregados
-      const dataTypes = ['sleep_session', 'sleep'];
+      const dataTypes = ['sleep_session', 'sleep', 'SLEEP_SESSION'];
       for (const dataType of dataTypes) {
         try {
           const result = await Health.queryAggregated({
@@ -520,7 +537,7 @@ class HealthConnectServiceClass {
           });
           if (result.aggregatedData?.length > 0) {
             const val = result.aggregatedData[0].value || 0;
-            if (val > 0) return val;
+            if (val > 0 && val < 16) return val;
           }
         } catch { /* skip */ }
       }
