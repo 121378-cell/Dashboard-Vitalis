@@ -6,7 +6,7 @@ Schemas para serialización/deserialización de datos.
 Separación clara entre Create, Update, Response y filtros.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ConfigDict, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from enum import Enum
@@ -27,7 +27,7 @@ class ExerciseLibraryBase(BaseModel):
     primary_muscle: MuscleGroup
     secondary_muscles: List[MuscleGroup] = []
     exercise_type: WorkoutType = WorkoutType.STRENGTH
-    recommended_rpe_range: List[float] = Field(default=[7.0, 9.0], min_items=2, max_items=2)
+    recommended_rpe_range: List[float] = Field(default=[7.0, 9.0], min_length=2, max_length=2)
     recommended_rest_seconds: int = Field(default=120, ge=0, le=600)
     recommended_tempo: str = Field(default="2-0-2", pattern=r"^\d+-\d+-\d+$")
     equipment_needed: List[str] = []
@@ -60,8 +60,7 @@ class ExerciseLibraryResponse(ExerciseLibraryBase):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -121,8 +120,7 @@ class ExerciseSetResponse(ExerciseSetBase):
     created_at: datetime
     completed_at: Optional[datetime]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -170,8 +168,7 @@ class ExerciseBlockResponse(ExerciseBlockBase):
     created_at: datetime
     updated_at: Optional[datetime]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -230,8 +227,7 @@ class WorkoutResponse(WorkoutBase):
     
     user_notes: Optional[str]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -278,8 +274,7 @@ class TrainingPlanResponse(TrainingPlanBase):
     generation_params: Optional[Dict[str, Any]]
     adaptation_history: List[Dict[str, Any]]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -313,8 +308,7 @@ class WorkoutFeedbackResponse(WorkoutFeedbackCreate):
     
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
