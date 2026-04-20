@@ -126,7 +126,7 @@ async def readiness_websocket(
     """
     WebSocket para streaming en tiempo real del Readiness Score.
     
-    URL: ws://localhost:8001/api/v1/ws/readiness?token=<jwt_token>
+    URL: ws://localhost:8005/api/v1/ws/readiness?token=<jwt_token>
     
     Mensajes enviados:
     

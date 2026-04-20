@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Strava OAuth2
     STRAVA_CLIENT_ID: Optional[str] = None
     STRAVA_CLIENT_SECRET: Optional[str] = None
-    STRAVA_REDIRECT_URI: str = "http://localhost:8001/api/v1/strava/callback"
+    STRAVA_REDIRECT_URI: str = "http://localhost:8005/api/v1/strava/callback"
     FRONTEND_URL: str = "http://localhost:5173"
     
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")

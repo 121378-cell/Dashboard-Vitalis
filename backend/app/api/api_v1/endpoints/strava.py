@@ -103,7 +103,7 @@ async def strava_callback(
             # Asegurar que el usuario existe
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
-                user = User(id=user_id, name="Atleta ATLAS")
+                user = User(id=user_id, name="Sergi")
                 db.add(user)
         
         # Actualizar tokens de Strava
