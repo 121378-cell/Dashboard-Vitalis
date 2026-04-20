@@ -17,7 +17,7 @@
 
 ### Tipo de Sistema
 - **Dashboard biométrico en tiempo real**
-- **API REST + WebSockets**
+- **API Dual (REST + WebSockets)** para comunicación sincrónica y asincrónica
 - **Aplicación de entrenamiento personal con IA**
 - **Sistema de análisis predictivo** (readiness scoring)
 
@@ -83,7 +83,7 @@ Garmin API → SyncService → SQLite → FastAPI API → React Frontend
 ## 3. 🔌 BACKEND
 
 ### Framework: FastAPI
-- **Puerto**: 8001 (configurado en `.env`)
+- **Puerto**: 8005 (configurado en `.env`)
 - **Database**: SQLite (`atlas_v2.db`)
 - **CORS**: Configurado para permitir `localhost:5173`
 
@@ -366,6 +366,16 @@ System prompt dinámico que incluye:
 - ⚠️ No hay ML/entrenamiento de modelos (aún)
 - ⚠️ No hay detección automática de patrones complejos
 
+#### Integración de Metodologías Científicas en ATLAS
+- **McGill (Biomecánica de columna)**: Los ejercicios recomendados por la IA incluyen principios de estabilidad lumbar y patrones de movimiento saludables, aunque actualmente no se miden directamente mediante wearables. Se planea integrar cuestionarios post-entrenamiento para validar la aplicación de estos principios.
+- **Stoppani (Hipertrofia)**: La lógica de balance de actividad y los perfiles de atleta (especialmente STRENGTH) incorporan principios de progresión de carga y variación de ejercicios para estimular la hipertrofia muscular.
+- **Bompa (Periodización)**: El motor ReadinessAdaptive implementa conceptos de periodización mediante el cálculo de cargas agudas/crónicas (ACWR) y la detección de overreaching, ajustando automáticamente las recomendaciones de volumen e intensidad según la fase de recuperación del atleta.
+
+#### Alineación con Objetivos Estratégicos
+- **Identidad Real**: El sistema construye un perfil biométrico único mediante baselines personales calculados de 450 días de historial, creando una base de datos personalizada que define la identidad fisiológica del atleta.
+- **Logger de Élite**: El registro detallado de entrenamientos sincronizados (Garmin/Wger/Hevy), métricas biométricas diarias y documentos analizados crea un historial de rendimiento de nivel élite, accesible mediante el chat contextualizado de IA.
+- **Protocolo de Adaptabilidad**: El motor ReadinessAdaptive implementa un protocolo dinámico que ajusta las recomendaciones de entrenamiento basado en readiness, perfil de atleta (STRENGTH/ENDURANCE/HYBRID/RECREATIONAL) y detección de overreaching, funcionando como un "Director Deportivo Ejecutivo" que toma decisiones basadas en datos.
+
 ---
 
 ## 9. ⚠️ PROBLEMAS DETECTADOS
@@ -430,18 +440,20 @@ allow_origins=["*"]  # En producción esto es peligroso
 
 ### Prioridad 1: CRÍTICA (Hacer HOY)
 
-1. **Unificar Readiness Score**
+1. **Unificar Readiness Score y Cálculo de ACWR**
    - Eliminar `analytics_service.py::get_readiness_score()`
-   - Usar solo `readiness_engine.py`
+   - Consolidar lógica de readiness y ACWR en `readiness_engine.py`
+   - Asegurar que el cálculo de ACWR (carga aguda/crónica) esté integrado en el motor principal
    - Archivos: 2 modificados
-   - Impacto: Consistencia de datos
+   - Impacto: Consistencia de datos, prevención de inconsistencias en métricas de carga
 
-2. **Implementar WebSocket Frontend**
-   - Crear `useWebSocket.ts` hook
+2. **Implementar WebSocket Frontend con Gestión de Latencia**
+   - Crear `useWebSocket.ts` hook con manejo de reconexión exponencial
    - Conectar a `/api/v1/ws/readiness`
    - Eliminar polling de 5 minutos
+   - Implementar UI de "Conectado en tiempo real" con indicador de latencia
    - Archivos: 1 nuevo, 1 modificado
-   - Impacto: Tiempo real verdadero, menos carga en servidor
+   - Impacto: Tiempo real verdadero, menos carga en servidor, briefings con latencia <1s
 
 ### Prioridad 2: ALTA (Esta semana)
 
