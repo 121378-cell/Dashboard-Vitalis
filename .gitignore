@@ -1,8 +1,212 @@
-node_modules/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
-.env*
+# ================================================
+# DASHBOARD VITALIS - GITIGNORE COMPLETO
+# Protege datos sensibles y archivos temporales
+# ================================================
+
+# ================================================
+# 🚨 DATOS SENSIBLES - NUNCA COMMITEAR
+# ================================================
+
+# Credenciales y variables de entorno
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
 !.env.example
+
+# Tokens y credenciales de Garmin
+tokens.json
+credentials.json
+garmin_tokens.json
+cookies.json
+session.json
+*.token
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Bases de datos SQLite y datos locales
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+database/
+data/
+backups/
+
+# Logs y dumps de depuración
+*.log
+*.dump
+debug_*.json
+export_*.json
+diagnostic_*.json
+sync_report_*.json
+
+# ================================================
+# 📦 DEPENDENCIAS
+# ================================================
+
+# Node
+node_modules/
+.pnp/
+.pnp.js
+
+# Python
+venv/
+.venv/
+env/
+.env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PYTHONPATH
+
+# Poetry y pipenv
+poetry.lock
+Pipfile.lock
+
+# ================================================
+# 🛠️ FRONTEND (VITE / REACT)
+# ================================================
+
+dist/
+build/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.next/
+.nuxt/
+.output/
+.vite/
+
+# ================================================
+# 🤖 ANDROID / CAPACITOR
+# ================================================
+
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/app/debug/
+android/app/*.apk
+android/app/*.aab
+android/local.properties
+android/gradle.properties
+android/captures/
+android/.externalNativeBuild
+android/.cxx/
+
+# Capacitor
+capacitor.config.json
+capacitor.config.ts.local
+www/
+
+# ================================================
+# ⚙️ BACKEND (FASTAPI)
+# ================================================
+
+# Archivos temporales de test
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Datos de test y sincronización
+test_data/
+temp/
+tmp/
+*.tmp
+*.temp
+
+# ================================================
+# 🧪 TESTS Y DEPURACIÓN
+# ================================================
+
+# Debug scripts y datos de prueba
+debug_*.py
+test_*.pyc
+*.pyc
+*.pyo
+
+# Reportes de test
+reports/
+test-results/
+junit.xml
+nosetests.xml
+
+# ================================================
+# 💻 IDE Y EDITORES
+# ================================================
+
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+*.swp
+*.swo
+*~
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+
+# ================================================
+# 🔧 OTROS ARCHIVOS TEMPORALES
+# ================================================
+
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+
+# Directorios de cache
+.cache/
+.temp/
+.tmp/
+
+# Archivos del sistema operativo
+Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ================================================
+# ⚠️ EXCEPCIONES - ARCHIVOS QUE SI DEBEN COMMITEAR
+# ================================================
+
+!.env.example
+!*.example.json
+!*.sample.json
+!docs/**
+!README.md
+!LICENSE
