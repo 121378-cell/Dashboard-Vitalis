@@ -14,7 +14,9 @@
     "test:watch": "vitest",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
-    "cap:build": "npm run build && npx cap sync android"
+    "cap:build": "npm run build && npx cap sync android",
+    "postinstall": "npx patch-package || echo 'patch-package no disponible, aplicar manualmente: git apply patches/*.patch'",
+    "build:android": "powershell -ExecutionPolicy Bypass -File ./scripts/build-android.ps1"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",
@@ -49,6 +51,8 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "jsdom": "^29.0.2",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
