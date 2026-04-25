@@ -2,8 +2,13 @@ import axios from 'axios';
 import { offlineStorage, SyncQueueItem } from './offlineStorage';
 import { HCBiometrics, HCWorkout } from './healthConnectService';
 
-// Fallback al URL de FastAPI dependiendo del entorno (usamos VITE_API_URL si está disponible)
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8005/api/v1';
+// URL única del backend (misma que usa App.tsx)
+const RAW_BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:9000/api/v1';
+
+const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, '');
 
 export class SyncService {
   

@@ -37,7 +37,11 @@ import { useHealthConnectPermissions } from './hooks/useHealthConnectPermissions
 import { Biometrics, AthleteProfile, Message, PDFDocument, Workout } from './types';
 import { DebugPanel } from './components/DebugPanel';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+const RAW_BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:9000/api/v1";
+const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, "");
 
 const App: React.FC = () => {
   // --- Native & System State ---
@@ -271,9 +275,14 @@ const App: React.FC = () => {
       const backendWorkouts = res.data as Workout[];
       console.log('[App] Workouts desde backend:', backendWorkouts.length);
       
-      // Combinar: HC tiene prioridad, backend complementa
-      const hcIds = new Set(allWorkouts.map(w => w.id));
-      const newBackendWorkouts = backendWorkouts.filter(w => !hcIds.has(w.id));
+      // Combinar: HC tiene prioridad, backend complementa (dedupe por source+external_id)
+      const hcKeys = new Set(
+        allWorkouts.map(w => `${w.source ?? ''}:${(w as any).external_id ?? w.id}`)
+      );
+      const newBackendWorkouts = backendWorkouts.filter(w => {
+        const key = `${(w as any).source ?? ''}:${(w as any).external_id ?? w.id}`;
+        return !hcKeys.has(key);
+      });
       allWorkouts = [...allWorkouts, ...newBackendWorkouts];
     } catch (e) {
       console.error("Error fetching workouts from backend", e);

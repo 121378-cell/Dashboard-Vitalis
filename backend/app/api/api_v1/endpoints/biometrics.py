@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.models.biometrics import Biometrics
 from datetime import date
 import json
@@ -13,7 +13,7 @@ from app.services.analytics_service import AnalyticsService
 @router.get("/")
 def get_biometrics(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     date_str: str = Query(None),
 ):
     if not date_str:
@@ -60,3 +60,35 @@ def get_biometrics(
         "overtraining": False,
         "source": "none",
     }
+
+
+@router.post("/")
+def upsert_biometrics(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Recibe biométricos desde el cliente (Health Connect / móvil) y los guarda por día.
+    Mantiene compatibilidad con el modelo `Biometrics.data` (JSON string).
+    """
+    try:
+        date_str = payload.get("date") or date.today().isoformat()
+        source = payload.get("source") or "health_connect"
+
+        existing = (
+            db.query(Biometrics)
+            .filter(Biometrics.user_id == user_id, Biometrics.date == date_str)
+            .first()
+        )
+        if not existing:
+            existing = Biometrics(user_id=user_id, date=date_str)
+            db.add(existing)
+
+        existing.data = json.dumps(payload)
+        existing.source = source
+        db.commit()
+
+        return {"success": True, "user_id": user_id, "date": date_str, "source": source}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
