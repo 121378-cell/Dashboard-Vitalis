@@ -3,10 +3,13 @@
     <array name="health_permissions">
         <item>steps</item>
         <item>heart_rate</item>
+        <item>heart_rate_variability</item>
         <item>active_energy_burned</item>
+        <item>total_calories_burned</item>
         <item>sleep</item>
         <item>exercise</item>
         <item>oxygen_saturation</item>
+        <item>respiratory_rate</item>
         <item>body_fat</item>
         <item>weight</item>
     </array>

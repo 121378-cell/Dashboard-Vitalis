@@ -4,9 +4,10 @@ import { Biometrics } from '../types';
 
 // Helper function to safely display values
 function displayValue(value: any, decimals: number = 0, fallback: string = "N/D"): string {
-  if (value === null || value === undefined || value === 0 || isNaN(Number(value))) {
+  if (value === null || value === undefined || isNaN(Number(value))) {
     return fallback;
   }
+  // Allow 0 as valid value (e.g. 0 steps or 0 calories)
   return decimals > 0 ? Number(value).toFixed(decimals) : String(Math.round(Number(value)));
 }
 

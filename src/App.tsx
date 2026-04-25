@@ -335,38 +335,7 @@ const App: React.FC = () => {
             return;
           }
 
-          const hcData = await healthConnectService.readTodayBiometrics();
-          console.log('[App] HC Raw Data:', JSON.stringify(hcData));
-          
-          if (hcData && (hcData.steps !== null || hcData.calories !== null || hcData.heartRate !== null)) {
-            const steps = hcData.steps ?? 0;
-            const sleep = hcData.sleepHours ?? 0;
-            const hr = hcData.heartRate ?? 0;
-            const readiness = calculateReadiness(steps, sleep, hr);
-            
-            const mapped: Biometrics = {
-              heartRate: hr,
-              hrv: hcData.hrv ?? 0,
-              spo2: 98, // Health Connect doesn't provide SpO2 directly, use default
-              stress: hcData.stress ?? 0,
-              steps,
-              sleep,
-              calories: hcData.calories ?? 0,
-              respiration: hcData.respiration ?? 0,
-              readiness,
-              status: readiness >= 80 ? 'excellent' : readiness >= 60 ? 'good' : 'poor',
-              overtraining: readiness < 40,
-              source: 'garmin'
-            };
-            // Siempre actualizar con datos frescos de Health Connect
-            setBiometrics(mapped);
-            syncService.syncBiometricsToBackend(mapped as any).catch(() => {});
-            setLoadingBiometrics(false);
-            return;
-          }
-        } catch (hcErr) {
-          console.warn('[App] Error leyendo HC:', hcErr);
-        }
+
       }
 
       // 2. Fallback: Backend (ahora incluye calories_workouts y calories_total)
@@ -377,7 +346,7 @@ const App: React.FC = () => {
           params: { date_str: todayLocal },
           timeout: 3000
         });
-        if (res.data && (res.data.steps > 0 || res.data.calories_workouts > 0)) {
+        if (res.data && res.data.source !== 'none') {
           setBiometrics(res.data);
           setLoadingBiometrics(false);
           return;
