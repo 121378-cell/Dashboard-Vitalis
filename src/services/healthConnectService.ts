@@ -209,34 +209,49 @@ class HealthConnectServiceClass {
     }
   }
 
+  /**
+   * Verifica permisos; si no estan concedidos, los solicita.
+   * Si la solicitud falla, abre la configuracion de Health Connect.
+   * Devuelve true si los permisos estan concedidos al final.
+   */
+  async ensurePermissions(): Promise<boolean> {
+    if (!this.available) return false;
+
+    // 1. Verificar actuales
+    let status = await this.checkPermissions();
+    if (status.granted) return true;
+
+    console.warn('[HC] Permisos no concedidos. Solicitando...');
+
+    // 2. Solicitar permisos
+    status = await this.requestPermissions();
+    if (status.granted) return true;
+
+    console.warn('[HC] Permisos DENEGADOS. Abriendo configuracion de Health Connect...');
+
+    // 3. Abrir settings para que el usuario los active manualmente
+    try {
+      await this.openSettings();
+    } catch (e) {
+      console.error('[HC] No se pudo abrir settings:', e);
+    }
+
+    return false;
+  }
+
   // ========================================================================
   // READ BIOMETRICS
   // ========================================================================
 
   async readTodayBiometrics(): Promise<HCBiometrics> {
-    // Ampliamos a 48h para capturar datos de ayer+hoy (Garmin sincroniza con retraso)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0);
-    startDate.setDate(startDate.getDate() - 1); // Desde ayer a medianoche
-    
-    // Diagnóstico: intentar queryWorkouts para ver si hay datos en HC
-    try {
-      const workouts = await Health.queryWorkouts({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        includeHeartRate: false,
-        includeRoute: false,
-        includeSteps: true,
-      });
-      console.log('[HC] Diagnóstico workouts encontrados:', workouts.workouts?.length ?? 0);
-      if (workouts.workouts?.length > 0) {
-        console.log('[HC] Primer workout:', JSON.stringify(workouts.workouts[0]));
-      }
-    } catch (e) {
-      console.warn('[HC] queryWorkouts falló:', e);
-    }
-    
+    // Leer solo el día actual (desde las 00:00 local) para evitar duplicar pasos
+    const now = new Date();
+    // Crear fecha de inicio a las 00:00:00 del día actual en hora LOCAL
+    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endDate = now;
+
+    console.log(`[HC] FIX ACTIVO: Leyendo hoy desde ${startDate.toISOString()} (local midnight) hasta ${endDate.toISOString()}`);
+
     return this.readBiometricsRange(startDate, endDate);
   }
 
@@ -251,58 +266,70 @@ class HealthConnectServiceClass {
     let sleepHours: number | null = null;
     let sleepSeconds: number | null = null;
 
-    // 1. WORKOUTS (Mejor para Garmin)
+    // 1. WORKOUTS: obtener HR, calories y steps (pero steps de workouts puede duplicar)
     try {
       const { workouts = [] } = await Health.queryWorkouts({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         includeHeartRate: true,
-        includeSteps: true,
+        includeSteps: false, // No sumar steps de workouts para evitar duplicación
         includeRoute: false,
       });
       
       if (workouts.length > 0) {
-        let wSteps = 0, wCals = 0, wHR = 0;
+        let wCals = 0, wHR = 0;
         workouts.forEach(w => {
-          wSteps += w.steps || 0;
           wCals += w.calories || 0;
           if (w.heartRate?.length) wHR = w.heartRate[w.heartRate.length-1].bpm;
         });
-        steps = wSteps || null;
         calories = wCals || null;
         heartRate = wHR || null;
-        console.log(`[HC] Datos de Workouts: steps=${steps}, cals=${calories}`);
+        console.log(`[HC] Datos de Workouts: cals=${calories}, hr=${heartRate}`);
       }
     } catch (e) { console.warn("[HC] Workouts err", e); }
 
-    // ESTRATEGIA 2: queryAggregated para steps (fallback)
-    if (steps === null) {
-      for (const dt of ['steps', 'STEPS']) {
-        try {
-          const r = await Health.queryAggregated({
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            dataType: dt as 'steps', bucket: 'DAILY',
-          });
-          const total = r.aggregatedData?.reduce((s, d) => s + (d.value || 0), 0) ?? 0;
-          if (total > 0) { steps = total; console.log(`[HC] Steps agg(${dt}): ${total}`); break; }
-        } catch { /* intentional */ }
+    // 2. PASOS: queryRecords primero (suma manual de registros individuales - más fiable)
+    try {
+      const { records = [] } = await Health.queryRecords({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        dataType: 'steps',
+      });
+      if (records.length > 0) {
+        const total = records.reduce((s: number, r: any) => s + (r.count || 0), 0);
+        steps = total;
+        console.log(`[HC] Steps records: ${records.length} registros, total=${total}`);
+      } else {
+        console.log('[HC] Steps records: 0 registros encontrados');
       }
+    } catch (e) { console.warn('[HC] Steps records falló:', e); }
+
+    // Fallback: queryAggregated si queryRecords no devolvió nada
+    if (steps === null || steps === 0) {
+      try {
+        const r = await Health.queryAggregated({
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          dataType: 'steps',
+          bucket: 'day',
+        });
+        const total = r.aggregatedData?.reduce((s: number, d: any) => s + (d.value || 0), 0) ?? 0;
+        if (total > 0) { steps = total; console.log(`[HC] Steps agg fallback: ${total}`); }
+      } catch (e) { console.warn('[HC] Steps agg fallback falló:', e); }
     }
 
-    // ESTRATEGIA 2: queryAggregated para calorías (fallback)
+    // 3. CALORÍAS: queryAggregated (sin bucket - original funcionaba así)
     if (calories === null) {
-      for (const dt of ['active-calories', 'calories']) {
-        try {
-          const r = await Health.queryAggregated({
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            dataType: dt as 'active-calories', bucket: 'DAILY',
-          });
-          const total = r.aggregatedData?.reduce((s, d) => s + (d.value || 0), 0) ?? 0;
-          if (total > 0) { calories = total; console.log(`[HC] Calories agg(${dt}): ${total}`); break; }
-        } catch { /* intentional */ }
-      }
+      try {
+        const r = await Health.queryAggregated({
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          dataType: 'active-calories',
+          bucket: 'day',
+        });
+        const total = r.aggregatedData?.reduce((s: number, d: any) => s + (d.value || 0), 0) ?? 0;
+        if (total > 0) { calories = total; console.log(`[HC] Calories agg: ${total}`); }
+      } catch (e) { console.warn('[HC] Calories agg falló:', e); }
     }
 
     // Sleep
@@ -375,7 +402,7 @@ class HealthConnectServiceClass {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
           dataType: dataType as 'steps',
-          bucket: 'DAILY',
+          bucket: 'day',
         });
         if (result.aggregatedData && result.aggregatedData.length > 0) {
           console.log(`[HC] Steps OK con dataType: ${dataType}`, result.aggregatedData);
@@ -445,7 +472,7 @@ class HealthConnectServiceClass {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
           dataType: dataType as 'active-calories',
-          bucket: 'DAILY',
+          bucket: 'day',
         });
         if (result.aggregatedData && result.aggregatedData.length > 0) {
           console.log(`[HC] Calories OK con dataType: ${dataType}`, result.aggregatedData);
@@ -468,7 +495,7 @@ class HealthConnectServiceClass {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         dataType: 'respiratory-rate' as 'steps',
-        bucket: 'DAILY'
+        bucket: 'day'
       });
       return result.aggregatedData?.[0]?.value || 0;
     } catch { return 0; }
@@ -480,7 +507,7 @@ class HealthConnectServiceClass {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         dataType: 'heart-rate-variability' as 'steps',
-        bucket: 'DAILY'
+        bucket: 'day'
       });
       return result.aggregatedData?.[0]?.value || 0;
     } catch { return 0; }
@@ -533,7 +560,7 @@ class HealthConnectServiceClass {
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
             dataType: dataType as 'steps',
-            bucket: 'DAILY',
+            bucket: 'day',
           });
           if (result.aggregatedData?.length > 0) {
             const val = result.aggregatedData[0].value || 0;

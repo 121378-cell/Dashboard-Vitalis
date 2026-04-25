@@ -35,6 +35,7 @@ import { notificationService } from './services/notificationService';
 import { healthConnectService } from './services/healthConnectService';
 import { useHealthConnectPermissions } from './hooks/useHealthConnectPermissions';
 import { Biometrics, AthleteProfile, Message, PDFDocument, Workout } from './types';
+import { DebugPanel } from './components/DebugPanel';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
@@ -55,6 +56,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingAI, setLoadingAI] = useState(false);
   const [documents, setDocuments] = useState<PDFDocument[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [profile, setProfile] = useState<AthleteProfile>({
     name: "Sergi",
     age: 47,
@@ -226,15 +228,59 @@ const App: React.FC = () => {
     }
   };
 
-  const fetchWorkouts = async () => {
+  const fetchWorkouts = async (forceHC: boolean = false): Promise<Workout[]> => {
+    let allWorkouts: Workout[] = [];
+    const hcAvailable = forceHC || isHCAvailable;
+    console.log('[App] fetchWorkouts - HC disponible:', hcAvailable);
+    
+    // 1. Intentar cargar desde Health Connect primero (datos en tiempo real)
+    if (hcAvailable) {
+      try {
+        // Verificar permisos antes de leer workouts
+        const hasPerms = await healthConnectService.ensurePermissions();
+        if (!hasPerms) {
+          console.warn('[App] Permisos HC denegados para workouts');
+        } else {
+          const hcWorkouts = await healthConnectService.readTodayWorkouts();
+          console.log('[App] Workouts desde Health Connect:', hcWorkouts.length);
+
+          if (hcWorkouts.length > 0) {
+            const mappedHCWorkouts: Workout[] = hcWorkouts.map((w, index) => ({
+              id: parseInt(w.id) || Date.now() + index,
+              external_id: w.id,
+              name: w.title,
+              description: `${w.exerciseType} - ${Math.round(w.duration / 60)} min, ${Math.round(w.calories)} kcal${w.steps ? `, ${w.steps} pasos` : ''}`,
+              date: w.startTime.toISOString().split('T')[0],
+              source: 'health_connect',
+              calories: w.calories,
+              duration: w.duration,
+            }));
+            allWorkouts = [...mappedHCWorkouts];
+          }
+        }
+      } catch (e) {
+        console.warn('[App] Error leyendo workouts de HC:', e);
+      }
+    }
+    
+    // 2. Intentar cargar desde el backend (backup/fallback)
     try {
       const res = await axios.get(`${BACKEND_URL}/workouts/`, {
         headers: { "x-user-id": "default_user" }
       });
-      setWorkouts(res.data);
+      const backendWorkouts = res.data as Workout[];
+      console.log('[App] Workouts desde backend:', backendWorkouts.length);
+      
+      // Combinar: HC tiene prioridad, backend complementa
+      const hcIds = new Set(allWorkouts.map(w => w.id));
+      const newBackendWorkouts = backendWorkouts.filter(w => !hcIds.has(w.id));
+      allWorkouts = [...allWorkouts, ...newBackendWorkouts];
     } catch (e) {
-      console.error("Error fetching workouts", e);
+      console.error("Error fetching workouts from backend", e);
     }
+    
+    setWorkouts(allWorkouts);
+    return allWorkouts; // Devolver para uso inmediato
   };
 
   // Calcula readiness localmente desde métricas HC (Garmin no disponible en móvil)
@@ -262,6 +308,15 @@ const App: React.FC = () => {
       // 1. Prioridad: Health Connect
       if (forceHC || isHCAvailable) {
         try {
+          // Verificar permisos antes de leer; si no están, solicitar automáticamente
+          const hasPerms = await healthConnectService.ensurePermissions();
+          if (!hasPerms) {
+            console.warn('[App] Permisos de Health Connect no concedidos. Mostrando onboarding...');
+            setShowHealthOnboarding(true);
+            setLoadingBiometrics(false);
+            return;
+          }
+
           const hcData = await healthConnectService.readTodayBiometrics();
           console.log('[App] HC Raw Data:', hcData);
           
@@ -285,20 +340,8 @@ const App: React.FC = () => {
               overtraining: readiness < 40,
               source: 'garmin'
             };
-            setBiometrics(prev => {
-              if (!prev) return mapped;
-              return {
-                ...mapped,
-                // Si la nueva lectura es 0 pero ya teníamos un dato positivo, conservamos el antiguo
-                steps: mapped.steps > 0 ? mapped.steps : prev.steps,
-                sleep: mapped.sleep > 0 ? mapped.sleep : prev.sleep,
-                calories: mapped.calories > 0 ? mapped.calories : prev.calories,
-                heartRate: mapped.heartRate > 0 ? mapped.heartRate : prev.heartRate,
-                hrv: mapped.hrv > 0 ? mapped.hrv : prev.hrv,
-                respiration: mapped.respiration > 0 ? mapped.respiration : prev.respiration,
-                stress: mapped.stress > 0 ? mapped.stress : prev.stress,
-              };
-            });
+            // Siempre actualizar con datos frescos de Health Connect
+            setBiometrics(mapped);
             syncService.syncBiometricsToBackend(mapped).catch(() => {});
             setLoadingBiometrics(false);
             return;
@@ -337,6 +380,11 @@ const App: React.FC = () => {
 
   // --- AI Chat Logic (REQ-F15, F16, F17) ---
   const handleSendMessage = async (content: string) => {
+    // Forzar recarga de workouts antes de enviar al AI (para tener datos actualizados)
+    console.log('[App] handleSendMessage - Recargando workouts antes de consultar al AI');
+    const currentWorkouts = await fetchWorkouts(true);
+    console.log('[App] Workouts cargados:', currentWorkouts.length, currentWorkouts.map(w => w.name).join(', '));
+    
     const userMsg: Message = {
       role: 'user',
       content,
@@ -351,7 +399,10 @@ const App: React.FC = () => {
       // Build System Prompt with Context (REQ-F17)
       const systemPrompt = `Eres ATLAS, el coach de Sergi para el 'PROYECTO 31/07'. 
       METODOLOGÍA: Sobrecarga Progresiva, Intensidad Stoppani y Salud McGill. 
+      FECHA ACTUAL: ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+      
       CONTEXTO: Sergi tiene 47-48 años, realiza 20k pasos diarios (NEAT masivo) y sus hitos son Banca 50kg y Prensa 100kg. 
+      METODOLOGÍA: Sobrecarga Progresiva, Intensidad Stoppani y Salud McGill.
       Tu tono es profesional, motivador y basado en datos reales.
         CONTEXTO DEL ATLETA:
         - Nombre: ${profile.name}
@@ -364,10 +415,11 @@ const App: React.FC = () => {
         - Sobreentrenamiento: ${biometrics?.overtraining ? 'SÍ' : 'NO'}
         
         ÚLTIMOS ENTRENAMIENTOS:
-        ${workouts.slice(0, 5).map(w => `- [${w.source}] ${w.name} (${w.date}): ${w.description}`).join('\n')}
+        ${(currentWorkouts || []).slice(0, 5).map(w => `- [${w.source}] ${w.name} (${w.date}): ${w.description}`).join('\n')}
+        ${currentWorkouts?.length === 0 ? '- No hay entrenamientos registrados hoy' : ''}
         
         DOCUMENTOS ANALIZADOS:
-        ${documents.map(d => `- ${d.name}: ${d.summary}`).join('\n')}
+        ${(documents || []).map(d => `- ${d.name}: ${d.summary}`).join('\n')}
         
         INSTRUCCIONES:
         1. Sé técnico pero motivador.
@@ -376,6 +428,9 @@ const App: React.FC = () => {
         4. Si hay riesgo de sobreentrenamiento, recomienda descanso activo.
       `;
 
+      console.log('[App] System prompt workouts section:', (currentWorkouts || []).slice(0, 5).map(w => `${w.name} (${w.source})`).join(', ') || 'SIN WORKOUTS');
+    console.log('[App] Estado workouts completo:', JSON.stringify(currentWorkouts, null, 2));
+      
       const result = await callAI(newMessages, systemPrompt);
       
       // REQ: Detect if AI generated a JSON session plan
@@ -444,7 +499,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Solo carga inicial de datos pesados
     fetchWorkouts();
-    loadBiometrics();
+    // No cargar biometrics aquí, esperar a que HC esté disponible
     generateBriefing();
   }, []); // Se ejecuta solo una vez al arrancar
 
@@ -471,11 +526,11 @@ const App: React.FC = () => {
 
   // 🔑 Reactivo: cuando Health Connect concede permisos, cargamos biométricos
   useEffect(() => {
-    if (granted) {
-      console.log('[App] Health Connect granted=true → Cargando biométricos nativos...');
-      loadBiometrics();
+    if (granted && isHCAvailable) {
+      console.log('[App] Health Connect granted=true + available → Cargando biométricos nativos...');
+      loadBiometrics(true);
     }
-  }, [granted]);
+  }, [granted, isHCAvailable]);
 
   // Load user profile on startup
   useEffect(() => {
@@ -548,15 +603,17 @@ const App: React.FC = () => {
             const hasSeen = localStorage.getItem('hc_onboarding_seen');
             if (!permStatus.granted && !hasSeen) {
               setShowHealthOnboarding(true);
-            } else {
-              // Ya tiene permisos — cargar ahora
-              loadBiometrics(true);
             }
+
+            // SIEMPRE intentar cargar biométricos; ensurePermissions solicitará permisos si faltan
+            loadBiometrics(true);
+            fetchWorkouts(true); // Cargar workouts desde Health Connect (forceHC=true)
           } catch (permErr) {
             console.warn('[HC] Error comprobando permisos (asumimos que sí):', permErr);
             // En caso de error al comprobar, intentamos leer igualmente
             setHcPermissionsGranted(true);
             loadBiometrics(true);
+            fetchWorkouts(true);
           }
         }
       } catch (e) {
@@ -577,6 +634,7 @@ const App: React.FC = () => {
       setHcPermissionsGranted(true); // Asumimos que sí si falla el check
     }
     loadBiometrics(true);
+    fetchWorkouts(true); // Cargar workouts desde Health Connect
   };
 
   return (
@@ -588,6 +646,14 @@ const App: React.FC = () => {
           onSkip={closeHealthOnboarding} 
         />
       )}
+      
+      {/* Debug Panel */}
+      <DebugPanel 
+        isOpen={showDebugPanel} 
+        onClose={() => setShowDebugPanel(false)} 
+        biometrics={biometrics}
+        workouts={workouts}
+      />
       
       {/* Mobile Drawer Overlay */}
       <AnimatePresence>
@@ -758,6 +824,15 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Debug Button */}
+            <button
+              onClick={() => setShowDebugPanel(true)}
+              className="p-2 bg-surface-variant rounded-lg hover:bg-primary/10 transition-colors"
+              title="Debug Panel"
+            >
+              <span className="text-xs font-mono text-primary">DBG</span>
+            </button>
+            
             <div className="flex flex-col items-end">
               <span className="text-xs font-bold">{profile.name}</span>
               <span className="text-[10px] text-on-surface-variant uppercase tracking-widest">{profile.goal}</span>
