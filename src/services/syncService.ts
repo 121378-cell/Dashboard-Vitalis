@@ -6,7 +6,7 @@ import { HCBiometrics, HCWorkout } from './healthConnectService';
 const RAW_BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL ||
   import.meta.env.VITE_API_URL ||
-  'http://localhost:9000/api/v1';
+  '/api/v1';
 
 const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, '');
 

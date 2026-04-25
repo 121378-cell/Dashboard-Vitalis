@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # Database
-    DATABASE_URL: str = "sqlite:///atlas.db"
+    DATABASE_URL: str = "sqlite:///atlas_v2.db"
     
     # Auth
     GARMIN_EMAIL: Optional[str] = None

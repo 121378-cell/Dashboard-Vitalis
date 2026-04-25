@@ -156,8 +156,8 @@ for /f "tokens=5" %%a in ('netstat -ano ^| find ":5173 " ^| findstr LISTENING') 
 timeout /t 1 /nobreak >nul
 
 echo.
-echo [1/3] Iniciando Backend FastAPI (puerto 8001)...
-start "Vitalis Backend" cmd /k "cd /d "%BACKEND_DIR%" && python -m uvicorn app.main:app --reload --port 8001"
+echo [1/3] Iniciando Backend FastAPI (puerto 8005)...
+start "Vitalis Backend" cmd /k "cd /d "%BACKEND_DIR%" && python -m uvicorn app.main:app --reload --port 8005"
 
 REM Esperar a que backend inicie
 echo [*] Esperando a que Backend se inicialice...
@@ -176,8 +176,8 @@ echo    VITALIS OPERATIVO
 echo ==========================================
 echo.
 echo Frontend:       http://localhost:5173
-echo Backend API:    http://localhost:8001/api/v1
-echo API Docs:       http://localhost:8001/docs
+echo Backend API:    http://localhost:8005/api/v1
+echo API Docs:       http://localhost:8005/docs
 echo.
 echo [INFO] Servicios ejecutándose en terminales separadas
 echo [INFO] Cierra las ventanas o ejecuta stop_vitalis.bat para detener

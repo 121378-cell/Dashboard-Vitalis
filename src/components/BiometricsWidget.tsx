@@ -134,7 +134,13 @@ export const BiometricsWidget: React.FC<Props> = ({ data, userId = 'default_user
         <MetricCard icon={Zap} label="SpO2" value={displayValue(data.spo2, 0, "N/D")} unit="%" color={getMetricColor(Number(data.spo2) || 0, 'spo2')} />
         <MetricCard icon={Footprints} label="Pasos" value={displayValue(data.steps, 0, "N/D")} unit="" color="text-on-surface" />
         
-        <MetricCard icon={Flame} label="Calorías" value={displayValue(data.calories, 0, "N/D")} unit="kcal" color="text-on-surface" />
+        <MetricCard icon={Flame} label="Calorías" value={displayValue(data.calories_total ?? data.calories, 0, "N/D")} unit="kcal" color="text-on-surface">
+          {data.calories_workouts && data.calories_workouts > 0 && (
+            <span className="text-[7px] font-bold text-orange-400 ml-1">
+              +{Math.round(data.calories_workouts)}
+            </span>
+          )}
+        </MetricCard>
         <MetricCard icon={Wind} label="Respiración" value={displayValue(data.respiration, 0, "N/D")} unit="rpm" color="text-on-surface" />
       </div>
     </div>

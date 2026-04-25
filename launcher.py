@@ -208,7 +208,7 @@ def main():
     time.sleep(1)
     
     # Matar procesos en puertos específicos
-    kill_port(8001)
+    kill_port(8005)
     kill_port(5173)
     time.sleep(1)
     
@@ -220,10 +220,10 @@ def main():
         # Arrancar backend
         print("\n🚀 Arrancando backend FastAPI...")
         print(f"   Directorio: {backend_dir}")
-        print("   Puerto: 8001")
+        print("   Puerto: 8005")
         
         backend_proc = subprocess.Popen(
-            ['python', '-m', 'uvicorn', 'app.main:app', '--port', '8001', '--host', '127.0.0.1'],
+            ['python', '-m', 'uvicorn', 'app.main:app', '--port', '8005', '--host', '127.0.0.1'],
             cwd=str(backend_dir),
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             stdout=subprocess.PIPE,
@@ -232,7 +232,7 @@ def main():
         
         # Esperar backend
         print("\n⏳ Esperando que el backend esté listo...")
-        if wait_for_backend("http://localhost:8001/health"):
+        if wait_for_backend("http://localhost:8005/health"):
             print("   ✅ Backend listo y respondiendo")
         else:
             print("   ⚠️  Backend tardando más de lo esperado, continuando...")
@@ -271,9 +271,9 @@ def main():
         # Mostrar resumen
         print("\n" + "=" * 50)
         print("   ✅ ATLAS está corriendo")
-        print(f"   📡 Backend:  http://localhost:8001")
+        print(f"   📡 Backend:  http://localhost:8005")
         print(f"   🎨 Frontend: http://localhost:5173")
-        print(f"   📚 API Docs: http://localhost:8001/docs")
+        print(f"   📚 API Docs: http://localhost:8005/docs")
         print("\n   💡 Cierra esta ventana para detener ATLAS")
         print("=" * 50)
         
@@ -319,7 +319,7 @@ def main():
         # Asegurar que no queden procesos huérfanos
         kill_process_by_name('python')
         kill_process_by_name('node')
-        kill_port(8001)
+        kill_port(8005)
         kill_port(5173)
         
         print("\n👋 ATLAS se ha detenido. ¡Hasta pronto!")

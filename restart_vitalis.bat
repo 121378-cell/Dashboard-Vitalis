@@ -16,9 +16,9 @@ taskkill /F /IM node.exe >nul 2>&1
 timeout /t 2 /nobreak
 
 REM Iniciar Backend
-echo [2/3] Iniciando Backend FastAPI (puerto 9000)...
+echo [2/3] Iniciando Backend FastAPI (puerto 8005)...
 cd backend
-start cmd /k "title Backend FastAPI && python -m uvicorn app.main:app --host 0.0.0.0 --port 9000 --reload"
+start cmd /k "title Backend FastAPI && python -m uvicorn app.main:app --host 0.0.0.0 --port 8005 --reload"
 cd ..
 timeout /t 3 /nobreak
 
@@ -33,8 +33,8 @@ echo ╚════════════════════════
 echo.
 echo Acceso:
 echo   Frontend:  http://localhost:5173
-echo   Backend:   http://localhost:9000/api/v1
-echo   Docs API:  http://localhost:9000/api/v1/docs
+echo   Backend:   http://localhost:8005/api/v1
+echo   Docs API:  http://localhost:8005/api/v1/docs
 echo.
 echo Esperando a que inicie...
 timeout /t 5 /nobreak

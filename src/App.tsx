@@ -40,7 +40,7 @@ import { DebugPanel } from './components/DebugPanel';
 const RAW_BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:9000/api/v1";
+  "/api/v1";
 const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, "");
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -274,9 +274,14 @@ const App: React.FC = () => {
     // 2. Intentar cargar desde el backend (backup/fallback)
     try {
       const res = await axios.get(`${BACKEND_URL}/workouts/`, {
-        headers: { "x-user-id": "default_user" }
+        headers: { "x-user-id": "default_user" },
+        timeout: 3000
       });
-      const backendWorkouts = res.data as Workout[];
+      // Ensure we always have an array — backend may return an object or non-array
+      const rawData = res.data;
+      const backendWorkouts: Workout[] = Array.isArray(rawData) 
+        ? rawData 
+        : (Array.isArray(rawData?.workouts) ? rawData.workouts : []);
       console.log('[App] Workouts desde backend:', backendWorkouts.length);
       
       // Combinar: HC tiene prioridad, backend complementa (dedupe por source+external_id)
@@ -331,9 +336,9 @@ const App: React.FC = () => {
           }
 
           const hcData = await healthConnectService.readTodayBiometrics();
-          console.log('[App] HC Raw Data:', hcData);
+          console.log('[App] HC Raw Data:', JSON.stringify(hcData));
           
-          if (hcData.steps !== null || hcData.calories !== null) {
+          if (hcData && (hcData.steps !== null || hcData.calories !== null || hcData.heartRate !== null)) {
             const steps = hcData.steps ?? 0;
             const sleep = hcData.sleepHours ?? 0;
             const hr = hcData.heartRate ?? 0;
@@ -364,7 +369,7 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. Fallback: Backend
+      // 2. Fallback: Backend (ahora incluye calories_workouts y calories_total)
       try {
         const todayLocal = localDateOnly(new Date());
         const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
@@ -372,7 +377,7 @@ const App: React.FC = () => {
           params: { date_str: todayLocal },
           timeout: 3000
         });
-        if (res.data && res.data.steps > 0) {
+        if (res.data && (res.data.steps > 0 || res.data.calories_workouts > 0)) {
           setBiometrics(res.data);
           setLoadingBiometrics(false);
           return;
@@ -381,13 +386,25 @@ const App: React.FC = () => {
         console.warn('[App] Backend no disponible o vacío');
       }
 
-      // 3. Mantener Baselines de Sergi (Proyecto 31/07) como punto de partida real
-      setBiometrics(prev => prev || {
-        heartRate: 48, hrv: 49, spo2: 98, stress: 22,
-        steps: 20000, sleep: 7.0, calories: 2400,
-        respiration: 13, readiness: 88, status: 'excellent',
-        overtraining: false, source: 'garmin'
-      });
+      // 3. Fallback Final: Datos Simulados de Health Connect (Mock Data)
+      try {
+        const fallbackData = await healthConnectService.readTodayBiometrics();
+        const steps = fallbackData.steps ?? 20000;
+        const sleep = fallbackData.sleepHours ?? 7.0;
+        const hr = fallbackData.heartRate ?? 48;
+        const readiness = calculateReadiness(steps, sleep, hr);
+        
+        setBiometrics(prev => prev || {
+          heartRate: hr, hrv: fallbackData.hrv ?? 49, spo2: fallbackData.spo2 ?? 98, stress: fallbackData.stress ?? 22,
+          steps: steps, sleep: sleep, calories: fallbackData.calories ?? 2400,
+          calories_baseline: fallbackData.calories ?? 2400, calories_workouts: 0, calories_total: fallbackData.calories ?? 2400,
+          workout_duration: 0, workout_count: 0,
+          respiration: fallbackData.respiration ?? 13, readiness: readiness, status: readiness >= 80 ? 'excellent' : readiness >= 60 ? 'good' : 'poor',
+          overtraining: readiness < 40, source: 'demo'
+        });
+      } catch (e) {
+        console.warn('[App] Error al cargar fallback mock data');
+      }
     } finally {
       setLoadingBiometrics(false);
     }
@@ -609,27 +626,14 @@ const App: React.FC = () => {
         console.log('[HC] isAvailable:', avail);
 
         if (avail) {
-          // Intentar comprobar permisos con try/catch robusto
-          try {
-            const permStatus = await healthConnectService.checkPermissions();
-            console.log('[HC] Permisos:', JSON.stringify(permStatus));
-            setHcPermissionsGranted(permStatus.granted);
-
+          healthConnectService.checkPermissions().then(ps => {
+            setHcPermissionsGranted(ps.granted);
             const hasSeen = localStorage.getItem('hc_onboarding_seen');
-            if (!permStatus.granted && !hasSeen) {
-              setShowHealthOnboarding(true);
-            }
-
-            // SIEMPRE intentar cargar biométricos; ensurePermissions solicitará permisos si faltan
-            loadBiometrics(true);
-            fetchWorkouts(true); // Cargar workouts desde Health Connect (forceHC=true)
-          } catch (permErr) {
-            console.warn('[HC] Error comprobando permisos (asumimos que sí):', permErr);
-            // En caso de error al comprobar, intentamos leer igualmente
-            setHcPermissionsGranted(true);
-            loadBiometrics(true);
-            fetchWorkouts(true);
-          }
+            if (!ps.granted && !hasSeen) setShowHealthOnboarding(true);
+          }).catch(() => {});
+          
+          loadBiometrics(true);
+          fetchWorkouts(true);
         }
       } catch (e) {
         console.warn('[HC] No disponible en esta plataforma:', e);

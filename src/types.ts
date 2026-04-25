@@ -17,6 +17,12 @@ export interface Biometrics {
   hrv_status?: string;
   rhr_baseline?: number;
   hrv_baseline?: number;
+  // Cumulative totals (workouts + baseline)
+  calories_baseline?: number;
+  calories_workouts?: number;
+  calories_total?: number;
+  workout_duration?: number;
+  workout_count?: number;
 }
 
 export interface AthleteProfile {
