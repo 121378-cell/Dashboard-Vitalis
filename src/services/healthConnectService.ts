@@ -7,6 +7,22 @@
 
 import { Health } from 'capacitor-health';
 
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/**
+ * Devuelve un ISO "local" sin sufijo Z ni offset.
+ * Motivo: algunos bridges/plugins interpretan strings ISO como hora local (y un "Z" desplaza el rango).
+ */
+function toLocalIsoNoTz(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+function toLocalDateOnly(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -250,7 +266,9 @@ class HealthConnectServiceClass {
     const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const endDate = now;
 
-    console.log(`[HC] FIX ACTIVO: Leyendo hoy desde ${startDate.toISOString()} (local midnight) hasta ${endDate.toISOString()}`);
+    console.log(
+      `[HC] FIX TZ: Leyendo hoy local desde ${toLocalIsoNoTz(startDate)} hasta ${toLocalIsoNoTz(endDate)}`
+    );
 
     return this.readBiometricsRange(startDate, endDate);
   }
@@ -258,7 +276,7 @@ class HealthConnectServiceClass {
   async readBiometricsRange(startDate: Date, endDate: Date): Promise<HCBiometrics> {
     if (!this.available) return getFallbackBiometrics();
 
-    console.log(`[HC] Leyendo rango: ${startDate.toISOString()} -> ${endDate.toISOString()}`);
+    console.log(`[HC] Leyendo rango local: ${toLocalIsoNoTz(startDate)} -> ${toLocalIsoNoTz(endDate)}`);
 
     let steps: number | null = null;
     let heartRate: number | null = null;
@@ -269,8 +287,8 @@ class HealthConnectServiceClass {
     // 1. WORKOUTS: obtener HR, calories y steps (pero steps de workouts puede duplicar)
     try {
       const { workouts = [] } = await Health.queryWorkouts({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: toLocalIsoNoTz(startDate),
+        endDate: toLocalIsoNoTz(endDate),
         includeHeartRate: true,
         includeSteps: false, // No sumar steps de workouts para evitar duplicación
         includeRoute: false,
@@ -291,8 +309,8 @@ class HealthConnectServiceClass {
     // 2. PASOS: queryRecords primero (suma manual de registros individuales - más fiable)
     try {
       const { records = [] } = await Health.queryRecords({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: toLocalIsoNoTz(startDate),
+        endDate: toLocalIsoNoTz(endDate),
         dataType: 'steps',
       });
       if (records.length > 0) {
@@ -308,8 +326,8 @@ class HealthConnectServiceClass {
     if (steps === null || steps === 0) {
       try {
         const r = await Health.queryAggregated({
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          startDate: toLocalIsoNoTz(startDate),
+          endDate: toLocalIsoNoTz(endDate),
           dataType: 'steps',
           bucket: 'day',
         });
@@ -322,8 +340,8 @@ class HealthConnectServiceClass {
     if (calories === null) {
       try {
         const r = await Health.queryAggregated({
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          startDate: toLocalIsoNoTz(startDate),
+          endDate: toLocalIsoNoTz(endDate),
           dataType: 'active-calories',
           bucket: 'day',
         });
@@ -365,7 +383,7 @@ class HealthConnectServiceClass {
       respiration: resp,
       stress,
       source: 'health_connect',
-      date: startDate.toISOString().split('T')[0],
+      date: toLocalDateOnly(startDate),
     };
   }
 
@@ -399,8 +417,8 @@ class HealthConnectServiceClass {
     for (const dataType of dataTypes) {
       try {
         const result = await Health.queryAggregated({
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          startDate: toLocalIsoNoTz(startDate),
+          endDate: toLocalIsoNoTz(endDate),
           dataType: dataType as 'steps',
           bucket: 'day',
         });
@@ -421,16 +439,16 @@ class HealthConnectServiceClass {
     try {
       console.log('[HC] Intentando escaneo manual de registros de pasos...');
       const { records = [] } = await Health.queryRecords({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: toLocalIsoNoTz(startDate),
+        endDate: toLocalIsoNoTz(endDate),
         dataType: 'steps'
       });
       if (records.length > 0) {
         const total = records.reduce((acc, r: any) => acc + (r.count || 0), 0);
         console.log(`[HC] Pasos manuales encontrados: ${total}`);
         return [{
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          startDate: toLocalIsoNoTz(startDate),
+          endDate: toLocalIsoNoTz(endDate),
           value: total
         }];
       }
@@ -469,8 +487,8 @@ class HealthConnectServiceClass {
     for (const dataType of dataTypes) {
       try {
         const result = await Health.queryAggregated({
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          startDate: toLocalIsoNoTz(startDate),
+          endDate: toLocalIsoNoTz(endDate),
           dataType: dataType as 'active-calories',
           bucket: 'day',
         });
@@ -492,8 +510,8 @@ class HealthConnectServiceClass {
   async readRespiration(startDate: Date, endDate: Date): Promise<number> {
     try {
       const result = await Health.queryAggregated({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: toLocalIsoNoTz(startDate),
+        endDate: toLocalIsoNoTz(endDate),
         dataType: 'respiratory-rate' as 'steps',
         bucket: 'day'
       });
@@ -504,8 +522,8 @@ class HealthConnectServiceClass {
   async readHRV(startDate: Date, endDate: Date): Promise<number> {
     try {
       const result = await Health.queryAggregated({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: toLocalIsoNoTz(startDate),
+        endDate: toLocalIsoNoTz(endDate),
         dataType: 'heart-rate-variability' as 'steps',
         bucket: 'day'
       });
@@ -523,8 +541,8 @@ class HealthConnectServiceClass {
       for (const dataType of sleepDataTypes) {
         try {
           const { records = [] } = await Health.queryRecords({
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
+            startDate: toLocalIsoNoTz(startDate),
+            endDate: toLocalIsoNoTz(endDate),
             dataType: dataType as 'steps'
           });
 
@@ -557,8 +575,8 @@ class HealthConnectServiceClass {
       for (const dataType of dataTypes) {
         try {
           const result = await Health.queryAggregated({
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
+            startDate: toLocalIsoNoTz(startDate),
+            endDate: toLocalIsoNoTz(endDate),
             dataType: dataType as 'steps',
             bucket: 'day',
           });
@@ -578,8 +596,8 @@ class HealthConnectServiceClass {
   async readWorkouts(startDate: Date, endDate: Date): Promise<HCWorkout[]> {
     try {
       const result = await Health.queryWorkouts({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: toLocalIsoNoTz(startDate),
+        endDate: toLocalIsoNoTz(endDate),
         includeHeartRate: true,
         includeRoute: false,
         includeSteps: true,

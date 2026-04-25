@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { healthConnectService, HCBiometrics, HCWorkout } from '../services/healthConnectService';
+import { healthConnectService, HCWorkout } from '../services/healthConnectService';
 import { X, RefreshCw, Activity, Heart, Footprints, Flame, Moon } from 'lucide-react';
 
 interface DebugPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  biometrics: HCBiometrics | null;
+  // Puede venir de Health Connect (HCBiometrics) o del modelo del dashboard (Biometrics)
+  // Ambos comparten campos clave (steps, heartRate, calories, etc.)
+  biometrics: any | null;
   workouts: any[];
 }
 

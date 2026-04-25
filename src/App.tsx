@@ -43,6 +43,10 @@ const RAW_BACKEND_URL =
   "http://localhost:9000/api/v1";
 const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, "");
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const localDateOnly = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 const App: React.FC = () => {
   // --- Native & System State ---
   const { granted, checkPermissions } = useHealthConnectPermissions();
@@ -351,7 +355,7 @@ const App: React.FC = () => {
             };
             // Siempre actualizar con datos frescos de Health Connect
             setBiometrics(mapped);
-            syncService.syncBiometricsToBackend(mapped).catch(() => {});
+            syncService.syncBiometricsToBackend(mapped as any).catch(() => {});
             setLoadingBiometrics(false);
             return;
           }
@@ -362,8 +366,10 @@ const App: React.FC = () => {
 
       // 2. Fallback: Backend
       try {
+        const todayLocal = localDateOnly(new Date());
         const res = await axios.get(`${BACKEND_URL}/biometrics/`, {
           headers: { "x-user-id": "default_user" },
+          params: { date_str: todayLocal },
           timeout: 3000
         });
         if (res.data && res.data.steps > 0) {
