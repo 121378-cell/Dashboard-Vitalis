@@ -16,7 +16,8 @@ function pad2(n: number): string {
  * Motivo: algunos bridges/plugins interpretan strings ISO como hora local (y un "Z" desplaza el rango).
  */
 function toLocalIsoNoTz(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  // Incluir 'Z' para formato ISO válido que Health Connect pueda parsear
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}Z`;
 }
 
 /**
@@ -178,7 +179,7 @@ class HealthConnectServiceClass {
     try {
       // Usar permisos requeridos actualizados
       const result = await Health.requestHealthPermissions({ 
-        permissions: REQUIRED_HEALTH_PERMISSIONS 
+        permissions: REQUIRED_HEALTH_PERMISSIONS as any 
       });
       
       const granted = (result as any).display === 'granted' || 
@@ -210,8 +211,7 @@ class HealthConnectServiceClass {
       const testResult = await Health.queryRecords({
         dataType: 'steps',
         startDate: toLocalIsoNoTz(new Date()),
-        endDate: toLocalIsoNoTz(new Date()),
-        limit: 1
+        endDate: toLocalIsoNoTz(new Date())
       }).catch(() => ({ records: [] }));
       
       return {
@@ -252,13 +252,52 @@ class HealthConnectServiceClass {
   async ensurePermissions(): Promise<boolean> {
     if (!this.available) return false;
 
-    let status = await this.checkPermissions();
-    if (status.granted) return true;
+    console.log('[HC] ensurePermissions: Verifying actual permissions (timeout 10s)...');
+    
+    // Verificar permisos reales haciendo una query de prueba
+    let hasRealPermissions = false;
+    try {
+      await Promise.race([
+        Health.queryRecords({
+          dataType: 'steps',
+          startDate: toLocalIsoNoTz(new Date()),
+          endDate: toLocalIsoNoTz(new Date())
+        }).then(() => { hasRealPermissions = true; }).catch(() => { hasRealPermissions = false; }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+      ]);
+    } catch {
+      hasRealPermissions = false;
+    }
+    
+    console.log('[HC] ensurePermissions: Real permissions check:', hasRealPermissions);
+    
+    if (hasRealPermissions) {
+      console.log('[HC] ensurePermissions: Permissions verified ✓');
+      return true;
+    }
 
-    console.warn('[HC] Permisos no concedidos. Solicitando...');
-
-    status = await this.requestPermissions();
-    if (status.granted) return true;
+    console.warn('[HC] Permisos no concedidos. Solicitando (timeout 15s)...');
+    
+    // Timeout wrapper for permission request - prevents hanging forever
+    const timeoutPromise = new Promise<boolean>((_, reject) => 
+      setTimeout(() => reject(new Error('Permission request timeout')), 15000)
+    );
+    
+    try {
+      const result = await Promise.race([
+        this.requestPermissions().then(s => s.granted),
+        timeoutPromise
+      ]);
+      
+      if (result) {
+        console.log('[HC] ensurePermissions: Permissions granted after request ✓');
+        return true;
+      }
+    } catch (timeoutErr) {
+      console.warn('[HC] ensurePermissions: Timeout waiting for permission dialog');
+      // Don't open settings on timeout - just return false
+      return false;
+    }
 
     console.warn('[HC] Permisos DENEGADOS. Abriendo configuracion...');
 
@@ -326,8 +365,7 @@ class HealthConnectServiceClass {
         const { records = [] } = await Health.queryRecords({
           startDate: toLocalIsoNoTz(startDate),
           endDate: toLocalIsoNoTz(endDate),
-          dataType: 'steps',
-          limit: 10000
+          dataType: 'steps'
         });
         if (records.length > 0) {
           const total = records.reduce((s: number, r: any) => s + (r.count || r.value || 0), 0);
@@ -365,7 +403,7 @@ class HealthConnectServiceClass {
       const r = await Health.queryAggregated({
         startDate: toLocalIsoNoTz(startDate),
         endDate: toLocalIsoNoTz(endDate),
-        dataType: 'calories',
+        dataType: 'active-calories',
         bucket: 'day',
       });
       if (r.aggregatedData && r.aggregatedData.length > 0) {
@@ -398,7 +436,7 @@ class HealthConnectServiceClass {
 
     // 4. HEART RATE
     try {
-      restingHR = await this.readRestingHeartRate(startDate, endDate);
+      const restingHR = await this.readRestingHeartRate(startDate, endDate);
       if (restingHR !== null && restingHR > 0) {
         restingHeartRate = restingHR;
         heartRate = restingHR;
@@ -440,10 +478,11 @@ class HealthConnectServiceClass {
       console.warn('[HC] Sleep error:', e);
     }
 
-    // 6. RESPIRATION
     try {
-      resp = await this.readRespiration(startDate, endDate);
-      if (resp !== null && resp > 0) respiration = resp;
+      const resp = await this.readRespiration(startDate, endDate);
+      if (resp !== null && resp > 0) {
+        respiration = resp;
+      }
     } catch (e) {
       console.warn('[HC] Respiration error:', e);
     }

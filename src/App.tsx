@@ -1,53 +1,168 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  MessageSquare, 
-  User, 
-  FileText, 
-  Settings, 
-  LogOut, 
-  RefreshCw,
-  Zap,
-  History,
-  LayoutDashboard,
-  Menu,
-  X,
-  Brain,
-  Activity,
-  Loader2
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import axios from 'axios';
+// ATLAS AI Personal Trainer - Main App
+// ======================================
+// Mobile-first React app with bottom navigation
 
-// Modular Components
-import { BiometricsWidget } from './components/BiometricsWidget';
-import { ProfileForm } from './components/ProfileForm';
-import { Chat } from './components/Chat';
-import { PDFManager } from './components/PDFManager';
-import { Setup } from './components/Setup';
-import { HealthConnectOnboarding } from './components/HealthConnectOnboarding';
-import { ExerciseSelector } from './components/ExerciseSelector';
-import { WorkoutLogger } from './components/WorkoutLogger';
+import { useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useAtlasStore } from './store/atlasStore';
+import { useAtlasData } from './hooks/useAtlasData';
+import { useHealthConnect } from './hooks/useHealthConnect';
 
-// Services & Types
-import { callAI } from './services/aiService';
-import { syncService } from './services/syncService';
-import { notificationService } from './services/notificationService';
-import { healthConnectService } from './services/healthConnectService';
-import { useHealthConnectPermissions } from './hooks/useHealthConnectPermissions';
-import { Biometrics, AthleteProfile, Message, PDFDocument, Workout } from './types';
-import { DebugPanel } from './components/DebugPanel';
+// Layout
+import { MobileNav } from './components/layout/MobileNav';
 
-const RAW_BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL ||
-  import.meta.env.VITE_API_URL ||
-  "/api/v1";
-const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, "");
+// Dashboard
+import { DailyBriefing } from './components/dashboard/DailyBriefing';
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
-const localDateOnly = (d: Date) =>
-  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+// Biometrics
+import { BiometricsWidget } from './components/biometrics/BiometricsWidget';
 
-const App: React.FC = () => {
+// Chat
+import { Chat } from './components/chat/Chat';
+
+// Components for each tab
+const HomeTab = () => {
+  const { biometrics, readiness, briefing, loadBriefing, isLoading } = useAtlasStore();
+  const { refreshAll } = useAtlasData();
+  
+  return (
+    <div className="space-y-4 p-4 pb-24">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-[var(--color-text)]">
+            ATLAS
+          </h1>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {new Date().toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              day: 'numeric',
+              month: 'short'
+            })}
+          </p>
+        </div>
+        <button
+          onClick={refreshAll}
+          disabled={isLoading}
+          className="w-10 h-10 rounded-xl glass flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-primary)]"
+        >
+          {isLoading ? (
+            <span className="animate-spin">↻</span>
+          ) : (
+            <span>↻</span>
+          )}
+        </button>
+      </div>
+      
+      {/* Daily Briefing */}
+      <DailyBriefing 
+        briefing={briefing} 
+        onRefresh={loadBriefing}
+        isLoading={isLoading}
+      />
+      
+      {/* Biometrics */}
+      <BiometricsWidget 
+        biometrics={biometrics} 
+        readiness={readiness}
+      />
+    </div>
+  );
+};
+
+const ChatTab = () => (
+  <div className="h-full pb-20">
+    <Chat />
+  </div>
+);
+
+const TrainTab = () => (
+  <div className="p-4 pb-24">
+    <h2 className="text-xl font-display font-bold text-[var(--color-text)] mb-4">
+      Entrenamiento
+    </h2>
+    <p className="text-sm text-[var(--color-text-muted)]">
+      Aquí aparecerá tu sesión de hoy
+    </p>
+  </div>
+);
+
+const ProgressTab = () => (
+  <div className="p-4 pb-24">
+    <h2 className="text-xl font-display font-bold text-[var(--color-text)] mb-4">
+      Progreso
+    </h2>
+    <p className="text-sm text-[var(--color-text-muted)]">
+      Aquí verás tu progreso
+    </p>
+  </div>
+);
+
+const SetupTab = () => (
+  <div className="p-4 pb-24">
+    <h2 className="text-xl font-display font-bold text-[var(--color-text)] mb-4">
+      Configuración
+    </h2>
+    <p className="text-sm text-[var(--color-text-muted)]">
+      Configura tus servicios aquí
+    </p>
+  </div>
+);
+
+const TAB_COMPONENTS: Record<string, React.FC> = {
+  home: HomeTab,
+  chat: ChatTab,
+  train: TrainTab,
+  progress: ProgressTab,
+  setup: SetupTab,
+};
+
+function App() {
+  const { activeTab, setHcAvailable } = useAtlasStore();
+  const { isAvailable, requestPermissions } = useHealthConnect();
+  const { refreshAll } = useAtlasData();
+  
+  // Initialize Health Connect
+  useEffect(() => {
+    const initHC = async () => {
+      if (isAvailable) {
+        setHcAvailable(true);
+        const granted = await requestPermissions();
+        if (granted) {
+          refreshAll();
+        }
+      }
+    };
+    initHC();
+  }, [isAvailable, setHcAvailable, requestPermissions, refreshAll]);
+  
+  const ActiveComponent = TAB_COMPONENTS[activeTab] || HomeTab;
+  
+  return (
+    <div className="h-full w-full bg-[var(--color-background)] flex flex-col">
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="h-full"
+          >
+            <ActiveComponent />
+          </motion.div>
+        </AnimatePresence>
+      </main>
+      
+      {/* Mobile Navigation */}
+      <MobileNav />
+    </div>
+  );
+}
+
+export default App;
   // --- Native & System State ---
   const { granted, checkPermissions } = useHealthConnectPermissions();
   const [showHealthOnboarding, setShowHealthOnboarding] = useState(false);
@@ -244,27 +359,22 @@ const App: React.FC = () => {
     // 1. Intentar cargar desde Health Connect primero (datos en tiempo real)
     if (hcAvailable) {
       try {
-        // Verificar permisos antes de leer workouts
-        const hasPerms = await healthConnectService.ensurePermissions();
-        if (!hasPerms) {
-          console.warn('[App] Permisos HC denegados para workouts');
-        } else {
-          const hcWorkouts = await healthConnectService.readTodayWorkouts();
-          console.log('[App] Workouts desde Health Connect:', hcWorkouts.length);
+        // No llamamos ensurePermissions aquí — loadBiometrics ya lo hizo secuencialmente
+        const hcWorkouts = await healthConnectService.readTodayWorkouts();
+        console.log('[App] Workouts desde Health Connect:', hcWorkouts.length);
 
-          if (hcWorkouts.length > 0) {
-            const mappedHCWorkouts: Workout[] = hcWorkouts.map((w, index) => ({
-              id: parseInt(w.id) || Date.now() + index,
-              external_id: w.id,
-              name: w.title,
-              description: `${w.exerciseType} - ${Math.round(w.duration / 60)} min, ${Math.round(w.calories)} kcal${w.steps ? `, ${w.steps} pasos` : ''}`,
-              date: w.startTime.toISOString().split('T')[0],
-              source: 'health_connect',
-              calories: w.calories,
-              duration: w.duration,
-            }));
-            allWorkouts = [...mappedHCWorkouts];
-          }
+        if (hcWorkouts.length > 0) {
+          const mappedHCWorkouts: Workout[] = hcWorkouts.map((w, index) => ({
+            id: parseInt(w.id) || Date.now() + index,
+            external_id: w.id,
+            name: w.title,
+            description: `${w.exerciseType} - ${Math.round(w.duration / 60)} min, ${Math.round(w.calories)} kcal${w.steps ? `, ${w.steps} pasos` : ''}`,
+            date: w.startTime.toISOString().split('T')[0],
+            source: 'health_connect',
+            calories: w.calories,
+            duration: w.duration,
+          }));
+          allWorkouts = [...mappedHCWorkouts];
         }
       } catch (e) {
         console.warn('[App] Error leyendo workouts de HC:', e);
@@ -335,7 +445,42 @@ const App: React.FC = () => {
             return;
           }
 
+          const hcData = await healthConnectService.readTodayBiometrics();
+          console.log('[App] HC Raw Data:', hcData);
 
+          if (hcData.steps !== null || hcData.calories !== null || hcData.heartRate !== null) {
+            const steps = hcData.steps ?? 0;
+            const sleep = hcData.sleepHours ?? 0;
+            const hr = hcData.heartRate ?? 0;
+            const readiness = calculateReadiness(steps, sleep, hr);
+
+            const mapped: Biometrics = {
+              heartRate: hr,
+              hrv: hcData.hrv ?? 0,
+              spo2: hcData.spo2 ?? 98,
+              stress: hcData.stress ?? 0,
+              steps,
+              sleep,
+              calories: hcData.calories ?? 0,
+              calories_baseline: hcData.calories ?? 2400,
+              calories_workouts: 0,
+              calories_total: hcData.calories ?? 0,
+              workout_duration: 0,
+              workout_count: 0,
+              respiration: hcData.respiration ?? 0,
+              readiness,
+              status: readiness >= 80 ? 'excellent' : readiness >= 60 ? 'good' : 'poor',
+              overtraining: readiness < 40,
+              source: 'health_connect'
+            };
+            setBiometrics(mapped);
+            syncService.syncBiometricsToBackend(mapped).catch(() => {});
+            setLoadingBiometrics(false);
+            return;
+          }
+        } catch (hcErr) {
+          console.warn('[App] Error leyendo HC:', hcErr);
+        }
       }
 
       // 2. Fallback: Backend (ahora incluye calories_workouts y calories_total)
@@ -601,8 +746,9 @@ const App: React.FC = () => {
             if (!ps.granted && !hasSeen) setShowHealthOnboarding(true);
           }).catch(() => {});
           
-          loadBiometrics(true);
-          fetchWorkouts(true);
+          // Secuencial: primero biométricos (asegura permisos), luego workouts
+          await loadBiometrics(true);
+          await fetchWorkouts(true);
         }
       } catch (e) {
         console.warn('[HC] No disponible en esta plataforma:', e);

@@ -1,69 +1,213 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+/* ATLAS Design System
+   Military-tech meets premium fitness
+   ================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-primary-fixed-dim: #00e2ee;
-  --color-on-surface: #ffffff;
-  --color-secondary: #feb700;
-  --color-primary-dim: #00e2ee;
-  --color-surface-variant: #262626;
-  --color-tertiary-fixed-dim: #ff7b74;
-  --color-surface-tint: #99f7ff;
-  --color-background: #0e0e0e;
-  --color-tertiary: #ff716b;
-  --color-error-container: #9f0519;
-  --color-outline: #767575;
-  --color-secondary-fixed: #ffc965;
-  --color-on-primary-fixed-variant: #006065;
-  --color-primary-container: #00f1fe;
-  --color-primary-fixed: #00f1fe;
-  --color-on-tertiary-container: #000000;
-  --color-on-error-container: #ffa8a3;
-  --color-on-error: #490006;
-  --color-surface-container: #1a1a1a;
-  --color-on-secondary: #533a00;
-  --color-on-tertiary-fixed-variant: #79000e;
-  --color-surface-container-low: #131313;
-  --color-on-secondary-container: #fff6ee;
-  --color-tertiary-container: #f94647;
-  --color-on-surface-variant: #adaaaa;
-  --color-tertiary-dim: #ff716b;
-  --color-secondary-container: #7c5800;
-  --color-error: #ff716c;
-  --color-secondary-dim: #ecaa00;
-  --color-on-primary: #005f64;
-  --color-on-secondary-fixed: #463000;
-  --color-tertiary-fixed: #ff928b;
-  --color-on-secondary-fixed-variant: #6b4b00;
-  --color-primary: #99f7ff;
-  --color-surface: #0e0e0e;
-  --color-on-primary-container: #00555a;
-  --color-surface-dim: #0e0e0e;
-  --color-on-tertiary-fixed: #3a0003;
-  --color-on-primary-fixed: #004145;
-  --color-surface-bright: #2c2c2c;
-  --color-on-tertiary: #490005;
-  --color-surface-container-highest: #262626;
-  --color-secondary-fixed-dim: #feb700;
-  --color-inverse-on-surface: #565555;
-  --color-on-background: #ffffff;
-  --color-inverse-surface: #fcf9f8;
-  --color-surface-container-high: #20201f;
-  --color-error-dim: #d7383b;
-  --color-inverse-primary: #006a70;
-  --color-surface-container-lowest: #000000;
-  --color-outline-variant: #484847;
+  /* Primary - Neon Yellow Action */
+  --color-primary: #E8FF47;
+  --color-primary-dim: #C8E030;
+  --color-on-primary: #0A0A0F;
+  
+  /* Background - Deep Void */
+  --color-background: #0A0A0F;
+  --color-surface: #13131A;
+  --color-surface-high: #1C1C26;
+  --color-surface-variant: #252532;
+  
+  /* Text Colors */
+  --color-text: #F0F0FF;
+  --color-text-muted: #6B6B8A;
+  --color-text-subtle: #4A4A5A;
+  
+  /* Status Colors */
+  --color-success: #4ADE80;
+  --color-warning: #FB923C;
+  --color-danger: #F87171;
+  --color-info: #60A5FA;
+  
+  /* Outlines & Borders */
+  --color-outline: #2A2A3A;
+  --color-outline-strong: #3A3A4A;
+  
+  /* Typography */
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
 
-  --font-headline: "Space Grotesk", sans-serif;
-  --font-body: "Inter", sans-serif;
-  --font-label: "Inter", sans-serif;
+/* Base Styles */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  @apply bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container;
-  height: 100dvh;
-  margin: 0;
-  overflow: hidden;
+  font-family: var(--font-body);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Utility Classes */
+.glass {
+  background: rgba(19, 19, 26, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-outline);
+}
+
+.glass-high {
+  background: rgba(28, 28, 38, 0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--color-outline-strong);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-success) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-primary {
+  box-shadow: 0 0 20px rgba(232, 255, 71, 0.3);
+}
+
+.glow-success {
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
+}
+
+.glow-warning {
+  box-shadow: 0 0 20px rgba(251, 146, 60, 0.3);
+}
+
+.glow-danger {
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.3);
+}
+
+/* Typography Classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(232, 255, 71, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(232, 255, 71, 0.4); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-count-up {
+  animation: count-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Status Backgrounds */
+.status-excellent {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.2) 0%, rgba(74, 222, 128, 0.05) 100%);
+  border-color: var(--color-success);
+}
+
+.status-good {
+  background: linear-gradient(135deg, rgba(232, 255, 71, 0.2) 0%, rgba(232, 255, 71, 0.05) 100%);
+  border-color: var(--color-primary);
+}
+
+.status-moderate {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.05) 100%);
+  border-color: var(--color-warning);
+}
+
+.status-poor {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.2) 0%, rgba(248, 113, 113, 0.05) 100%);
+  border-color: var(--color-danger);
+}
+
+/* Safe Area Support for Mobile */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Focus States */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 #root {

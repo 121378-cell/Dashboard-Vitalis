@@ -42,44 +42,42 @@ class AIService:
     def _generate_chat_response(self, messages: List[Dict[str, str]], system_instruction: Optional[str] = None) -> Dict[str, Any]:
         start_time = time.time()
         
-        # 1. Try Groq with 30s timeout
+        # 1. Groq (llama-3.3-70b-versatile) — fastest, 10s timeout
         if self.groq_client:
             try:
-                logger.info("Trying Groq AI provider for Briefing...")
-                content = self._generate_openai_compatible(self.groq_client, "llama-3.1-8b-instant", messages, system_instruction, timeout=30)
-                logger.info(f"Groq responded successfully in {time.time() - start_time:.1f}s")
+                logger.info("Trying Groq AI provider...")
+                content = self._generate_openai_compatible(
+                    self.groq_client, "llama-3.3-70b-versatile", messages, system_instruction, timeout=10
+                )
+                logger.info(f"Groq responded in {time.time() - start_time:.1f}s")
                 return {"content": content, "provider": "Groq"}
             except Exception as e:
                 logger.warning(f"Groq failed: {e}")
 
-        # 2. Check Ollama availability before trying
-        ollama_available = self._check_ollama_available()
-        if ollama_available:
-            try:
-                logger.info("Trying Ollama (local) AI provider...")
-                content = self._generate_openai_compatible(self.ollama_client, "llama3", messages, system_instruction, timeout=15)
-                logger.info(f"Ollama responded successfully in {time.time() - start_time:.1f}s")
-                return {"content": content, "provider": "Ollama (Local)"}
-            except Exception as e:
-                logger.warning(f"Ollama failed: {e}")
-
-        # 3. Fallback to Gemini with 30s timeout
+        # 2. Gemini (gemini-2.0-flash) — fallback, 10s timeout
         if self.gemini_client:
             try:
                 logger.info("Trying Gemini AI provider...")
                 content = self._generate_gemini(messages, system_instruction)
-                logger.info(f"Gemini responded successfully in {time.time() - start_time:.1f}s")
+                logger.info(f"Gemini responded in {time.time() - start_time:.1f}s")
                 return {"content": content, "provider": "Gemini"}
             except Exception as e:
                 logger.error(f"Gemini failed: {e}")
+
+        # 3. Ollama local — offline fallback, 10s timeout
+        if self._check_ollama_available():
+            try:
+                logger.info("Trying Ollama (local) AI provider...")
+                content = self._generate_openai_compatible(
+                    self.ollama_client, "llama3", messages, system_instruction, timeout=10
+                )
+                logger.info(f"Ollama responded in {time.time() - start_time:.1f}s")
+                return {"content": content, "provider": "Ollama (Local)"}
+            except Exception as e:
+                logger.warning(f"Ollama failed: {e}")
         
-        # All providers failed - return error within 45s total
         elapsed = time.time() - start_time
-        if elapsed > 45:
-            logger.error(f"All AI providers failed after {elapsed:.1f}s (timeout exceeded)")
-        else:
-            logger.error(f"All AI providers failed after {elapsed:.1f}s")
-        
+        logger.error(f"All AI providers failed after {elapsed:.1f}s")
         raise Exception("All AI providers failed. Please check your API keys or try again later.")
 
     def _check_ollama_available(self) -> bool:
@@ -111,10 +109,10 @@ class AIService:
         for m in messages:
             role = "model" if m["role"] == "assistant" else "user"
             contents.append(types.Content(role=role, parts=[types.Part(text=m["content"])]))
-            
+
         config = types.GenerateContentConfig(system_instruction=system_instruction)
         response = self.gemini_client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             contents=contents,
             config=config
         )

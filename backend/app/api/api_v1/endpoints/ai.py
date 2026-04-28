@@ -4,6 +4,7 @@ from app.api.deps import get_db
 from app.services.ai_service import AIService
 from app.services.context_service import ContextService
 from app.services.session_service import SessionService
+from app.services.memory_service import MemoryService
 from app.models.biometrics import Biometrics
 from app.models.session import TrainingSession
 from pydantic import BaseModel
@@ -105,6 +106,14 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
             coach_context += session_context
     except Exception:
         pass  # No crítico si falla
+
+    # Inject LTM (Long-Term Memory) context
+    try:
+        memory_context = MemoryService.get_memory_context_string(db, user_id)
+        if memory_context:
+            coach_context += memory_context
+    except Exception:
+        pass  # Non-critical
 
     full_system_prompt = f"{coach_context}\n\n{request.system_prompt or ''}"
         

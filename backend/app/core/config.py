@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # Auth
     GARMIN_EMAIL: Optional[str] = None
     GARMIN_PASSWORD: Optional[str] = None
+    GARMIN_TOKEN_DIR: str = "/data/.garth"
+    
+    # CORS
+    ALLOW_ALL_ORIGINS: bool = False
     
     # AI Providers
     GEMINI_API_KEY: Optional[str] = None
@@ -24,6 +28,7 @@ class Settings(BaseSettings):
     STRAVA_CLIENT_SECRET: Optional[str] = None
     STRAVA_REDIRECT_URI: str = "http://localhost:8001/api/v1/strava/callback"
     FRONTEND_URL: str = "http://localhost:5173"
+    FLY_APP_URL: str = "https://atlas-vitalis-backend.fly.dev"
     
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 

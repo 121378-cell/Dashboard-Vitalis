@@ -128,7 +128,7 @@ export function useReadinessWebSocket(
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentAttemptRef = useRef(0);
 
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://atlas-vitalis-backend.fly.dev/api/v1';
   const WS_URL = BACKEND_URL.replace(/^http/, 'ws').replace('/api/v1', '') + '/api/v1/ws/readiness';
 
   /**

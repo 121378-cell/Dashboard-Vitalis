@@ -1,5 +1,6 @@
 export interface Biometrics {
   heartRate: number;
+  resting_hr?: number;
   hrv: number;
   spo2: number;
   stress: number;
@@ -10,7 +11,7 @@ export interface Biometrics {
   readiness: number;
   status: 'excellent' | 'good' | 'poor' | 'high' | 'medium' | 'low';
   overtraining: boolean;
-  source: 'garmin_api' | 'garmin' | 'cache' | 'demo' | 'none';
+  source: 'garmin_api' | 'garmin' | 'cache' | 'demo' | 'none' | 'health_connect';
   // Optional fields from backend
   training_status?: string;
   recovery_time?: number;
@@ -91,6 +92,170 @@ export interface SessionPlan {
   warmup: string;
   exercises: Exercise[];
   cooldown: string;
-  coach_notes: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  calories: number;
+  steps?: number;
+  distance?: number;
+  heartRate?: Array<{ bpm: number; time: string }>;
+}
+
+// Readiness Score
+export interface ReadinessScore {
+  score: number | null;
+  status: 'excellent' | 'good' | 'moderate' | 'poor' | 'rest' | 'no_data';
+  components: {
+    hrv?: { value: number; score: number; weight: number; baseline?: number };
+    sleep?: { value: number; score: number; weight: number };
+    stress?: { value: number; score: number; weight: number };
+    resting_hr?: { value: number; score: number; weight: number; baseline?: number };
+  };
+  baseline_days: number;
+  date: string;
+}
+
+// Daily Briefing
+export interface DailyBriefing {
+  briefing: string;
+  generated_at?: string;
+}
+
+// Memory Entry (LTM)
+export interface MemoryEntry {
+  id: number;
+  type: 'injury' | 'achievement' | 'pattern' | 'preference' | 'milestone';
+  content: string;
+  date: string;
+  importance: number;
+  source: string;
+}
+
+// Training Session Full
+export interface TrainingSessionFull {
+  id: string;
+  user_id: string;
+  date: string;
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
+  generated_by: string;
+  plan?: SessionPlan;
+  actual?: {
+    exercises: Array<{
+      name: string;
+      muscle_group: string;
+      sets: ExerciseSet[];
+    }>;
+  };
+  session_report?: string;
+  garmin_activity_id?: string;
+  garmin_hr_avg?: number;
+  garmin_hr_max?: number;
+  garmin_calories?: number;
+  garmin_duration_min?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Generate Session Response
+export interface GenerateSessionResponse {
+  session_id: string;
+  date: string;
+  status: string;
+  plan: SessionPlan;
+  should_train: ShouldTrainToday;
+  message: string;
+}
+
+// Weekly Report
+export interface WeeklyReport {
+  id: string;
+  week_start: string;
+  week_end: string;
+  report_text?: string;
+  metrics?: Record<string, number>;
+  next_week_plan?: {
+    focus: string;
+    sessions: number;
+    notes: string;
+  };
+  created_at: string;
+}
+
+// Should Train Today
+export interface ShouldTrainToday {
+  train: boolean;
+  reason: string;
+  suggested_type: string;
   readiness: number;
 }
+
+// App Tab
+export type AppTab = 'home' | 'chat' | 'train' | 'progress' | 'setup';
+
+// Health Connect Types
+export interface HCBiometrics {
+  steps: number;
+  heartRate: number | null;
+  hrv: number | null;
+  calories: number | null;
+  sleepHours: number;
+  sleepSeconds: number | null;
+  respiration: number | null;
+  spo2: number | null;
+  weight: number | null;
+  bodyFat: number | null;
+  restingHeartRate: number | null;
+  date: string;
+  source: 'health_connect';
+}
+
+export interface HCWorkout {
+  id: string;
+  title: string;
+  exerciseType: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  calories: number;
+  steps?: number;
+  distance?: number;
+  heartRate?: Array<{ bpm: number; time: string }>;
+}
+
+// Chat Types
+export interface ChatRequest {
+  messages: Message[];
+  system_prompt?: string;
+}
+
+export interface ChatResponse {
+  content: string;
+  provider: string;
+  error?: string;
+}
+
+// Garmin Types
+export interface GarminAuthStatus {
+  authenticated: boolean;
+}
+
+export interface GarminLoginRequest {
+  email: string;
+  password: string;
+  userId?: string;
+}
+
+export interface SyncResult {
+  garmin?: boolean;
+  wger?: boolean;
+  hevy?: boolean;
+  errors?: string[];
+}
+
+// Readiness Thresholds
+export const READINESS_THRESHOLDS = {
+  excellent: 85,
+  good: 70,
+  moderate: 50,
+  poor: 30,
+} as const;

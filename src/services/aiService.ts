@@ -1,7 +1,7 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { Message } from "../types";
 
-const BACKEND_URL = "http://192.168.1.133:8005/api/v1";
+const BACKEND_URL = "https://atlas-vitalis-backend.fly.dev/api/v1";
 const GEMINI_API_KEY = "AIzaSyAOQLH9ys29PJK4-SxphRIsJmnXHZP-DvQ";
 const GROQ_API_KEY = "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";
 

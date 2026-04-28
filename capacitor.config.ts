@@ -11,7 +11,9 @@ const config: CapacitorConfig = {
       'api.groq.com',
       '*.google.com',
       '192.168.1.*',
-      'localhost'
+      'localhost',
+      'atlas-vitalis-backend.fly.dev',
+      '*.fly.dev'
     ]
   }
 };

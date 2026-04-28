@@ -68,20 +68,28 @@ async def fix_https_redirect(request: Request, call_next):
         request.scope["scheme"] = "https"
     return await call_next(request)
 
-# Configuración de CORS refinada para Producción
-# Incluimos la URL de Vercel y localhost para desarrollo
+# CORS configuration
+# Production: fly.dev + Capacitor mobile origins + local dev
 origins = [
     "https://dashboard-vitalis.vercel.app",
-    "https://dashboard-vitalis-git-main-sergimarquezbrugal-2353.vercel.app", # URL de preview de Vercel
+    "https://dashboard-vitalis-git-main-sergimarquezbrugal-2353.vercel.app",
+    "https://atlas-vitalis-backend.fly.dev",
     "http://localhost:5173",
     "http://localhost:3000",
-    "http://localhost",       # Android Capacitor base origin
-    "capacitor://localhost"   # iOS Capacitor base origin
+    "http://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
+    "https://*.fly.dev",
+    "capacitor://",
+    "ionic://",
 ]
+
+if settings.ALLOW_ALL_ORIGINS:
+    origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
