@@ -115,6 +115,30 @@ export interface ReadinessScore {
   date: string;
 }
 
+export interface ReadinessResult {
+  score: number;
+  status: 'excellent' | 'good' | 'moderate' | 'poor' | 'rest';
+  recommendation: string;
+  components: {
+    hrv?: number;
+    sleep?: number;
+    stress?: number;
+    rhr?: number;
+    load?: number;
+  };
+  baseline: {
+    hrv_mean?: number | null;
+    hrv_std?: number | null;
+    rhr_mean?: number | null;
+    rhr_std?: number | null;
+    sleep_mean?: number | null;
+    stress_mean?: number | null;
+    days_available: number;
+  };
+  overtraining_risk: boolean;
+  date: string;
+}
+
 // Daily Briefing
 export interface DailyBriefing {
   briefing: string;
