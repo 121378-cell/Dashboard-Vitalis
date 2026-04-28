@@ -10,6 +10,7 @@ from app.models.workout import Workout
 from app.models.token import Token
 from app.models.biometrics import Biometrics
 from app.utils.garmin import get_garmin_client, safe_get
+from app.services.memory_service import MemoryService
 
 logger = logging.getLogger("app.services.sync_service")
 
@@ -169,6 +170,62 @@ class SyncService:
                     break
                 
                 success = False
+
+        # After successful sync, trigger Memory Engine pattern detection
+        if success:
+            try:
+                # Get recent biometrics for pattern detection (last 30 days)
+                cutoff = (date.today() - timedelta(days=30)).isoformat()
+                recent_biometrics = db.query(Biometrics).filter(
+                    Biometrics.user_id == user_id,
+                    Biometrics.date >= cutoff
+                ).order_by(Biometrics.date.desc()).all()
+                
+                # Get recent workouts for pattern detection
+                recent_workouts = db.query(Workout).filter(
+                    Workout.user_id == user_id,
+                    Workout.source == "garmin",
+                    Workout.date >= datetime.strptime(cutoff, "%Y-%m-%d")
+                ).order_by(Workout.date.desc()).limit(20).all()
+                
+                # Convert workouts to dict format
+                workouts_data = []
+                for w in recent_workouts:
+                    workouts_data.append({
+                        "duration": w.duration or 0,
+                        "calories": w.calories or 0,
+                        "date": w.date.isoformat() if w.date else None
+                    })
+                
+                # Get latest biometrics data for today
+                latest_biometrics = None
+                if recent_biometrics:
+                    try:
+                        data = json.loads(recent_biometrics[0].data) if recent_biometrics[0].data else {}
+                        latest_biometrics = {
+                            "steps": data.get("steps"),
+                            "sleep": data.get("sleep"),
+                            "hrv": data.get("hrv")
+                        }
+                    except:
+                        pass
+                
+                # Auto-generate memories
+                memories = MemoryService.auto_generate_from_sync(
+                    db=db,
+                    user_id=user_id,
+                    biometrics_data=latest_biometrics,
+                    workouts_data=workouts_data,
+                    recent_biometrics=recent_biometrics
+                )
+                
+                if memories:
+                    logger.info(f"Memory Engine: Generated {len(memories)} new memories for user {user_id}")
+                    
+            except Exception as e:
+                logger.error(f"Memory Engine error during sync: {e}")
+                # Don't fail the sync if memory generation fails
+                pass
 
         return success
 

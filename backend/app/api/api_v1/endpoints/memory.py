@@ -66,7 +66,8 @@ def create_memory_entry(
     user_id: str = "default_user"
 ):
     """Manually add a memory entry."""
-    if request.type not in ("injury", "achievement", "pattern", "preference", "milestone"):
+    valid_types = ("injury", "achievement", "pattern", "preference", "milestone", "health_alert")
+    if request.type not in valid_types:
         raise HTTPException(status_code=400, detail=f"Invalid memory type: {request.type}")
 
     entry = MemoryService.add_memory(
@@ -87,3 +88,16 @@ def create_memory_entry(
         importance=entry.importance,
         source=entry.source
     )
+
+
+@router.delete("/{memory_id}")
+def delete_memory_entry(
+    memory_id: int,
+    db: Session = Depends(get_db),
+    user_id: str = "default_user"
+):
+    """Delete a specific memory entry."""
+    success = MemoryService.delete_memory(db, user_id, memory_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Memory {memory_id} not found")
+    return {"message": f"Memory {memory_id} deleted successfully"}

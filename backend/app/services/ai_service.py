@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from openai import OpenAI
 from app.core.config import settings
+from app.services.memory_service import MemoryService
 
 logger = logging.getLogger("app.services.ai_service")
 
@@ -117,3 +118,51 @@ class AIService:
             config=config
         )
         return response.text
+
+    @staticmethod
+    def inject_memory_context(
+        db: Session,
+        user_id: str,
+        base_system_prompt: str,
+        max_tokens: int = 2000
+    ) -> str:
+        """
+        Inject memory context into system prompt for personalized AI responses.
+        
+        This method retrieves the athlete's historical memories and adds them
+        to the system prompt, enabling the AI to provide contextually-aware
+        coaching that considers the athlete's history, injuries, patterns,
+        and achievements.
+        
+        Args:
+            db: Database session
+            user_id: Athlete user ID
+            base_system_prompt: Original system prompt without memory context
+            max_tokens: Maximum tokens for memory context
+            
+        Returns:
+            Enhanced system prompt with memory context injected
+        """
+        try:
+            # Get memory context string
+            memory_context = MemoryService.get_memory_context_string(
+                db, user_id, max_tokens=max_tokens
+            )
+            
+            if not memory_context:
+                return base_system_prompt
+            
+            # Inject memory context before the base prompt
+            enhanced_prompt = f"""{memory_context}
+
+{base_system_prompt}
+
+IMPORTANT: Use the athlete's historical context above to personalize your responses. 
+Reference specific achievements, injuries, or patterns when relevant to provide 
+truly personalized coaching."""
+            
+            return enhanced_prompt
+            
+        except Exception as e:
+            logger.error(f"Error injecting memory context: {e}")
+            return base_system_prompt

@@ -107,15 +107,18 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
     except Exception:
         pass  # No crítico si falla
 
-    # Inject LTM (Long-Term Memory) context
+    # Inject LTM (Long-Term Memory) context using enhanced method
     try:
-        memory_context = MemoryService.get_memory_context_string(db, user_id)
-        if memory_context:
-            coach_context += memory_context
-    except Exception:
-        pass  # Non-critical
-
-    full_system_prompt = f"{coach_context}\n\n{request.system_prompt or ''}"
+        base_prompt = f"{coach_context}\n\n{request.system_prompt or ''}"
+        full_system_prompt = AIService.inject_memory_context(
+            db=db,
+            user_id=user_id,
+            base_system_prompt=base_prompt,
+            max_tokens=2000
+        )
+    except Exception as e:
+        logger.warning(f"Memory injection failed, using base prompt: {e}")
+        full_system_prompt = f"{coach_context}\n\n{request.system_prompt or ''}"
         
     # Convert Pydantic messages to list of dicts for AIService
     messages_list = [{"role": m.role, "content": m.content} for m in request.messages]
