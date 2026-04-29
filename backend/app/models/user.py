@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.sql import func
 from app.db.session import Base
 
@@ -9,3 +9,6 @@ class User(Base):
     name = Column(String)
     email = Column(String, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_pro = Column(Boolean, default=False)
