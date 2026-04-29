@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.api_v1.endpoints import auth, workouts, biometrics, ai, sync, settings, readiness, readiness_ws, sessions, strava, memory, notifications
+from app.api.api_v1.endpoints import auth, workouts, biometrics, ai, sync, settings, readiness, readiness_ws, sessions, strava, memory, notifications, community
 
 api_router = APIRouter()
 
@@ -15,3 +15,4 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 api_router.include_router(memory.router, prefix="/memory", tags=["memory"])
+api_router.include_router(community.router, prefix="/community", tags=["community"])

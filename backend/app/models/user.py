@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.sql import func
 from app.db.session import Base
+from sqlalchemy.orm import relationship
 
 class User(Base):
     __tablename__ = "users"
@@ -12,3 +13,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_pro = Column(Boolean, default=False)
+    
+    # Relationships
+    challenge_participations = relationship("ChallengeParticipant", back_populates="user")
+    public_profile = relationship("UserPublicProfile", back_populates="user", uselist=False)
