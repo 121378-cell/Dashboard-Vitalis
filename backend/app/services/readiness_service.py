@@ -586,3 +586,56 @@ class ReadinessService:
             })
         
         return forecast
+
+    @classmethod
+    def calculate_and_store(cls, db: Session, user_id: str, date_str: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Calculate readiness and store result in daily_briefings table.
+        
+        Args:
+            db: Database session
+            user_id: User ID
+            date_str: Target date (YYYY-MM-DD), defaults to today
+            
+        Returns:
+            Readiness result dictionary
+        """
+        result = cls.calculate(db, user_id, date_str)
+        
+        # Store in daily_briefings table if we have a score
+        if result.get("score") is not None:
+            try:
+                from app.models.daily_briefing import DailyBriefing
+                from datetime import date as date_type
+                
+                target_date = date_str or date.today().isoformat()
+                existing = db.query(DailyBriefing).filter(
+                    DailyBriefing.user_id == user_id,
+                    DailyBriefing.date == target_date
+                ).first()
+                
+                import json
+                content = json.dumps({
+                    "readiness_score": result["score"],
+                    "status": result["status"],
+                    "recommendation": result["recommendation"],
+                    "components": result.get("components", {})
+                })
+                
+                if existing:
+                    existing.content = content
+                else:
+                    briefing = DailyBriefing(
+                        id=f"{user_id}_{target_date}",
+                        user_id=user_id,
+                        date=target_date,
+                        content=content
+                    )
+                    db.add(briefing)
+                
+                db.commit()
+                logger.info(f"Stored readiness for user {user_id} on {target_date}")
+            except Exception as e:
+                logger.error(f"Error storing readiness: {e}", exc_info=True)
+        
+        return result

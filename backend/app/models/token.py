@@ -11,6 +11,9 @@ class Token(Base):
     password = Column(String)        # Garmin password (nombre real en DB)
     garmin_session = Column(String)
     
+    # Firebase Cloud Messaging token for push notifications
+    fcm_token = Column(String, nullable=True)
+    
     # Rate limiting fields
     garmin_rate_limited_until = Column(DateTime(timezone=True), nullable=True)
     last_login_attempt = Column(DateTime(timezone=True), nullable=True)

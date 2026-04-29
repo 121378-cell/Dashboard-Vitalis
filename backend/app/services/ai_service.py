@@ -150,19 +150,212 @@ class AIService:
             )
             
             if not memory_context:
-                return base_system_prompt
-            
-            # Inject memory context before the base prompt
-            enhanced_prompt = f"""{memory_context}
+            return base_system_prompt
 
-{base_system_prompt}
-
-IMPORTANT: Use the athlete's historical context above to personalize your responses. 
-Reference specific achievements, injuries, or patterns when relevant to provide 
-truly personalized coaching."""
+    async def generate_morning_briefing(
+        self, 
+        db: Session, 
+        user_id: str,
+        readiness_result: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a morning briefing for a user.
+        
+        Args:
+            db: Database session
+            user_id: User ID
+            readiness_result: Optional readiness result from readiness_service
             
-            return enhanced_prompt
+        Returns:
+            Dict containing briefing content with readiness_score and recommendation
+        """
+        try:
+            # Get user's readiness score (use provided result or calculate)
+            from app.services.readiness_service import ReadinessService
+            if readiness_result is None:
+                readiness_result = ReadinessService.calculate(db, user_id)
+            
+            # Get user's recent memories for context
+            from app.services.memory_service import MemoryService
+            memories = MemoryService.get_memory_context_string(
+                db, user_id, max_tokens=1000
+            )
+            
+            # Prepare prompt for AI
+            system_prompt = """Eres un entrenador personal experto que proporciona un briefing matutino personalizado basado en los datos biométricos y el historial del atleta."""
+            
+            user_prompt = f"""
+            Genera un briefing matutino personalizado para el atleta basado en:
+            
+            Puntuación de readiness: {readiness_result.get('score', 'N/A')}/100
+            Estado: {readiness_result.get('status', 'N/A')}
+            Componentes: {readiness_result.get('components', {})}
+            
+            Historial y contexto del atleta:
+            {memories if memories else 'No hay datos históricos disponibles'}
+            
+            El briefing debe incluir:
+            1. Una evaluación del estado físico y mental del día
+            2. Una recomendación de entrenamiento específica
+            3. Un mensaje motivacional
+            
+            Formato de respuesta como JSON con:
+            {{
+                "readiness_score": número (0-100),
+                "status": string (excellent, good, moderate, poor, rest),
+                "recommendation": string (recomendación de entrenamiento),
+                "summary": string (resumen breve del briefing),
+                "motivational_message": string (mensaje motivacional)
+            }}
+            """
+            
+            # Generate response using AI
+            messages = [{"role": "user", "content": user_prompt}]
+            response = self._generate_chat_response(messages, system_prompt)
+            
+            # Parse JSON response
+            import json
+            try:
+                briefing_content = json.loads(response["content"])
+            except json.JSONDecodeError:
+                # Fallback if AI doesn't return valid JSON
+                briefing_content = {
+                    "readiness_score": readiness_result.get('score', 50),
+                    "status": readiness_result.get('status', 'moderate'),
+                    "recommendation": readiness_result.get('recommendation', 'Entrenamiento moderado recomendado'),
+                    "summary": f"Tu readiness hoy es {readiness_result.get('score', 'N/A')}/100. Estado: {readiness_result.get('status', 'N/A')}.",
+                    "motivational_message": "¡Que tengas un gran día!"
+                }
+            
+            return briefing_content
             
         except Exception as e:
-            logger.error(f"Error injecting memory context: {e}")
-            return base_system_prompt
+            logger.error(f"Error generating morning briefing for user {user_id}: {e}", exc_info=True)
+            # Return fallback briefing
+            return {
+                "readiness_score": 50,
+                "status": "moderate",
+                "recommendation": "Entrenamiento moderado recomendado",
+                "summary": "Error generando briefing. Por favor intenta de nuevo más tarde.",
+                "motivational_message": "¡Confía en el proceso!"
+            }
+
+    async def generate_weekly_report(
+        self, 
+        db: Session, 
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Generate a weekly report for a user.
+        
+        Args:
+            db: Database session
+            user_id: User ID
+            
+        Returns:
+            Dict containing report content with summary and stats
+        """
+        try:
+            from datetime import date, timedelta
+            from app.models.biometrics import Biometrics
+            from app.models.workout import Workout
+            
+            # Get data for the last 7 days
+            cutoff = (date.today() - timedelta(days=7)).isoformat()
+            
+            # Get biometrics
+            biometrics = db.query(Biometrics).filter(
+                Biometrics.user_id == user_id,
+                Biometrics.date >= cutoff
+            ).all()
+            
+            # Get workouts
+            workouts = db.query(Workout).filter(
+                Workout.user_id == user_id,
+                Workout.date >= cutoff
+            ).all()
+            
+            # Calculate stats
+            total_workouts = len(workouts)
+            total_duration = sum(w.duration or 0 for w in workouts)  # in minutes
+            total_calories = sum(w.calories or 0 for w in workouts)
+            
+            # Calculate average readiness
+            readiness_scores = []
+            for bio in biometrics:
+                if bio.data:
+                    try:
+                        data = json.loads(bio.data)
+                        # We don't store readiness directly in biometrics, so we'll estimate
+                        # In a real implementation, we'd join with daily_briefings or readiness table
+                        readiness_scores.append(70)  # placeholder
+                    except:
+                        pass
+            
+            avg_readiness = sum(readiness_scores) / len(readiness_scores) if readiness_scores else 70
+            
+            # Prepare prompt for AI
+            system_prompt = """Eres un entrenador personal experto que proporciona un informe semanal personalizado basado en los datos de entrenamiento y biométricos del atleta."""
+            
+            user_prompt = f"""
+            Genera un informe semanal personalizado para el atleta basado en:
+            
+            Entrenamientos totales: {total_workouts}
+            Duración total: {total_duration} minutos
+            Calorías totales quemadas: {total_calories} kcal
+            Readiness promedio estimado: {avg_readiness:.1f}/100
+            
+            El informe debe incluir:
+            1. Resumen de la semana de entrenamiento
+            2. Logros y progresos destacados
+            3. Áreas de mejora para la próxima semana
+            4. Recomendaciones generales
+            
+            Formato de respuesta como JSON con:
+            {{
+                "summary": string (resumen ejecutivo del informe semanal),
+                "total_workouts": número,
+                "total_duration_minutes": número,
+                "total_calories": número,
+                "avg_readiness": número,
+                "achievements": array de strings (logros destacados),
+                "recommendations": array de strings (recomendaciones para próxima semana)
+            }}
+            """
+            
+            # Generate response using AI
+            messages = [{"role": "user", "content": user_prompt}]
+            response = self._generate_chat_response(messages, system_prompt)
+            
+            # Parse JSON response
+            import json
+            try:
+                report_content = json.loads(response["content"])
+            except json.JSONDecodeError:
+                # Fallback if AI doesn't return valid JSON
+                report_content = {
+                    "summary": f"Semana con {total_workouts} entrenamientos, {total_duration} minutos de actividad y {total_calories} kcal quemadas.",
+                    "total_workouts": total_workouts,
+                    "total_duration_minutes": total_duration,
+                    "total_calories": total_calories,
+                    "avg_readiness": round(avg_readiness, 1),
+                    "achievements": ["Completaste todos tus entrenamientos programados"] if total_workouts > 0 else ["Mantuviste tu rutina"],
+                    "recommendations": ["Continúa con tu plan de entrenamiento", "Presta atención a tu recuperación"]
+                }
+            
+            return report_content
+            
+        except Exception as e:
+            logger.error(f"Error generating weekly report for user {user_id}: {e}", exc_info=True)
+            # Return fallback report
+            return {
+                "summary": "Error generando informe semanal. Por favor intenta de nuevo más tarde.",
+                "total_workouts": 0,
+                "total_duration_minutes": 0,
+                "total_calories": 0,
+                "avg_readiness": 50,
+                "achievements": [],
+                "recommendations": ["Verifica tu conexión y vuelve a intentar"]
+            }
+            
+

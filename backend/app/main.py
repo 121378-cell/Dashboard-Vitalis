@@ -8,6 +8,7 @@ import app.db.base
 from contextlib import asynccontextmanager
 import logging
 import os
+from app.services.scheduler_service import start_scheduler, shutdown_scheduler
 
 logger = logging.getLogger("app.main")
 
@@ -47,13 +48,20 @@ async def lifespan(app: FastAPI):
                 db.add(token)
                 db.commit()
                 logger.info("Garmin credentials bootstrapped successfully.")
-                
+        
+        # 3. Start the scheduler
+        logger.info("Starting scheduler...")
+        start_scheduler()
+        logger.info("Scheduler started successfully.")
+        
     except Exception as e:
         logger.error(f"Error during bootstrap: {e}")
 
     yield
     # Shutdown
     logger.info("ATLAS shutting down...")
+    shutdown_scheduler()
+    logger.info("Scheduler shut down.")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
