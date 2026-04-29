@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<iq:layouts xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:layout id="AtlasMainLayout">
+        <iq:drawable id="@drawable/launcher_icon" />
+        <!-- Launcher icon placeholder -->
+    </iq:layout>
+</iq:layouts>

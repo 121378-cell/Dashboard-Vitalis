@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:app id="atlas.ai.trainer" launcherIcon="@drawable/launcher_icon">
+        <iq:products>
+            <iq:product id="fr245"/>
+            <iq:product id="fr245m"/>
+            <iq:product id="fr255"/>
+        </iq:products>
+        <iq:permissions>
+            <iq:uses-permission id="Communications"/>
+            <iq:uses-permission id="Sensor"/>
+            <iq:uses-permission id="UserProfile"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>ENG</iq:language>
+            <iq:language>SPA</iq:language>
+        </iq:languages>
+        <iq:barometer>NotRequired</iq:barometer>
+        <iq:gps>NotRequired</iq:gps>
+    </iq:app>
+</iq:manifest>

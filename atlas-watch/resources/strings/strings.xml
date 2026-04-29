@@ -1,0 +1,18 @@
+<iq:strings xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:string id="AppTitle">ATLAS</iq:string>
+    <iq:string id="LabelReadiness">READINESS</iq:string>
+    <iq:string id="LabelHRV">HRV</iq:string>
+    <iq:string id="LabelHR">HR</iq:string>
+    <iq:string id="LabelSleep">SUEÑO</iq:string>
+    <iq:string id="LabelToday">HOY</iq:string>
+    <iq:string id="LabelWorkout">VER EJERCICIOS</iq:string>
+    <iq:string id="StatusExcellent">EXCELENTE</iq:string>
+    <iq:string id="StatusGood">BUENO</iq:string>
+    <iq:string id="StatusModerate">MODERADO</iq:string>
+    <iq:string id="StatusPoor">BAJO</iq:string>
+    <iq:string id="StatusRest">DESCANSO</iq:string>
+    <iq:string id="OvertrainingWarning">RIESGO SOBREENTRENAMIENTO</iq:string>
+    <iq:string id="Loading">CARGANDO...</iq:string>
+    <iq:string id="ErrorMsg">ERROR DE CONEXIÓN</iq:string>
+    <iq:string id="NoData">SIN DATOS</iq:string>
+</iq:strings>

@@ -1,0 +1,30 @@
+# Placeholder Launcher Icon
+# This file should be replaced with an actual 48x48 PNG icon
+#
+# Requirements for launcher_icon.png:
+# - Size: 48x48 pixels (or 24x24 for some devices)
+# - Format: PNG
+# - Background: Transparent or dark (#1A1A1A)
+# - Foreground: White/light with yellow accent (#E8FF47)
+#
+# Suggested design:
+# - ATLAS text or icon
+# - Minimal, clean, visible on watch face
+#
+# To create:
+# 1. Use image editor (GIMP, Photoshop, etc.)
+# 2. Create 48x48 canvas
+# 3. Design simple icon
+# 4. Export as PNG with transparency
+# 5. Save as resources/drawables/launcher_icon.png
+
+# Placeholder - create a simple 48x48 PNG using Python:
+# 
+# import struct
+# width = 48
+# height = 48
+# Create simple dark gray icon with ATLAS text
+#
+# Or use online PNG generator
+#
+# Current file: resources/drawables/launcher_icon.png (to be created)

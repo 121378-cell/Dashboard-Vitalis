@@ -1,0 +1,9 @@
+<iq:monkey.jungle xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:application id="atlas.ai.trainer" entry="AtlasApp" type="widget">
+        <iq:products>
+            <iq:product>fr245</iq:product>
+            <iq:product>fr245m</iq:product>
+            <iq:product>fr255</iq:product>
+        </iq:products>
+    </iq:application>
+</iq:monkey.jungle>
