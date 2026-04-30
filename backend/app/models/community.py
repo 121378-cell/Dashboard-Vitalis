@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float, Enum
 from sqlalchemy.orm import relationship
-from .base import Base
+from app.db.session import Base
 import enum
 
 class ChallengeType(str, enum.Enum):

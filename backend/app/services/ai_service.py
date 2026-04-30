@@ -150,6 +150,11 @@ class AIService:
             )
             
             if not memory_context:
+                return base_system_prompt
+
+            return base_system_prompt + memory_context
+        except Exception as e:
+            logger.error(f"Error injecting memory context: {e}")
             return base_system_prompt
 
     async def generate_morning_briefing(

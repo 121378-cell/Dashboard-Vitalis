@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, Text
 from sqlalchemy.sql import func
-from sqlalchemy.orm relationship
+from sqlalchemy.orm import relationship
 from backend.app.db.base import Base
 
 class Achievement(Base):
