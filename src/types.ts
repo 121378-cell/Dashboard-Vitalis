@@ -7,20 +7,31 @@ export interface WeeklyPlan {
   generated_at: string;
   status: 'active' | 'completed' | 'skipped' | 'archived';
   objective: string;
-  plan_data: any;
+  structure_name?: string;
+  week_number?: number;
+  plan_data?: any;
+  sessions: TrainingSession[];
 }
 
 export interface TrainingSession {
   id: number;
-  plan_id: number;
-  day_index: number;
+  plan_id?: number;
+  day: number;
+  day_index?: number;
   day_name: string;
   scheduled_date: string;
-  exercises_data: PlanExercise[];
+  exercises: PlanExercise[];
+  exercises_data?: PlanExercise[];
   completed: boolean;
   actual_data?: any;
-  skipped: boolean;
+  skipped?: boolean;
   notes?: string;
+  readiness_score?: number | null;
+  mcgill_warmup?: {
+    name: string;
+    exercises: Array<Record<string, unknown>>;
+    notes: string;
+  };
 }
 
 export interface PlanExercise {
@@ -35,6 +46,10 @@ export interface PlanExercise {
   rest?: string;
   tempo?: string;
   notes?: string;
+  superset_with?: string;
+  drop_set?: boolean;
+  drop_set_note?: string;
+  week_number?: number;
 }
 
 export interface PersonalRecord {

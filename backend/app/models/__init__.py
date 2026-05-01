@@ -7,5 +7,5 @@ from .daily_briefing import DailyBriefing
 from .gamification import Achievement, Streak, XpLog
 from .community import Challenge, ChallengeParticipant, UserPublicProfile
 from .memory import AtlasMemory
-from .training_plan import WeeklyPlan, PlanSession, PersonalRecord
-from .weekly_plan import WeeklyPlan, TrainingSession, PersonalRecord
+from .training_plan import WeeklyPlan as PlanWeeklyPlan, PlanSession, PersonalRecord
+from .training_plan import WeeklyPlan as WeeklyPlanAlias

@@ -219,37 +219,77 @@ async def weekly_report():
     logger.info("Finished scheduled weekly report generation")
 
 
+async def generate_weekly_plan_for_all_users():
+    """Generate new weekly training plan for all users every Sunday."""
+    logger.info("Starting scheduled weekly plan generation for all users")
+    db = SessionLocal()
+    try:
+        users = db.query(User).all()
+        for user in users:
+            try:
+                logger.info(f"Generating weekly plan for user {user.id}")
+
+                from app.services.planner_service import TrainingPlannerService
+
+                planner = TrainingPlannerService()
+                plan = await planner.generate_weekly_plan(db, user.id)
+
+                token = db.query(Token).filter(Token.user_id == user.id).first()
+
+                if token and token.fcm_token:
+                    from app.services.push_service import push_service
+                    await push_service.send_push(
+                        token=token.fcm_token,
+                        title="Nuevo Plan Semanal",
+                        body=f"Tu plan para la semana {plan.get('week_start', '')} esta listo. {plan.get('structure_name', '')}",
+                        data={"type": "weekly_plan", "user_id": user.id},
+                    )
+                    logger.info(f"Sent weekly plan notification to user {user.id}")
+
+            except Exception as e:
+                logger.error(f"Error generating weekly plan for user {user.id}: {e}", exc_info=True)
+                continue
+    finally:
+        db.close()
+    logger.info("Finished scheduled weekly plan generation")
+
+
 def start_scheduler():
     """Start the APScheduler and add jobs."""
     logger.info("Starting ATLAS scheduler...")
-    
-    # Schedule Garmin sync: daily at 03:00 UTC
+
     scheduler.add_job(
         sync_garmin_all_users,
         trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
         id="sync_garmin_all_users",
         name="Sync Garmin data for all users",
-        replace_existing=True
+        replace_existing=True,
     )
-    
-    # Schedule morning briefings: daily at 05:30 UTC (07:30 Spain)
+
     scheduler.add_job(
         generate_morning_briefings,
         trigger=CronTrigger(hour=5, minute=30, timezone="UTC"),
         id="generate_morning_briefings",
         name="Generate morning briefings",
-        replace_existing=True
+        replace_existing=True,
     )
-    
-    # Schedule weekly report: weekly on Sunday at 20:00 UTC
+
+    scheduler.add_job(
+        generate_weekly_plan_for_all_users,
+        trigger=CronTrigger(day_of_week="sun", hour=20, minute=0, timezone="UTC"),
+        id="generate_weekly_plan",
+        name="Generate weekly training plan",
+        replace_existing=True,
+    )
+
     scheduler.add_job(
         weekly_report,
         trigger=CronTrigger(day_of_week="sun", hour=20, minute=0, timezone="UTC"),
         id="weekly_report",
         name="Generate weekly report",
-        replace_existing=True
+        replace_existing=True,
     )
-    
+
     scheduler.start()
     logger.info("ATLAS scheduler started successfully")
 
