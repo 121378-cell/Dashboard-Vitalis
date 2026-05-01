@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 from typing import List, Dict, Optional
 from app.models.community import Challenge, ChallengeParticipant, UserPublicProfile
-from app.db.session import BaseSession
 
 class CommunityService:
-    def __init__(self, session: BaseSession):
+    def __init__(self, session: Session):
         self.session = session
     
     def get_leaderboard(self, metric: str, period: str = "weekly") -> List[Dict]:

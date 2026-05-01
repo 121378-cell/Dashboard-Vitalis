@@ -22,6 +22,7 @@ Version: 2.0.0
 """
 
 import json
+import logging
 import statistics
 from datetime import date, timedelta
 from typing import Dict, Optional, List, Any
@@ -29,6 +30,8 @@ from dataclasses import dataclass, asdict
 from sqlalchemy.orm import Session
 
 from app.models.biometrics import Biometrics
+
+logger = logging.getLogger("app.services.readiness")
 
 
 @dataclass
@@ -169,21 +172,25 @@ class ReadinessService:
             total_weight = sum(available_weights.values())
         
         normalized_weights = {k: v / total_weight for k, v in available_weights.items()}
-        
-        # Calculate weighted score
+
+        # Calculate weighted score (load_score excluded - it uses inverted scale, only penalty applied below)
         raw_score = (
-            component_scores.get('hrv', hrv_score) * normalized_weights.get('hrv', 0) +
-            component_scores.get('sleep', sleep_score) * normalized_weights.get('sleep', 0) +
-            component_scores.get('stress', stress_score) * normalized_weights.get('stress', 0) +
-            component_scores.get('rhr', rhr_score) * normalized_weights.get('rhr', 0)
+            component_scores.get("hrv", 0) * normalized_weights.get("hrv", 0) +
+            component_scores.get("sleep", 0) * normalized_weights.get("sleep", 0) +
+            component_scores.get("stress", 0) * normalized_weights.get("stress", 0) +
+            component_scores.get("rhr", 0) * normalized_weights.get("rhr", 0)
         )
-        
-        # Add load score to components
-        component_scores['load'] = round(load_score, 1)
-        
-        # Penalización por carga acumulada (evitar sobreentrenamiento)
-        if load_score > 80:  # Semana muy cargada
-            raw_score *= 0.85
+
+        component_scores["load"] = round(load_score, 1)
+
+        # Penalizacion por carga acumulada (evitar sobreentrenamiento)
+        # load_score: 0-40 = very high load (bad), 60-100 = low load (good)
+        # Invert for penalty: high_load_penalty = (40 - load_score) / 40
+        if load_score < 40:
+            high_load_penalty = 1.0 - (load_score / 40)
+            raw_score *= (1.0 - high_load_penalty * 0.5)  # up to -50% for extreme load
+        elif load_score > 80:
+            raw_score *= 0.85  # light overtraining signal bonus
         
         final_score = round(max(0, min(100, raw_score)))
         status = cls._score_to_status(final_score)
@@ -197,7 +204,7 @@ class ReadinessService:
         )
         
         # Generate personalized recommendation
-        recommendation = cls._generate_recommendation(final_score, data, baseline)
+        recommendation = cls._generate_recommendation(final_score, data, baseline, component_scores)
         
         return {
             "score": final_score,
@@ -465,19 +472,12 @@ class ReadinessService:
 
     @staticmethod
     def _generate_recommendation(
-        score: int, data: Dict, baseline: PersonalBaseline
+        score: int, data: Dict, baseline: PersonalBaseline, components: Optional[Dict[str, float]] = None
     ) -> str:
-        """
-        Generate personalized recommendation based on score.
-        
-        Returns recommendation string matching the exact format from prompt.
-        """
-        # High load warning takes priority
-        load_score = data.get("load_score", 50)
+        load_score = components.get("load", 50) if components else 50
         if load_score < 40:
             return "Día de descanso total. Tu cuerpo lo necesita para progresar."
-        
-        # Score-based recommendations (exact format from prompt)
+
         if score >= 85:
             return "Día óptimo para entrenamiento de alta intensidad. Tu cuerpo está en peak."
         elif score >= 70:
