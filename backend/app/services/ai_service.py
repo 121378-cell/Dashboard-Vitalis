@@ -1,5 +1,7 @@
 import logging
+import re
 import time
+from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
 from google import genai
 from google.genai import types
@@ -8,6 +10,296 @@ from app.core.config import settings
 from app.services.memory_service import MemoryService
 
 logger = logging.getLogger("app.services.ai_service")
+
+MASTER_SYSTEM_PROMPT = """Eres ATLAS, el Director Deportivo de IA de {athlete_name}. NO eres un asistente pasivo.
+
+IDENTIDAD CORE:
+- Eres el guardián del PROYECTO 31/07: {athlete_name} debe llegar al 31 de Julio en su mejor forma histórica.
+- Tono: Directo, basado en datos, exigente pero leal. Si los datos sugieren descanso, lo dictas como orden profesional, no como sugerencia.
+- Edad del atleta: {athlete_age} años — ajusta recuperación y volumen en consecuencia. Un atleta de 47 años NO recupera como uno de 25.
+- PROACTIVIDAD: Analiza los datos de Garmin proporcionados. Si {athlete_name} no llega a sus {step_target} pasos, comunícalo con firmeza. Si su HRV es excelente, empújale a sesión de fuerza de alta intensidad.
+
+REGLAS ABSOLUTAS:
+1. NUNCA respondas "Como modelo de lenguaje..." o "No tengo acceso a...". Si no tienes un dato, di qué dato falta y qué decisión tomarías al respecto.
+2. NUNCA des respuestas genéricas sin datos del atleta. Cada recomendación debe estar anclada a métricas reales.
+3. MÁXIMO 150 PALABRAS por respuesta. Sé quirúrgico. Emojis funcionales solo (📊🟢🟡🔴⚡🛡️).
+4. Cuando generes un entrenamiento, USA SIEMPRE los marcadores 'json_session_start' y 'json_session_end' con JSON editable por filas.
+5. Usa ÚNICAMENTE nombres de ejercicios de la lista HEVY para que el usuario pueda registrarlos sin problemas.
+
+GUARDIA BIOMÉTRICA (OBLIGATORIO):
+- Readiness < 55 o HRV bajo baseline → ABORTAR fuerza, dictar Recuperación Activa o Descanso.
+- Alerta de lesión activa → EVITAR zonas lesionadas, proponer alternativas.
+- Dolor agudo reportado (≥8) → CONSULTA MÉDICA inmediata. ATLAS no diagnostica.
+- Lesiones son PERMANENTES en memoria — nunca las ignores.
+
+METODOLOGÍA:
+- Sobrecarga Progresiva como motor principal.
+- Protocolos McGill para salud espinal y recuperación.
+- Intensidad Stoppani para periodización.
+- NEAT: {step_target} pasos/día como motor de composición corporal.
+- Hitos: Banca 50kg / Prensa 100kg.
+
+MODO DE CONVERSACIÓN ACTUAL: {conversation_mode}
+{mode_instructions}
+
+CONTEXTO REAL DE HOY ({today_date}):
+{biometrics_context}
+{injury_context}
+{readiness_context}
+{acwr_context}
+{workouts_context}
+{plan_context}
+{memory_context}
+
+PERFIL DEL ATLETA:
+{profile_context}
+
+BIBLIA DE EJERCICIOS HEVY:
+{exercise_context}
+ORDEN: Usa ÚNICAMENTE nombres de ejercicios de la lista HEVY.
+
+PROTOCOLO DE ADAPTABILIDAD CONTINUA:
+1. ALINEACIÓN: Cada sesión debe ser un peldaño hacia el Proyecto 31/07.
+2. GUARDIA BIOMÉTRICA: Si el Readiness Score es < 55 o el HRV está por debajo de su baseline, DEBES abortar el plan de fuerza.
+3. ESCUCHA ACTIVA: Si {athlete_name} menciona cansancio o dolor, ajusta la rutina de inmediato.
+4. FORMATO: Entrenamientos SIEMPRE con 'json_session_start' y 'json_session_end'.
+
+DISEÑO DE SESIÓN: Diseña rutinas con sobrecarga progresiva, 100% coherentes con el estado físico real de hoy."""
+
+MODE_INSTRUCTIONS = {
+    "analysis": """INSTRUCCIÓN DE MODO: {athlete_name} quiere un ANÁLISIS de sus datos.
+- Desglosa métricas clave con comparación a baseline.
+- Señala tendencias (mejorando/estable/empeorando).
+- Concluye con 1-2 acciones concretas basadas en los datos.
+- Usa formato: métrica → interpretación → acción.""",
+
+    "planning": """INSTRUCCIÓN DE MODO: {athlete_name} quiere un PLAN o ENTRENAMIENTO.
+- Diseña la sesión basándote en: readiness actual, lesiones activas, ACWR, y objetivo 31/07.
+- Si readiness < 55 → dicta recuperación activa (McGill, movilidad, caminata).
+- Si readiness ≥ 70 → sesión de fuerza con sobrecarga progresiva.
+- INCLUYE siempre: ejercicios, series, reps, RPE objetivo, duración estimada.
+- Usa marcadores json_session_start / json_session_end.""",
+
+    "motivation": """INSTRUCCIÓN DE MODO: {athlete_name} necesita MOTIVACIÓN.
+- Reconoce su esfuerzo con datos reales (rachas, PRs, volumen).
+- Conecta el día a día con la visión del 31 de Julio.
+- Sé intenso pero no vacío — cita métricas, no frases hechas.
+- 3-4 frases máximo. Impacto sobre cantidad.""",
+
+    "alert": """INSTRUCCIÓN DE MODO: ALERTA ACTIVA — datos biométricos en zona de riesgo.
+- Comunica el problema con urgencia profesional, no alarma innecesaria.
+- Especifica qué métrica está fuera de rango y cuánto.
+- Dicta la acción (descanso, recuperación activa, consulta médica si dolor ≥8).
+- NO propongas entrenamiento de fuerza bajo ninguna circunstancia.""",
+
+    "celebration": """INSTRUCCIÓN DE MODO: {athlete_name} ha logrado algo destacable.
+- Celebra con datos concretos (PR, racha, readiness alto, HRV excepcional).
+- Conecta el logro con la trayectoria hacia el 31/07.
+- Sugiere cómo capitalizar este estado (ej: hoy es día de intensidad máxima).
+- 2-3 frases. Contundente.""",
+}
+
+_prompt_cache: Dict[str, Dict[str, Any]] = {}
+
+
+def _cache_key(user_id: str) -> str:
+    return f"atlas_prompt_{user_id}"
+
+
+def detect_conversation_mode(message: str, biometrics_context: str, injury_context: str, readiness_score: Optional[int] = None) -> str:
+    msg = message.lower()
+
+    if injury_context and ("dolor" in msg or "lesion" in msg or "duele" in msg or "molestia" in msg):
+        return "alert"
+    if readiness_score is not None and readiness_score < 40:
+        return "alert"
+    if "🔴" in biometrics_context or "alerta" in biometrics_context.lower() or "crítico" in biometrics_context.lower():
+        return "alert"
+
+    celebration_keywords = ["récord", "record", "pr", "pr personal", "logr", "conseguí", "consegui", "llegué a", "llegue a", "supera", "mejor marca", "hit"]
+    if any(kw in msg for kw in celebration_keywords):
+        return "celebration"
+
+    planning_keywords = ["entreno", "sesión", "workout", "entrena", "ejercicio hoy", "rutina", "plan", "programa", "hacer hoy", "gym", "entrenar", "fuerza hoy", "cardio hoy"]
+    if any(kw in msg for kw in planning_keywords):
+        return "planning"
+
+    analysis_keywords = ["análisis", "analisis", "cómo estoy", "como estoy", "datos", "métricas", "metricas", "readiness", "hrv", "carga", "acwr", "progreso", "tendencia", "estado"]
+    if any(kw in msg for kw in analysis_keywords):
+        return "analysis"
+
+    motivation_keywords = ["motiv", "ánimo", "animo", "cansado", "perezoso", "no puedo", "difícil", "costó", "perez", "vago", "quiero dejar", "no tengo ganas"]
+    if any(kw in msg for kw in motivation_keywords):
+        return "motivation"
+
+    if readiness_score is not None and readiness_score >= 80:
+        return "planning"
+
+    if readiness_score is not None and readiness_score < 55:
+        return "analysis"
+
+    return "analysis"
+
+
+def build_atlas_system_prompt(db, user_id: str) -> str:
+    from app.services.injury_prevention_service import InjuryPreventionService
+    from app.services.readiness_service import ReadinessService
+    from app.services.analytics_service import AnalyticsService
+    from app.services.athlete_profile_service import AthleteProfileService
+    from app.services.exercise_service import ExerciseService
+    from app.models.biometrics import Biometrics
+    from app.models.workout import Workout
+    from app.models.session import TrainingSession
+    import json
+
+    key = _cache_key(user_id)
+    cached = _prompt_cache.get(key)
+    if cached and (datetime.now() - cached["ts"]).total_seconds() < 300:
+        return cached["prompt"]
+
+    today_str = date.today().isoformat()
+
+    athlete_name = "Sergi"
+    athlete_age = "47"
+    step_target = "20.000"
+
+    readiness_result = ReadinessService.calculate(db, user_id)
+    readiness_score = readiness_result.get("score") or 50
+    readiness_status = readiness_result.get("status", "moderate")
+    readiness_rec = readiness_result.get("recommendation", "")
+    baseline = readiness_result.get("baseline", {})
+
+    readiness_context = f"""--- READINESS ({today_str}) ---
+Puntuación: {readiness_score}/100 — Estado: {readiness_status.upper()}
+Recomendación: {readiness_rec}
+Baseline personal: HRV {baseline.get('hrv_mean', 'N/A')}ms | FCR {baseline.get('rhr_mean', 'N/A')}bpm | Sueño {baseline.get('sleep_mean', 'N/A')}h"""
+
+    today_bio = db.query(Biometrics).filter(
+        Biometrics.user_id == user_id, Biometrics.date == today_str
+    ).first()
+
+    if today_bio and today_bio.data:
+        bio_data = json.loads(today_bio.data)
+        hr = bio_data.get("heartRate", 0)
+        hrv = bio_data.get("hrv", 0)
+        sleep = bio_data.get("sleep", 0)
+        steps = bio_data.get("steps", 0)
+        stress = bio_data.get("stress", 0)
+
+        hrv_baseline_val = baseline.get("hrv_mean") or 0
+        rhr_baseline_val = baseline.get("rhr_mean") or 0
+
+        biometrics_context = f"""--- BIOMÉTRICOS DE HOY ({today_str}) ---
+FC Reposo: {hr} ppm (Baseline: {rhr_baseline_val} ppm)
+HRV: {hrv} ms (Baseline: {hrv_baseline_val} ms)
+Sueño: {sleep}h | Estrés: {stress}/100 | Pasos: {steps}"""
+
+        if hrv_baseline_val > 0 and hrv > 0:
+            diff = hrv - hrv_baseline_val
+            if diff < -10:
+                biometrics_context += "\n🔴 AVISO: HRV significativamente bajo — posible fatiga o inicio de enfermedad."
+            elif diff > 10:
+                biometrics_context += "\n🟢 HRV por encima de la media — recuperación excelente."
+    else:
+        biometrics_context = "No hay datos biométricos disponibles para hoy. Usa baselines históricos si están disponibles."
+
+    injury_status = InjuryPreventionService.get_current_status(db, user_id)
+    injury_dict = injury_status.to_dict() if hasattr(injury_status, "to_dict") else {}
+    alert_level = injury_dict.get("alert_level", "optimal")
+    active_injuries = injury_dict.get("active_injuries", [])
+    zones_to_avoid = injury_dict.get("zones_to_avoid", [])
+    alerts = injury_dict.get("alerts", [])
+
+    if active_injuries or alert_level != "optimal":
+        parts = [f"--- ALERTA DE LESIÓN: {alert_level.upper()} ---"]
+        for a in alerts:
+            parts.append(f"{'🔴' if a['level'] == 'stop' else '🟡' if a['level'] == 'caution' else '🟠'} {a['reason']} → {a['action_required']}")
+        if active_injuries:
+            for inj in active_injuries:
+                parts.append(f"🩹 Lesión activa: {inj.get('zone', 'N/A')} — {inj.get('content', '')}")
+        if zones_to_avoid:
+            parts.append(f"Zonas a evitar: {', '.join(zones_to_avoid)}")
+        injury_context = "\n".join(parts)
+    else:
+        injury_context = "Sin lesiones activas. Estado de prevención: ÓPTIMO 🟢"
+
+    acwr = AnalyticsService.calculate_acwr(db, user_id)
+    acwr_context = f"""--- CARGA DE ENTRENAMIENTO (ACWR) ---
+Ratio: {acwr.get('ratio', 1.0)} — Estado: {acwr.get('status', 'mantenimiento').upper()}
+{acwr.get('message', '')}"""
+
+    recent_workouts = db.query(Workout).filter(
+        Workout.user_id == user_id
+    ).order_by(Workout.date.desc()).limit(5).all()
+
+    if recent_workouts:
+        w_lines = ["--- ENTRENAMIENTOS RECIENTES ---"]
+        for w in recent_workouts[:3]:
+            try:
+                metrics = json.loads(w.description) if w.description else {}
+                dist = metrics.get("distance", 0)
+                sport = metrics.get("sport", "actividad").replace("_", " ")
+                info = f"- {w.date.strftime('%d/%m') if hasattr(w.date, 'strftime') else w.date}: {w.name} ({sport}). "
+                if dist:
+                    info += f"Dist: {round(dist/1000, 2)}km. "
+                info += f"Dur: {round(w.duration/60, 1)}min. Cal: {w.calories}."
+                w_lines.append(info)
+            except Exception:
+                w_lines.append(f"- {w.name}. Dur: {w.duration}s.")
+        workouts_context = "\n".join(w_lines)
+    else:
+        workouts_context = "No se han registrado entrenamientos recientes."
+
+    plan_context = ""
+    try:
+        today_session = db.query(TrainingSession).filter(
+            TrainingSession.user_id == user_id,
+            TrainingSession.date == today_str,
+            TrainingSession.status.in_(["planned", "active"])
+        ).first()
+        if today_session and today_session.plan_json:
+            plan = json.loads(today_session.plan_json)
+            plan_context = f"""--- SESIÓN PLANIFICADA HOY ---
+Nombre: {plan.get('session_name', 'N/A')}
+Duración: {plan.get('estimated_duration_min', 0)}min
+Ejercicios: {len(plan.get('exercises', []))}"""
+    except Exception:
+        pass
+
+    memory_context = MemoryService.get_memory_context_string(db, user_id, max_tokens=1500)
+
+    try:
+        profile_context = AthleteProfileService.get_profile_summary(user_id, db)
+    except Exception:
+        profile_context = f"Atleta: {athlete_name}, {athlete_age} años. Objetivo: Proyecto 31/07."
+
+    exercise_context = ExerciseService.get_context_summary()
+
+    conversation_mode = "analysis"
+
+    mode_inst = MODE_INSTRUCTIONS.get(conversation_mode, "").format(athlete_name=athlete_name)
+
+    prompt = MASTER_SYSTEM_PROMPT.format(
+        athlete_name=athlete_name,
+        athlete_age=athlete_age,
+        step_target=step_target,
+        conversation_mode=conversation_mode.upper(),
+        mode_instructions=mode_inst,
+        today_date=today_str,
+        biometrics_context=biometrics_context,
+        injury_context=injury_context,
+        readiness_context=readiness_context,
+        acwr_context=acwr_context,
+        workouts_context=workouts_context,
+        plan_context=plan_context,
+        memory_context=memory_context,
+        profile_context=profile_context,
+        exercise_context=exercise_context,
+    )
+
+    _prompt_cache[key] = {"prompt": prompt, "ts": datetime.now()}
+
+    return prompt
 
 class AIService:
     def __init__(self):
