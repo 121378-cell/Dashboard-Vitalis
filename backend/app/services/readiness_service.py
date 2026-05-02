@@ -93,7 +93,7 @@ class ReadinessService:
             db: Database session
             user_id: User ID
             date_str: Target date (YYYY-MM-DD), defaults to today
-            
+        
         Returns:
             Complete readiness result as dictionary
         """
@@ -172,7 +172,7 @@ class ReadinessService:
             total_weight = sum(available_weights.values())
         
         normalized_weights = {k: v / total_weight for k, v in available_weights.items()}
-
+        
         # Calculate weighted score (load_score excluded - it uses inverted scale, only penalty applied below)
         raw_score = (
             component_scores.get("hrv", 0) * normalized_weights.get("hrv", 0) +
@@ -180,27 +180,27 @@ class ReadinessService:
             component_scores.get("stress", 0) * normalized_weights.get("stress", 0) +
             component_scores.get("rhr", 0) * normalized_weights.get("rhr", 0)
         )
-
+        
         component_scores["load"] = round(load_score, 1)
 
         # Penalizacion por carga acumulada (evitar sobreentrenamiento)
         # load_score: 0-40 = very high load (bad), 60-100 = low load (good)
-        # Invert for penalty: high_load_penalty = (40 - load_score) / 40
         if load_score < 40:
             high_load_penalty = 1.0 - (load_score / 40)
-            raw_score *= (1.0 - high_load_penalty * 0.5)  # up to -50% for extreme load
-        elif load_score > 80:
-            raw_score *= 0.85  # light overtraining signal bonus
+            raw_score *= (1.0 - high_load_penalty * 0.5) # up to -50% for extreme load
+        elif load_score < 60:
+            moderate_penalty = 1.0 - (load_score / 60)
+            raw_score *= (1.0 - moderate_penalty * 0.15) # up to -15% for high load
         
         final_score = round(max(0, min(100, raw_score)))
         status = cls._score_to_status(final_score)
         
         # Determine overtraining risk
         overtraining_risk = (
-            load_score > 85 or
+            load_score < 40 or
             (hrv_score < 30 and baseline.hrv_mean > 0) or
             (rhr_score < 30 and baseline.rhr_mean > 0) or
-            (load_score > 80 and final_score < 40)
+            (load_score < 60 and final_score < 40)
         )
         
         # Generate personalized recommendation
@@ -260,7 +260,7 @@ class ReadinessService:
                     rhr_values.append(float(rhr))
                 if (stress := data.get("stress")) and stress > 0:
                     stress_values.append(float(stress))
-                    
+            
             except (json.JSONDecodeError, ValueError):
                 continue
         
@@ -406,56 +406,49 @@ class ReadinessService:
         """
         Calculate training load score for the last N days.
         
+        Queries the Workout table for actual training duration.
+        
         Returns 0-100 score where:
         - 0-40: Very high load (risk of overtraining)
-        - 40-60: High load 
+        - 40-60: High load
         - 60-80: Moderate/optimal load
         - 80-100: Low load (undertraining or recovery week)
         """
-        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        from app.models.workout import Workout
         
-        rows = db.query(Biometrics).filter(
-            Biometrics.user_id == user_id,
-            Biometrics.date >= cutoff
+        cutoff = date.today() - timedelta(days=days)
+        
+        workouts = db.query(Workout).filter(
+            Workout.user_id == user_id,
+            Workout.date >= cutoff
         ).all()
         
-        total_duration = 0
+        total_duration_min = 0
         active_days = 0
         
-        for row in rows:
-            if not row.data:
-                continue
-            try:
-                data = json.loads(row.data)
-                duration = data.get("workout_duration", 0) or 0
-                
-                if duration > 0:
-                    total_duration += duration
-                    active_days += 1
-                    
-            except (json.JSONDecodeError, ValueError):
-                continue
+        for w in workouts:
+            duration_min = (w.duration or 0) / 60
+            if duration_min > 0:
+                total_duration_min += duration_min
+                active_days += 1
         
         if active_days == 0:
-            return 100.0  # No training = low load (recovery)
+            return 100.0 # No training = low load (recovery)
         
-        # Calculate average daily training duration in hours
-        avg_daily_hours = total_duration / days / 60
+        avg_daily_min = total_duration_min / days
         
-        # Score based on volume
-        # Healthy range: 0.5-2.0 hours/day on average (30-120 min)
-        if avg_daily_hours < 0.5:  # < 30 min average
-            return 100.0  # Very low load (recovery week)
-        elif avg_daily_hours < 1.0:  # 30-60 min
+        if avg_daily_min < 30:
+            return 100.0
+        elif avg_daily_min < 60:
             return 90.0
-        elif avg_daily_hours < 1.5:  # 60-90 min
-            return 80.0  # Optimal range
-        elif avg_daily_hours < 2.0:  # 90-120 min
-            return 60.0  # Moderate-high
-        elif avg_daily_hours < 3.0:  # 120-180 min
-            return 40.0  # High load
-        else:  # > 3 hours average
-            return 20.0  # Very high load (overtraining risk)
+        elif avg_daily_min < 90:
+            return 80.0
+        elif avg_daily_min < 120:
+            return 60.0
+        elif avg_daily_min < 180:
+            return 40.0
+        else:
+            return 20.0
 
     @staticmethod
     def _score_to_status(score: int) -> str:
@@ -477,7 +470,7 @@ class ReadinessService:
         load_score = components.get("load", 50) if components else 50
         if load_score < 40:
             return "Día de descanso total. Tu cuerpo lo necesita para progresar."
-
+        
         if score >= 85:
             return "Día óptimo para entrenamiento de alta intensidad. Tu cuerpo está en peak."
         elif score >= 70:
@@ -596,7 +589,7 @@ class ReadinessService:
             db: Database session
             user_id: User ID
             date_str: Target date (YYYY-MM-DD), defaults to today
-            
+        
         Returns:
             Readiness result dictionary
         """
@@ -606,7 +599,6 @@ class ReadinessService:
         if result.get("score") is not None:
             try:
                 from app.models.daily_briefing import DailyBriefing
-                from datetime import date as date_type
                 
                 target_date = date_str or date.today().isoformat()
                 existing = db.query(DailyBriefing).filter(
@@ -614,7 +606,6 @@ class ReadinessService:
                     DailyBriefing.date == target_date
                 ).first()
                 
-                import json
                 content = json.dumps({
                     "readiness_score": result["score"],
                     "status": result["status"],

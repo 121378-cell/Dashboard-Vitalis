@@ -19,7 +19,7 @@ class WeeklyPlan(Base):
     ai_version = Column(String, default="1.0")
     
     # Relationships
-    sessions = relationship("TrainingSession", back_populates="plan", cascade="all, delete-orphan")
+    sessions = relationship("PlanSession", back_populates="plan", cascade="all, delete-orphan")
 
 
 class PlanSession(Base):

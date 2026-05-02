@@ -141,7 +141,7 @@ def detect_conversation_mode(message: str, biometrics_context: str, injury_conte
     return "analysis"
 
 
-def build_atlas_system_prompt(db, user_id: str) -> str:
+def build_atlas_system_prompt(db, user_id: str) -> Dict[str, Any]:
     from app.services.injury_prevention_service import InjuryPreventionService
     from app.services.readiness_service import ReadinessService
     from app.services.analytics_service import AnalyticsService
@@ -155,13 +155,34 @@ def build_atlas_system_prompt(db, user_id: str) -> str:
     key = _cache_key(user_id)
     cached = _prompt_cache.get(key)
     if cached and (datetime.now() - cached["ts"]).total_seconds() < 300:
-        return cached["prompt"]
+        return cached["result"]
 
     today_str = date.today().isoformat()
 
     athlete_name = "Sergi"
     athlete_age = "47"
     step_target = "20.000"
+
+    try:
+        from app.models.user import User
+        user_obj = db.query(User).filter(User.id == user_id).first()
+        if user_obj and user_obj.name:
+            athlete_name = user_obj.name
+    except Exception:
+        pass
+
+    try:
+        profile_summary = AthleteProfileService.get_profile_summary(user_id, db)
+        if profile_summary and "Perfil no disponible" not in profile_summary:
+            import re as _re
+            age_match = _re.search(r'(\d+)\s*años', profile_summary)
+            if age_match:
+                athlete_age = age_match.group(1)
+            steps_match = _re.search(r'([\d.,]+)\s*pasos/día', profile_summary)
+            if steps_match:
+                step_target = steps_match.group(1).replace(",", ".")
+    except Exception:
+        pass
 
     readiness_result = ReadinessService.calculate(db, user_id)
     readiness_score = readiness_result.get("score") or 50
@@ -297,9 +318,29 @@ Ejercicios: {len(plan.get('exercises', []))}"""
         exercise_context=exercise_context,
     )
 
-    _prompt_cache[key] = {"prompt": prompt, "ts": datetime.now()}
+    bio_summary = ""
+    if today_bio and today_bio.data:
+        try:
+            bd = json.loads(today_bio.data)
+            bio_summary = f"HRV:{bd.get('hrv', 0)} FCR:{bd.get('heartRate', 0)}"
+        except Exception:
+            pass
+    injury_summary = "active_injury" if active_injuries else "clear"
 
-    return prompt
+    _prompt_cache[key] = {
+        "result": {
+            "prompt": prompt,
+            "athlete_name": athlete_name,
+            "athlete_age": athlete_age,
+            "step_target": step_target,
+            "readiness_score": readiness_score,
+            "bio_summary": bio_summary,
+            "injury_summary": injury_summary,
+        },
+        "ts": datetime.now(),
+    }
+
+    return _prompt_cache[key]["result"]
 
 class AIService:
     def __init__(self):

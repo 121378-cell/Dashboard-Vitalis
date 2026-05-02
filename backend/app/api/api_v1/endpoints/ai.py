@@ -1,18 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
-from app.services.ai_service import AIService, build_atlas_system_prompt, detect_conversation_mode, MASTER_SYSTEM_PROMPT, MODE_INSTRUCTIONS
-from app.services.context_service import ContextService
+from app.services.ai_service import AIService, build_atlas_system_prompt, detect_conversation_mode, MODE_INSTRUCTIONS
 from app.services.session_service import SessionService
-from app.services.memory_service import MemoryService
-from app.services.readiness_service import ReadinessService
-from app.models.biometrics import Biometrics
 from app.models.session import TrainingSession
 from pydantic import BaseModel
-from datetime import date, timedelta
+from datetime import date
 from typing import List, Optional
 import json
-import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,6 +36,7 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
         logger.error(f"Error detecting workout request: {e}")
         is_workout_request = False
 
+    detected_mode = None
     if is_workout_request:
         try:
             today_str = date.today().isoformat()
@@ -51,11 +47,13 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
 
             if existing_session and existing_session.status in ["planned", "active"]:
                 plan = json.loads(existing_session.plan_json) if existing_session.plan_json else {}
+                detected_mode = "planning"
                 return {
                     "content": json.dumps(plan),
                     "provider": "atlas_session",
                     "session_id": existing_session.id,
-                    "type": "session_plan"
+                    "type": "session_plan",
+                    "mode": "planning"
                 }
             else:
                 plan = SessionService.generate_session_plan(user_id, db, date.today())
@@ -68,44 +66,30 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
                 )
                 db.add(session)
                 db.commit()
+                detected_mode = "planning"
                 return {
                     "content": json.dumps(plan),
                     "provider": "atlas_session",
                     "session_id": session.id,
-                    "type": "session_plan"
+                    "type": "session_plan",
+                    "mode": "planning"
                 }
         except Exception as e:
             pass
 
     # Build dynamic ATLAS system prompt with real-time context
-    full_system_prompt = build_atlas_system_prompt(db, user_id)
+    prompt_result = build_atlas_system_prompt(db, user_id)
+    full_system_prompt = prompt_result["prompt"]
+    athlete_name = prompt_result["athlete_name"]
 
-    # Detect conversation mode and inject mode-specific instructions
-    readiness_result = ReadinessService.calculate(db, user_id)
-    readiness_score = readiness_result.get("score")
-
-    bio_row = db.query(Biometrics).filter(
-        Biometrics.user_id == user_id,
-        Biometrics.date == date.today().isoformat()
-    ).first()
-    bio_summary = ""
-    if bio_row and bio_row.data:
-        try:
-            bd = json.loads(bio_row.data)
-            hrv = bd.get("hrv", 0)
-            hr = bd.get("heartRate", 0)
-            bio_summary = f"HRV:{hrv} FCR:{hr}"
-        except Exception:
-            pass
-
-    from app.services.injury_prevention_service import InjuryPreventionService
-    injury_status = InjuryPreventionService.get_current_status(db, user_id)
-    injury_dict = injury_status.to_dict() if hasattr(injury_status, "to_dict") else {}
-    injury_summary = "active_injury" if injury_dict.get("active_injuries") else "clear"
+    # Use cached context values from build_atlas_system_prompt (avoids double DB queries)
+    readiness_score = prompt_result.get("readiness_score")
+    bio_summary = prompt_result.get("bio_summary", "")
+    injury_summary = prompt_result.get("injury_summary", "clear")
 
     mode = detect_conversation_mode(last_message, bio_summary, injury_summary, readiness_score)
 
-    mode_inst = MODE_INSTRUCTIONS.get(mode, "").format(athlete_name="Sergi")
+    mode_inst = MODE_INSTRUCTIONS.get(mode, "").format(athlete_name=athlete_name)
 
     full_system_prompt = full_system_prompt.replace(
         "MODO DE CONVERSACIÓN ACTUAL: ANALYSIS",
@@ -155,7 +139,8 @@ def generate_plan(
 @router.get("/daily-briefing")
 def daily_briefing(db: Session = Depends(get_db), user_id: str = "default_user"):
     """Get the morning summary with deep analysis context."""
-    full_system_prompt = build_atlas_system_prompt(db, user_id)
+    prompt_result = build_atlas_system_prompt(db, user_id)
+    full_system_prompt = prompt_result["prompt"]
 
     system_instr = f"{full_system_prompt}\n\nDa un resumen estructurado en 3 secciones: 1. Estado de Recuperación, 2. Análisis de Carga (ACWR), 3. Recomendación del día."
     prompt = "Genera mi Daily Briefing matutino basado en los datos proporcionados. Sé técnico pero motivador."
