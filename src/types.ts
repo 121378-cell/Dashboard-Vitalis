@@ -88,3 +88,67 @@ export interface WeeklyStats {
   total_duration_minutes: number;
   total_exercises: number;
 }
+
+// Recovery & Injury Prevention Types
+export type AlertLevelType = 'optimal' | 'caution' | 'warning' | 'stop';
+
+export interface RecoveryAlert {
+  level: AlertLevelType;
+  reason: string;
+  indicator: string;
+  value?: number | string | null;
+  threshold?: number | string | null;
+  action_required: string;
+}
+
+export interface RecoveryStatus {
+  alert_level: AlertLevelType;
+  alerts: RecoveryAlert[];
+  readiness_penalty: number;
+  active_injuries: InjuryRecord[];
+  zones_to_avoid: string[];
+  recommendations: string[];
+  forecast_risk: number;
+}
+
+export interface RecoverySessionData {
+  type: string;
+  duration_min: number;
+  exercises: string[];
+  message?: string | null;
+  optional: string[];
+  alert_level: AlertLevelType;
+}
+
+export interface InjuryRecord {
+  id: number;
+  date: string;
+  zone?: string | null;
+  content: string;
+  pain_level: number;
+  type: string;
+  importance: number;
+  is_active: boolean;
+  tags: string[];
+}
+
+export interface InjuryPattern {
+  zone: string;
+  recurrence_gap_days: number;
+  first_date: string;
+  last_date: string;
+}
+
+export interface InjuryPatternsResponse {
+  zone_frequency: Record<string, number>;
+  patterns: InjuryPattern[];
+  insights: string[];
+  total_injuries: number;
+}
+
+export interface PainReport {
+  zone: string;
+  pain_level: number;
+  pain_type: 'agudo' | 'sordo' | 'ardor' | 'fatiga';
+  notes?: string;
+}

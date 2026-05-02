@@ -28,6 +28,7 @@ from app.services.readiness_service import ReadinessService
 from app.services.memory_service import MemoryService
 from app.services.ai_service import AIService
 from app.services.athlete_profile_service import AthleteProfileService
+from app.services.injury_prevention_service import InjuryPreventionService, AlertLevel
 
 logger = logging.getLogger("app.services.planner")
 
@@ -81,6 +82,11 @@ class TrainingPlannerService:
         self.ai_service = AIService()
 
     async def generate_weekly_plan(self, db: Session, user_id: str) -> Dict[str, Any]:
+        recovery_status = InjuryPreventionService.get_current_status(db, user_id)
+        injury_alert_level = recovery_status.alert_level
+        zones_to_avoid = recovery_status.zones_to_avoid
+        readiness_penalty = recovery_status.readiness_penalty
+
         profile = await self._get_athlete_profile(db, user_id)
         readiness_history = await self._get_readiness_history(db, user_id, days=30)
         workout_history = await self._get_workout_history(db, user_id, weeks=8)
@@ -102,9 +108,15 @@ class TrainingPlannerService:
             profile=profile,
         )
 
-        weekly_structure = self._reorder_sessions_by_readiness(
-            weekly_structure, upcoming_readiness
-        )
+        if injury_alert_level in [AlertLevel.ORANGE, AlertLevel.RED]:
+            weekly_structure = InjuryPreventionService.apply_recovery_mode(weekly_structure)
+        else:
+            weekly_structure = self._reorder_sessions_by_readiness(
+                weekly_structure, upcoming_readiness
+            )
+
+        if zones_to_avoid:
+            weekly_structure = self._mark_avoid_exercises(weekly_structure, zones_to_avoid)
 
         plan_prompt = self._build_plan_prompt(
             profile, prs, weekly_structure, memory_context,
@@ -248,6 +260,49 @@ class TrainingPlannerService:
                 exercise["rpe_target"] = self._calculate_rpe_target(week_number)
                 exercise["intensity_percentage"] = int(phase_intensity * 100)
                 exercise["week_number"] = week_number
+
+        return plan
+
+    @staticmethod
+    def _mark_avoid_exercises(plan: Dict[str, Any], zones_to_avoid: List[str]) -> Dict[str, Any]:
+        """Mark exercises that target injured zones as 'avoid' in the plan."""
+        ZONE_EXERCISE_MAP = {
+            "shoulder_left": ["overhead_press", "lateral_raise", "face_pull", "shoulder_press", "bench_press", "push_press", "arnold_press", "y_raises", "external_rotation"],
+            "shoulder_right": ["overhead_press", "lateral_raise", "face_pull", "shoulder_press", "bench_press", "push_press", "arnold_press", "y_raises", "external_rotation"],
+            "knee_left": ["squat", "leg_extension", "lunge", "leg_press", "bulgarian_split_squat", "hack_squat", "terminal_knee_extension"],
+            "knee_right": ["squat", "leg_extension", "lunge", "leg_press", "bulgarian_split_squat", "hack_squat", "terminal_knee_extension"],
+            "lower_back": ["deadlift", "romanian_deadlift", "good_morning", "barbell_row", "back_extension", "back_squat"],
+            "upper_back": ["barbell_row", "lat_pulldown", "pull_up", "cable_row", "t_bar_row"],
+            "elbow_left": ["bicep_curl", "hammer_curl", "chin_up", "wrist_curl", "reverse_curl"],
+            "elbow_right": ["bicep_curl", "hammer_curl", "chin_up", "wrist_curl", "reverse_curl"],
+            "wrist_left": ["wrist_curl", "reverse_wrist_curl", "grip_squeeze", "farmer_walk"],
+            "wrist_right": ["wrist_curl", "reverse_wrist_curl", "grip_squeeze", "farmer_walk"],
+            "hip_left": ["hip_thrust", "squat", "lunge", "pigeon_stretch", "adductor", "glute_bridge"],
+            "hip_right": ["hip_thrust", "squat", "lunge", "pigeon_stretch", "adductor", "glute_bridge"],
+            "ankle_left": ["calf_raise", "jump_rope", "box_jump", "sprint"],
+            "ankle_right": ["calf_raise", "jump_rope", "box_jump", "sprint"],
+            "chest": ["bench_press", "incline_bench", "dumbbell_fly", "push_up", "cable_crossover", "pec_deck"],
+            "core": ["crunch", "plank", "hanging_leg_raise", "ab_wheel", "russian_twist"],
+            "neck": ["shrug", "neck_curl", "overhead_press"],
+        }
+
+        avoid_exercises = set()
+        for zone in zones_to_avoid:
+            zone_lower = zone.lower()
+            for mapped_zone, exercises in ZONE_EXERCISE_MAP.items():
+                if zone_lower == mapped_zone or zone_lower in mapped_zone:
+                    avoid_exercises.update(exercises)
+
+        if not avoid_exercises:
+            return plan
+
+        for session in plan.get("sessions", []):
+            for exercise in session.get("exercises", []):
+                ex_name = exercise.get("name", "").lower().replace(" ", "_")
+                if any(avoid in ex_name or ex_name in avoid for avoid in avoid_exercises):
+                    exercise["avoid"] = True
+                    exercise["avoid_reason"] = f"Zona lesionada activa — {', '.join(z.replace('_', ' ') for z in zones_to_avoid)}"
+                    exercise["alternative"] = "McGill Big 3 o movilidad"
 
         return plan
 
