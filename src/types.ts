@@ -152,3 +152,94 @@ export interface PainReport {
   pain_type: 'agudo' | 'sordo' | 'ardor' | 'fatiga';
   notes?: string;
 }
+
+// Analytics Types
+export interface CorrelationData {
+  r: number | null;
+  label: string;
+  strength: string;
+}
+
+export interface RestImpactData {
+  optimal_rest_days: number;
+  average_readiness_after: number;
+  breakdown: Record<string, number>;
+}
+
+export interface BestTrainingTime {
+  best_hour: number | null;
+  best_hour_label?: string;
+  avg_rpe_at_best?: number;
+  message?: string;
+  all_hours?: Record<string, number>;
+}
+
+export interface CorrelationsResponse {
+  status: 'ok' | 'accumulating';
+  days_available?: number;
+  days_required?: number;
+  days_analyzed?: number;
+  message?: string;
+  correlations: {
+    sleep_to_hrv: CorrelationData;
+    hrv_to_performance: CorrelationData;
+    rest_days_to_readiness: RestImpactData;
+    best_training_time: BestTrainingTime;
+  };
+  insights: InsightItem[];
+}
+
+export interface InsightItem {
+  id: string;
+  importance: 'alta' | 'media' | 'baja';
+  text: string;
+  correlation_r?: number | null;
+  suggestion?: string;
+}
+
+export interface ReadinessForecastDay {
+  date: string;
+  weekday: string;
+  predicted_score: number;
+  confidence: number;
+}
+
+export interface ReadinessForecastResponse {
+  status: 'ok' | 'accumulating';
+  days_available?: number;
+  days_analyzed?: number;
+  message?: string;
+  forecasts: ReadinessForecastDay[];
+}
+
+export interface PlateauEntry {
+  exercise: string;
+  weeks_stagnant: number;
+  current_weight: number;
+  slope_per_week: number;
+  suggestion: string;
+}
+
+export interface PlateausResponse {
+  status: 'ok' | 'no_data' | 'progressing';
+  message?: string;
+  plateaus: PlateauEntry[];
+}
+
+export interface OptimalVolumeResponse {
+  status: 'ok' | 'accumulating' | 'insufficient_variation';
+  optimal_volume_min?: number | null;
+  optimal_sessions_per_week?: number;
+  message?: string;
+  weeks_available?: number;
+  data_points?: number;
+}
+
+export interface MonthlyInsightsResponse {
+  status: 'ok' | 'accumulating';
+  generated_at: string;
+  insights: InsightItem[];
+  correlations_summary: Record<string, unknown>;
+  plateaus: PlateauEntry[];
+  optimal_volume: OptimalVolumeResponse;
+}

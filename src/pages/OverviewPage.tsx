@@ -10,6 +10,10 @@ import { ChartSkeleton } from '../components/charts/ChartSkeleton';
 import { ExportButton } from '../components/common/ExportButton';
 import { ChartExportButton } from '../components/common/ChartExportButton';
 import { useBiometrics, useWorkouts } from '../hooks/useDashboardData';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { ForecastWidget } from '../components/analytics/ForecastWidget';
+import { InsightCard } from '../components/analytics/InsightCard';
+import { PlateauAlert } from '../components/analytics/PlateauAlert';
 
 
 const COLORS = {
@@ -31,6 +35,7 @@ export const OverviewPage = () => {
 
   const { data: biometrics, isLoading: isLoadingBiometrics } = useBiometrics();
   const { data: workouts, isLoading: isLoadingWorkouts } = useWorkouts(50);
+  const { insights, forecast, correlations, isLoading: isLoadingAnalytics, refresh: refreshAnalytics } = useAnalytics();
 
   // Mock data for charts when no API data available
   const generateMockData = () => {
@@ -327,6 +332,67 @@ export const OverviewPage = () => {
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* AI Analytics Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-[var(--color-primary)]" />
+            <h2 className="text-lg font-display font-bold text-[var(--color-text)]">
+              Insights & Predicciones
+            </h2>
+          </div>
+          <button
+            onClick={refreshAnalytics}
+            disabled={isLoadingAnalytics}
+            className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-50"
+          >
+            {isLoadingAnalytics ? 'Actualizando...' : 'Actualizar'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <ForecastWidget
+              forecasts={forecast?.forecasts ?? []}
+              isLoading={isLoadingAnalytics}
+            />
+            <PlateauAlert
+              plateaus={insights?.plateaus ?? []}
+              isLoading={isLoadingAnalytics}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--color-text-muted)]">
+              Descubrimientos del mes
+            </h3>
+            {insights?.insights?.length ? (
+              insights.insights.map((insight) => (
+                <InsightCard key={insight.id} insight={insight} />
+              ))
+            ) : (
+              <div className="rounded-xl bg-white/5 border border-white/10 p-4 text-center">
+                <p className="text-sm text-[var(--color-text-muted)]">
+                  {isLoadingAnalytics ? 'Cargando insights...' : 'Acumulando datos para generar insights...'}
+                </p>
+              </div>
+            )}
+            {insights?.optimal_volume?.status === 'ok' && insights.optimal_volume.optimal_volume_min != null && (
+              <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 backdrop-blur-sm p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">🎯</span>
+                  <span className="text-sm font-semibold text-emerald-400">Volumen Óptimo</span>
+                </div>
+                <p className="text-xs text-[var(--color-text)]">
+                  {insights.optimal_volume.optimal_volume_min}-{insights.optimal_volume.optimal_volume_min + 30} min/semana
+                  ({insights.optimal_volume.optimal_sessions_per_week} sesiones)
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
