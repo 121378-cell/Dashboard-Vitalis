@@ -41,6 +41,7 @@ class PersonalBaseline:
     hrv_std: float = 0.0
     sleep_mean: float = 0.0
     rhr_mean: float = 0.0
+    rhr_std: float = 0.0
     stress_mean: float = 0.0
     days_available: int = 0
 

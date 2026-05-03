@@ -3,12 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.api_v1 import api
 from app.db.session import engine, Base
-# Importar base para asegurar que todos los modelos están registrados
-import app.db.base 
+import app.db.base
 from contextlib import asynccontextmanager
 import logging
 import os
+import time
 from app.services.scheduler_service import start_scheduler, shutdown_scheduler
+from app.middleware.monitoring import MonitoringMiddleware, get_metrics
+from app.core.rate_limiter import RateLimiterMiddleware
 
 logger = logging.getLogger("app.main")
 
@@ -95,6 +97,8 @@ origins = [
 if settings.ALLOW_ALL_ORIGINS:
     origins = ["*"]
 
+app.add_middleware(MonitoringMiddleware)
+app.add_middleware(RateLimiterMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -103,8 +107,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_start_time = time.time()
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    db_ok = False
+    try:
+        from app.db.session import SessionLocal
+        with SessionLocal() as db:
+            db.execute("SELECT 1")
+            db_ok = True
+    except Exception:
+        pass
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "db": "ok" if db_ok else "error",
+        "uptime_seconds": int(time.time() - _start_time),
+    }
+
+@app.get("/metrics")
+def metrics_endpoint():
+    return get_metrics()
 
 app.include_router(api.api_router, prefix=settings.API_V1_STR)
