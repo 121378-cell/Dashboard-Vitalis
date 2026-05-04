@@ -4,6 +4,7 @@ from app.db.session import Base
 
 class Biometrics(Base):
     __tablename__ = "biometrics"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id"), index=True)

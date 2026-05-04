@@ -9,7 +9,7 @@ class AtlasMemory(Base):
 
     Stores persistent facts about the athlete that accumulate over time
     and are injected into every AI context window.
-    
+
     Types:
     - injury: Lesiones, molestias, restricciones físicas
     - achievement: PRs, hitos, logros destacados
@@ -20,6 +20,7 @@ class AtlasMemory(Base):
     """
 
     __tablename__ = "atlas_memory"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, index=True, nullable=False)

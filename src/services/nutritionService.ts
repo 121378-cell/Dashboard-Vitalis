@@ -109,13 +109,13 @@ export interface HydrationStatus {
 
 export const nutritionService = {
   getDailyNeeds: (targetDate?: string) =>
-    api.get<{ status: string; data: NutritionDaily }>("/nutrition/daily", targetDate ? { target_date: targetDate } : {}),
+    api.get<{ status: string; data: NutritionDaily }>("/nutrition/daily", { params: targetDate ? { target_date: targetDate } : undefined }),
 
   getToday: () =>
     api.get<{ status: string; data: NutritionToday }>("/nutrition/today"),
 
   getMealPlan: (targetDate?: string) =>
-    api.get<{ status: string; data: { date: string; goal_type: string; target_calories: number; meals: MealTiming[] } }>("/nutrition/meal-plan", targetDate ? { target_date: targetDate } : {}),
+    api.get<{ status: string; data: { date: string; goal_type: string; target_calories: number; meals: MealTiming[] } }>("/nutrition/meal-plan", { params: targetDate ? { target_date: targetDate } : undefined }),
 
   logMeal: (meal: {
     meal_type: string;
@@ -132,7 +132,7 @@ export const nutritionService = {
     api.delete<{ status: string }>(`/nutrition/log/${mealId}`),
 
   getHistory: (days = 7) =>
-    api.get<{ status: string; data: { history: NutritionHistoryEntry[]; days_requested: number; days_returned: number } }>("/nutrition/history", { days }),
+    api.get<{ status: string; data: { history: NutritionHistoryEntry[]; days_requested: number; days_returned: number } }>("/nutrition/history", { params: { days } }),
 
   getSettings: () =>
     api.get<{ status: string; data: NutritionSettings }>("/nutrition/settings"),

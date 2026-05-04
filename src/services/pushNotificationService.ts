@@ -1,6 +1,5 @@
-import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { apiService } from './apiService';
+import { postData } from './api';
 
 export class PushNotificationService {
   private initialized = false;
@@ -11,19 +10,13 @@ export class PushNotificationService {
     }
 
     try {
-      // Request permission for push notifications
-      const permissionStatus = await PushNotifications.requestPermissions();
-      if (permissionStatus.receive === 'granted') {
-        // Register with FCM to get the token
-        await PushNotifications.register();
-
-        // Add listeners for push notifications
+      const { display } = await LocalNotifications.requestPermissions();
+      if (display === 'granted') {
         this.setupListeners();
-
         this.initialized = true;
         console.log('[PushNotificationService] Initialized successfully');
       } else {
-        console.warn('[PushNotificationService] Permission to receive push notifications denied');
+        console.warn('[PushNotificationService] Permission to receive notifications denied');
       }
     } catch (error) {
       console.error('[PushNotificationService] Failed to initialize', error);
@@ -31,36 +24,18 @@ export class PushNotificationService {
   }
 
   private setupListeners() {
-    // Listen for registration (token)
-    PushNotifications.addListener('registration', async (token) => {
-      console.log('[PushNotificationService] Registration token:', token.value);
-      // Send token to backend
-      await this.registerToken(token.value);
+    LocalNotifications.addListener('localNotificationReceived', async (notification) => {
+      console.log('[PushNotificationService] Local notification received:', notification);
     });
 
-    // Listen for incoming push notifications
-    PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-      console.log('[PushNotificationService] Push notification received:', notification);
-      // Show local notification so user sees it immediately if app is in foreground
-      await this.showLocalNotification(notification.title, notification.body, notification.data);
-    });
-
-    // Listen for when user taps on a notification
-    PushNotifications.addListener('pushNotificationActionPerformed', async (notification) => {
-      console.log('[PushNotificationService] Push notification action performed:', notification);
-      // Handle action if needed (e.g., navigate to specific screen)
-    });
-
-    // Handle registration errors
-    PushNotifications.addListener('registrationError', async (error) => {
-      console.error('[PushNotificationService] Registration error:', error);
+    LocalNotifications.addListener('localNotificationActionPerformed', async (notification) => {
+      console.log('[PushNotificationService] Local notification action performed:', notification);
     });
   }
 
   private async registerToken(fcmToken: string) {
     try {
-      // Send token to backend
-      await apiService.post('/notifications/register', { fcm_token: fcmToken });
+      await postData('/notifications/register', { fcm_token: fcmToken });
       console.log('[PushNotificationService] FCM token registered with backend');
     } catch (error) {
       console.error('[PushNotificationService] Failed to register FCM token with backend:', error);
@@ -69,7 +44,6 @@ export class PushNotificationService {
 
   private async showLocalNotification(title: string, body: string, data: any = {}) {
     try {
-      // Create a unique ID for the notification
       const id = Math.floor(Math.random() * 10000);
 
       await LocalNotifications.schedule({
@@ -78,7 +52,6 @@ export class PushNotificationService {
             id,
             title,
             body,
-            // Add data if needed
             extra: data,
           }
         ]
@@ -90,21 +63,12 @@ export class PushNotificationService {
     }
   }
 
-  // Method to manually trigger token refresh (if needed)
-  async refreshToken() {
-    try {
-      await PushNotifications.unregister();
-      await PushNotifications.register();
-      console.log('[PushNotificationService] Token refresh initiated');
-    } catch (error) {
-      console.error('[PushNotificationService] Failed to refresh token:', error);
-    }
-  }
-
-  // Method to remove all pending local notifications (if needed)
   async clearLocalNotifications() {
     try {
-      await LocalNotifications.cancelAll();
+      const pending = await LocalNotifications.getPending();
+      if (pending.notifications.length > 0) {
+        await LocalNotifications.cancel({ notifications: pending.notifications });
+      }
       console.log('[PushNotificationService] Cleared all local notifications');
     } catch (error) {
       console.error('[PushNotificationService] Failed to clear local notifications:', error);
@@ -112,5 +76,4 @@ export class PushNotificationService {
   }
 }
 
-// Export singleton instance
 export const pushNotificationService = new PushNotificationService();

@@ -18,4 +18,5 @@ class Workout(Base):
 
     __table_args__ = (
         UniqueConstraint('user_id', 'source', 'external_id', name='_user_source_external_uc'),
+        {'extend_existing': True},
     )

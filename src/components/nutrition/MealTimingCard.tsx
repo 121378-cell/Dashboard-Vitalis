@@ -37,8 +37,8 @@ const MealTimingCard: React.FC<MealTimingCardProps> = ({ className = "" }) => {
   const { data, isLoading } = useQuery({
     queryKey: ["meal-plan"],
     queryFn: async () => {
-      const { data: response } = await nutritionService.getMealPlan();
-      return response.data as { date: string; goal_type: string; target_calories: number; meals: MealTiming[] };
+      const response = await nutritionService.getMealPlan();
+      return (response as any).data as { date: string; goal_type: string; target_calories: number; meals: MealTiming[] };
     },
     refetchInterval: 300000,
   });

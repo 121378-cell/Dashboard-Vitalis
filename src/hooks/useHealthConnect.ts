@@ -21,7 +21,8 @@ export const useHealthConnect = () => {
 
   // Check if Health Connect is available
   const checkAvailability = useCallback(async () => {
-    const available = await healthConnectService.initialize();
+    await healthConnectService.initialize();
+    const available = await healthConnectService.isAvailable();
     setHcAvailable(available);
     return available;
   }, [setHcAvailable]);

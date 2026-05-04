@@ -14,12 +14,11 @@ Conceptos clave implementados:
 """
 
 from sqlalchemy import (
-    Column, String, Integer, Float, DateTime, ForeignKey, 
-    Text, Boolean, Enum, JSON, Interval, func
+    Column, String, Integer, Float, DateTime, ForeignKey,
+    Text, Boolean, Enum, JSON
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func as sql_func
-from datetime import datetime, timedelta
 from enum import Enum as PyEnum
 import uuid
 
@@ -94,7 +93,8 @@ class ExerciseLibrary(Base):
     Ejercicios predefinidos con metadata científica.
     """
     __tablename__ = "exercise_library"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     description = Column(Text)
@@ -126,7 +126,8 @@ class TrainingPlan(Base):
     Contiene múltiples Workouts organizados temporalmente.
     """
     __tablename__ = "training_plans"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
@@ -164,7 +165,8 @@ class Workout(Base):
     Contiene bloques de ejercicios con sets.
     """
     __tablename__ = "workouts"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     plan_id = Column(String, ForeignKey("training_plans.id"), nullable=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
@@ -213,7 +215,8 @@ class ExerciseBlock(Base):
     Contiene múltiples sets del mismo ejercicio.
     """
     __tablename__ = "exercise_blocks"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     workout_id = Column(String, ForeignKey("workouts.id"), nullable=False)
     exercise_id = Column(String, ForeignKey("exercise_library.id"), nullable=False)
@@ -251,7 +254,8 @@ class ExerciseSet(Base):
     Unidad mínima de trabajo con todos los parámetros científicos.
     """
     __tablename__ = "exercise_sets"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     block_id = Column(String, ForeignKey("exercise_blocks.id"), nullable=False)
     
@@ -301,7 +305,8 @@ class WorkoutFeedback(Base):
     Para análisis de fatiga y adaptación de futuros workouts.
     """
     __tablename__ = "workout_feedback"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     workout_id = Column(String, ForeignKey("workouts.id"), nullable=False, unique=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
@@ -333,7 +338,8 @@ class TrainingAdaptation(Base):
     Auditoría de decisiones de la IA/heurísticas.
     """
     __tablename__ = "training_adaptations"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     plan_id = Column(String, ForeignKey("training_plans.id"), nullable=True)
     workout_id = Column(String, ForeignKey("workouts.id"), nullable=True)
@@ -364,7 +370,8 @@ class UserTrainingProfile(Base):
     Preferencias, historial y parámetros para personalización.
     """
     __tablename__ = "user_training_profiles"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=False, unique=True)
     

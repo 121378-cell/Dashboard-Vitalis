@@ -5,9 +5,10 @@ from app.db.session import Base
 
 class Achievement(Base):
     __tablename__ = "achievements"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     type = Column(String(50), nullable=False)  # e.g., "first_blood", "iron_will"
     title = Column(String(100), nullable=False)
     description = Column(Text)
@@ -17,9 +18,10 @@ class Achievement(Base):
 
 class Streak(Base):
     __tablename__ = "streaks"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     type = Column(String(50), nullable=False)  # e.g., "garmin_sync", "readiness_above_60"
     current_count = Column(Integer, default=0)
     best_count = Column(Integer, default=0)
@@ -27,9 +29,10 @@ class Streak(Base):
 
 class XpLog(Base):
     __tablename__ = "xp_log"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     xp = Column(Integer, nullable=False)
     reason = Column(String(200), nullable=False)  # e.g., "workout_completed", "daily_sync"
     date = Column(DateTime(timezone=True), server_default=func.now())

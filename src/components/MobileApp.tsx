@@ -1,27 +1,27 @@
 import React from 'react';
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useAtlasStore } from './store/atlasStore';
-import { useAtlasData } from './hooks/useAtlasData';
-import { useHealthConnect } from './hooks/useHealthConnect';
+import { useAtlasStore } from '../store/atlasStore';
+import { useAtlasData } from '../hooks/useAtlasData';
+import { useHealthConnect } from '../hooks/useHealthConnect';
 
 // Layout
-import { MobileNav } from './components/layout/MobileNav';
+import { MobileNav } from './layout/MobileNav';
 
 // Dashboard
-import { DailyBriefing } from './components/dashboard/DailyBriefing';
+import { DailyBriefing } from './dashboard/DailyBriefing';
 
 // Biometrics
-import { BiometricsWidget } from './components/biometrics/BiometricsWidget';
+import { BiometricsWidget } from './biometrics/BiometricsWidget';
 
 // Chat
-import { Chat } from './components/chat/Chat';
+import { Chat } from './chat/Chat';
 
 // Components for each tab
 const HomeTab = () => {
-  const { biometrics, readiness, briefing, loadBriefing, isLoading } = useAtlasStore();
-  const { refreshAll } = useAtlasData();
-  
+  const { biometrics, readiness, briefing, isLoading } = useAtlasStore();
+  const { refreshAll, loadBriefing } = useAtlasData();
+
   return (
     <div className="space-y-4 p-4 pb-24">
       {/* Header */}
@@ -31,8 +31,8 @@ const HomeTab = () => {
             ATLAS
           </h1>
           <p className="text-sm text-[var(--color-text-muted)]">
-            {new Date().toLocaleDateString('es-ES', { 
-              weekday: 'long', 
+            {new Date().toLocaleDateString('es-ES', {
+              weekday: 'long',
               day: 'numeric',
               month: 'short'
             })}
@@ -50,10 +50,10 @@ const HomeTab = () => {
           )}
         </button>
       </div>
-      
+
       {/* Daily Briefing */}
-      <DailyBriefing 
-        briefing={briefing} 
+      <DailyBriefing
+        briefing={briefing}
         onRefresh={loadBriefing}
         isLoading={isLoading}
       />

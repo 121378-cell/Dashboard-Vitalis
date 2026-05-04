@@ -243,3 +243,213 @@ export interface MonthlyInsightsResponse {
   plateaus: PlateauEntry[];
   optimal_volume: OptimalVolumeResponse;
 }
+
+// Biometrics Types
+export interface Biometrics {
+  id?: number;
+  user_id?: string;
+  date?: string;
+  source?: string;
+  readiness?: number;
+  status?: string;
+  overtraining?: boolean;
+  training_status?: string;
+  recovery_time?: number;
+  hrv_status?: string;
+  hrv?: number | null;
+  hrv_baseline?: number;
+  heartRate?: number | null;
+  heart_rate?: number | null;
+  resting_hr?: number | null;
+  rhr_baseline?: number;
+  sleep?: number | null;
+  stress?: number | null;
+  steps?: number | null;
+  calories?: number | null;
+  calories_total?: number | null;
+  calories_workouts?: number | null;
+  spo2?: number | null;
+  respiration?: number | null;
+  weight?: number | null;
+  body_fat?: number | null;
+  sleep_seconds?: number | null;
+}
+
+export interface ReadinessScore {
+  score: number;
+  status: 'excellent' | 'good' | 'moderate' | 'poor' | 'rest' | 'no_data';
+  recommendation?: string;
+  baseline_days?: number;
+  component_scores?: Record<string, number>;
+  overtraining_risk?: boolean;
+}
+
+export const READINESS_THRESHOLDS = {
+  excellent: 80,
+  good: 65,
+  moderate: 50,
+  poor: 35,
+} as const;
+
+// Chat Types
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  provider?: string;
+  timestamp?: string;
+}
+
+// Session Plan Types (for Chat session generation)
+export interface SessionPlan {
+  session_id?: string;
+  session_name: string;
+  date?: string;
+  readiness?: number;
+  estimated_duration_min?: number;
+  coach_notes?: string;
+  warmup?: string;
+  cooldown?: string;
+  exercises: SessionExercise[];
+}
+
+export interface SessionExercise {
+  name: string;
+  muscle_group: string;
+  sets: ExerciseSet[];
+}
+
+export interface ExerciseSet {
+  set_number: number;
+  reps: number;
+  weight_kg: number;
+  rpe_target?: number;
+  rest_seconds?: number;
+  tempo?: string;
+  actual_reps?: number;
+  actual_weight_kg?: number;
+  actual_rpe?: number;
+  status?: 'pending' | 'completed' | 'partial' | 'failed';
+}
+
+// Exercise selector type
+export interface Exercise {
+  id: string;
+  name: string;
+  muscle_group: string;
+  type: string;
+}
+
+// Daily Briefing
+export interface DailyBriefing {
+  briefing: string;
+  generated_at?: string;
+}
+
+// PDF Document
+export interface PDFDocument {
+  id: string;
+  name: string;
+  summary: string;
+  analyzing?: boolean;
+  uploaded_at?: string;
+}
+
+// Athlete Profile
+export interface AthleteProfile {
+  name: string;
+  age: number;
+  weight: number;
+  height: number;
+  goal: string;
+  experience: 'principiante' | 'intermedio' | 'avanzado' | 'élite';
+  daysPerWeek: number;
+  medicalHistory: string;
+}
+
+// Health Connect Biometrics (from native plugin)
+export interface HCBiometrics {
+  heartRate: number | null;
+  restingHeartRate: number | null;
+  hrv: number | null;
+  steps: number | null;
+  sleepSeconds: number | null;
+  sleepHours: number | null;
+  calories: number | null;
+  activeCalories?: number | null;
+  bodyFat: number | null;
+  respiration: number | null;
+  stress: number | null;
+  spo2: number | null;
+  weight: number | null;
+  source: 'health_connect' | 'cache' | 'demo';
+  date: string;
+}
+
+// Garmin Auth Types
+export interface GarminAuthStatus {
+  authenticated: boolean;
+  last_sync?: string;
+}
+
+export interface GarminLoginRequest {
+  email: string;
+  password: string;
+  user_id?: string;
+}
+
+// Sync Result
+export interface SyncResult {
+  garmin?: boolean;
+  wger?: boolean;
+  hevy?: boolean;
+  errors?: string[];
+}
+
+// Memory Entry
+export interface MemoryEntry {
+  id: number;
+  type: string;
+  content: string;
+  date: string;
+  importance: number;
+  tags?: string[];
+  source?: string;
+  created_at?: string;
+}
+
+// App Tab
+export type AppTab = 'home' | 'chat' | 'train' | 'progress' | 'setup';
+
+// Session Service Types
+export interface TrainingSessionFull extends TrainingSession {
+  session_name?: string;
+  estimated_duration_min?: number;
+  coach_notes?: string;
+  warmup?: string;
+  cooldown?: string;
+}
+
+export interface GenerateSessionResponse {
+  session_id: string;
+  session: TrainingSessionFull;
+  message?: string;
+}
+
+export interface ShouldTrainToday {
+  should_train: boolean;
+  reason: string;
+  readiness_score?: number;
+  recommendation?: string;
+}
+
+// Workout Type
+export interface Workout {
+  id: number;
+  source?: string;
+  external_id?: string;
+  name?: string;
+  description?: string;
+  date?: string;
+  duration?: number;
+  calories?: number;
+}

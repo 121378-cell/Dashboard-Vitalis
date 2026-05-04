@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 import bcrypt
 from jose import JWTError, jwt
@@ -24,9 +24,9 @@ class AuthService:
     def _create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=15)
+            expire = datetime.now(timezone.utc) + timedelta(minutes=15)
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
@@ -34,9 +34,9 @@ class AuthService:
     def _create_refresh_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(days=7)
+            expire = datetime.now(timezone.utc) + timedelta(days=7)
         to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt

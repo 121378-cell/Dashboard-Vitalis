@@ -11,6 +11,7 @@ from app.db.session import Base
 
 class DailyBriefing(Base):
     __tablename__ = "daily_briefings"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(String, primary_key=True, index=True)  # Could be UUID or user_id + date
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)

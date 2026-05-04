@@ -1,6 +1,6 @@
 """
 ATLAS Nutrition Models
-======================
+=======================
 
 Models for nutrition tracking and calculation:
 - NutritionSettings: User nutrition preferences (goal, height, age, gender)
@@ -11,7 +11,6 @@ Autor: ATLAS Team
 Version: 1.0.0
 """
 
-from datetime import date, datetime
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text
 from sqlalchemy.sql import func
 from app.db.session import Base
@@ -19,6 +18,7 @@ from app.db.session import Base
 
 class NutritionSettings(Base):
     __tablename__ = "nutrition_settings"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, unique=True, index=True)
@@ -42,6 +42,7 @@ class NutritionSettings(Base):
 
 class MealLog(Base):
     __tablename__ = "meal_logs"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, index=True)
@@ -63,6 +64,7 @@ class MealLog(Base):
 
 class DailyNutritionSummary(Base):
     __tablename__ = "daily_nutrition_summaries"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, index=True)

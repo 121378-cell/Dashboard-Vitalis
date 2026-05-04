@@ -11,6 +11,8 @@ class ChallengeType(str, enum.Enum):
 
 class Challenge(Base):
     __tablename__ = "challenges"
+    __table_args__ = {'extend_existing': True}
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(String)
@@ -23,8 +25,10 @@ class Challenge(Base):
 
 class ChallengeParticipant(Base):
     __tablename__ = "challenge_participants"
+    __table_args__ = {'extend_existing': True}
+
     challenge_id = Column(Integer, ForeignKey("challenges.id"), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     current_value = Column(Float, default=0)
     rank = Column(Integer, default=0)
     challenge = relationship("Challenge", back_populates="participants")
@@ -32,7 +36,9 @@ class ChallengeParticipant(Base):
 
 class UserPublicProfile(Base):
     __tablename__ = "user_public_profile"
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    __table_args__ = {'extend_existing': True}
+
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     display_name = Column(String, nullable=False)
     avatar_url = Column(String)
     is_public = Column(Boolean, default=False)
