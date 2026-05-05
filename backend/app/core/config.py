@@ -1,13 +1,18 @@
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from typing import Optional
+from pathlib import Path
+
+# Ruta base del directorio 'backend/'
+_BACKEND_DIR = Path(__file__).parent.parent.parent
+_DB_PATH = _BACKEND_DIR / "atlas_v2.db"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Fitness Coach"
     API_V1_STR: str = "/api/v1"
 
-    # Database
-    DATABASE_URL: str = "sqlite:///atlas_v2.db"
+    # Database — ruta absoluta para evitar ambigüedad según CWD
+    DATABASE_URL: str = f"sqlite:///{_DB_PATH}"
     
     # Auth
     GARMIN_EMAIL: Optional[str] = None
