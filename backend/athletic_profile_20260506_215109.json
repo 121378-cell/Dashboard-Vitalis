@@ -1,0 +1,70 @@
+{
+  "generated_at": "2026-05-06T21:51:09.676253",
+  "user_id": "default_user",
+  "athlete_identity": {
+    "name": "Sergi",
+    "age": 47,
+    "age_group": "masters_athlete",
+    "primary_sport": "strength_training",
+    "sports_mix": [
+      "strength_training",
+      "running",
+      "trail_running"
+    ]
+  },
+  "fitness_baseline": {
+    "weekly_sessions_avg": 3.75,
+    "strength_sessions_per_week": 2.9166666666666665,
+    "cardio_sessions_per_week": 0.25,
+    "mobility_sessions_per_week": 0.0,
+    "avg_strength_duration_min": 69.90072463768117,
+    "resting_hr_avg": 45.5,
+    "resting_hr_trend": "stable",
+    "fitness_level": "intermediate",
+    "best_training_days": [
+      0
+    ],
+    "total_training_hours_2y": 689.9716666666667,
+    "primary_sport": "strength_training",
+    "data_quality_notes": [
+      "Sesión running corrupta filtrada: 17326477482",
+      "Sesión running corrupta filtrada: 17438319297",
+      "Sesión running corrupta filtrada: 17438319302",
+      "Sesión running corrupta filtrada: 17438319305",
+      "Sesión running corrupta filtrada: 17439787978",
+      "Sesión running corrupta filtrada: 17439787984",
+      "Sesión running corrupta filtrada: 17439788000"
+    ],
+    "avg_strength_calories": 288.30434782608694,
+    "avg_running_pace_min_km": 6.806391834275415
+  },
+  "sleep_patterns": {
+    "sleep_avg_recent_4w": 6.7625,
+    "sleep_avg_historical": 6.150268817204301,
+    "poor_sleep_pct": 75.0,
+    "critical_sleep_pct": 0.0,
+    "sleep_debt_7d_hours": 2.9499999999999993,
+    "sleep_trend": "stable",
+    "chronic_sleep_deficit": true
+  },
+  "recovery_capacity": {
+    "body_battery_avg": 70.5,
+    "body_battery_trend": "stable",
+    "low_battery_days_pct": 0.0,
+    "rhr_fatigue_days_recent": 0,
+    "stress_avg_30d": 26.25,
+    "high_stress_days_pct": 0.0,
+    "max_consecutive_training_days": 6,
+    "avg_rest_days_between_blocks": 1.25,
+    "recovery_score": 81.41666666666667
+  },
+  "overreaching_risk": {
+    "acwr_ratio": 0.8734201237332524,
+    "acute_load_min": 17259,
+    "chronic_load_min": 19760.25,
+    "risk_level": "optimal",
+    "additional_risk_factors": 0,
+    "recommendation": "Carga óptima - balance entre entrenamiento y recuperación."
+  },
+  "coach_context_summary": "Sergi es un atleta de 47 años con nivel intermediate (FC reposo 46 bpm, 3.8 sesiones/semana). Lleva 690 horas de entrenamiento en los últimos 2 años con strength_training como disciplina principal. Presenta un déficit de sueño crónico (media histórica 6.2h < 7h óptimos). Recuperación basada en Body Battery (70) y stress (26/100) dado que el dispositivo no mide HRV. Carga de entrenamiento actual es óptima."
+}

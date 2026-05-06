@@ -1,5 +1,15 @@
-import sqlite3
-conn = sqlite3.connect("../atlas_v2.db")
-tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-print("Tablas:", [t[0] for t in tables])
+"""
+Verificar nombres de tablas en base de datos SQLite
+"""
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from app.db.session import engine
+from sqlalchemy import text
+
+conn = engine.connect()
+result = conn.execute(text('SELECT name FROM sqlite_master WHERE type="table"'))
+tables = [row[0] for row in result.fetchall()]
+print('Tablas:', tables)
 conn.close()
