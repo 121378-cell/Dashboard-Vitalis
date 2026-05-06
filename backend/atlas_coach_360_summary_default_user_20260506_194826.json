@@ -1,0 +1,154 @@
+{
+  "user_id": "default_user",
+  "generated_at": "2026-05-06T19:48:26.017924",
+  "data_coverage": {
+    "biometrics_days": 147,
+    "activities_count": 560,
+    "biometrics_range": {
+      "oldest": "2024-05-06",
+      "newest": "2026-05-06"
+    },
+    "activities_range": {
+      "oldest": "2024-06-08 22:05:54",
+      "newest": "2026-05-06 04:34:51"
+    }
+  },
+  "biometrics_profile": {
+    "sleep": {
+      "average_hours": 6.15,
+      "days_with_data": 125
+    },
+    "steps": {
+      "average_daily": 17261.0,
+      "days_with_data": 147
+    },
+    "stress": {
+      "average_level": 36.4,
+      "days_with_data": 147
+    },
+    "resting_heart_rate": {
+      "average_bpm": 47,
+      "days_with_data": 147
+    },
+    "body_battery": {
+      "average": 54.5,
+      "days_with_data": 143
+    }
+  },
+  "training_profile": {
+    "total_activities": 560,
+    "total_duration_hours": 690.0,
+    "total_distance_km": 967.6,
+    "total_calories": 211576,
+    "avg_duration_minutes": 73.9,
+    "avg_calories": 378.0,
+    "training_frequency_per_week": 5.6,
+    "activity_types": {
+      "strength_training": {
+        "count": 362,
+        "avg_duration_minutes": 68.2,
+        "avg_calories": 287.0,
+        "total_distance_km": null
+      },
+      "running": {
+        "count": 79,
+        "avg_duration_minutes": 55.5,
+        "avg_calories": 586.0,
+        "total_distance_km": 285.0
+      },
+      "walking": {
+        "count": 59,
+        "avg_duration_minutes": 148.3,
+        "avg_calories": 711.0,
+        "total_distance_km": 533.1
+      },
+      "trail_running": {
+        "count": 15,
+        "avg_duration_minutes": 66.9,
+        "avg_calories": 675.0,
+        "total_distance_km": 147.8
+      },
+      "other": {
+        "count": 31,
+        "avg_duration_minutes": 71.2,
+        "avg_calories": 251.0,
+        "total_distance_km": null
+      },
+      "yoga": {
+        "count": 2,
+        "avg_duration_minutes": 28.6,
+        "avg_calories": 55.0,
+        "total_distance_km": null
+      },
+      "pilates": {
+        "count": 6,
+        "avg_duration_minutes": 26.2,
+        "avg_calories": 65.0,
+        "total_distance_km": null
+      },
+      "indoor_cardio": {
+        "count": 4,
+        "avg_duration_minutes": 29.3,
+        "avg_calories": 156.0,
+        "total_distance_km": null
+      },
+      "lap_swimming": {
+        "count": 2,
+        "avg_duration_minutes": 18.2,
+        "avg_calories": 188.0,
+        "total_distance_km": 1.7
+      }
+    }
+  },
+  "athlete_characteristics": {
+    "activity_level": "Muy activo",
+    "sleep_quality": "Adecuado",
+    "stress_level": "Moderado",
+    "fitness_level": "Alto"
+  },
+  "training_insights": {
+    "training_volume": "high",
+    "consistency": "high",
+    "primary_focus": "strength_training",
+    "total_training_hours": 689.9716666666667,
+    "training_frequency_per_week": 5.624103299856528
+  },
+  "current_readiness": {
+    "score": 90,
+    "status": "excellent",
+    "recommendation": "Día óptimo para entrenamiento de alta intensidad. Tu cuerpo está en peak.",
+    "components": {
+      "sleep": 81.7,
+      "stress": 100.0,
+      "body_battery": 63.0,
+      "load": 90.0
+    },
+    "baseline": {
+      "hrv_mean": null,
+      "hrv_std": null,
+      "rhr_mean": null,
+      "rhr_std": null,
+      "sleep_mean": null,
+      "stress_mean": null,
+      "body_battery_mean": null,
+      "days_available": 4
+    },
+    "overtraining_risk": false,
+    "date": "2026-05-06"
+  },
+  "coach_recommendations": {
+    "training_focus": "Enfoque principal: strength_training",
+    "volume_management": "Volumen: high - 690.0 horas totales",
+    "frequency_guidance": "Frecuencia: 5.6 sesiones/semana",
+    "recovery_priority": "Priorizar recuperación",
+    "sleep_optimization": "Mejorar duración"
+  },
+  "key_insights": [
+    "Atleta muy activo con 560 actividades registradas",
+    "Condición física alto (FC reposo: 47 bpm)",
+    "Entrenamiento high con 5.6 sesiones/semana",
+    "Enfoque principal: strength_training (362 sesiones)",
+    "Calidad de sueño adecuado (6.1 horas promedio)",
+    "Nivel de estrés moderado (36/100)"
+  ]
+}

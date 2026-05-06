@@ -1,0 +1,71 @@
+{
+  "user_id": "default_user",
+  "generated_at": "2026-05-06T18:57:27.394696",
+  "data_coverage": {
+    "total_biometrics_records": 147,
+    "total_activities": 0,
+    "oldest_date": "2024-05-06",
+    "newest_date": "2026-05-06",
+    "download_progress": "20.1%"
+  },
+  "overall_statistics": {
+    "sleep": {
+      "average": 6.15,
+      "std": 0.87,
+      "days_with_data": 125
+    },
+    "steps": {
+      "average": 17261.0,
+      "std": 6734.0,
+      "days_with_data": 147
+    },
+    "hrv": {
+      "average": 0,
+      "std": 0,
+      "days_with_data": 0
+    },
+    "stress": {
+      "average": 36.4,
+      "std": 7.1,
+      "days_with_data": 147
+    },
+    "resting_heart_rate": {
+      "average": 47.0,
+      "std": 2.2,
+      "days_with_data": 147
+    },
+    "body_battery": {
+      "average": 54.5,
+      "days_with_data": 143
+    }
+  },
+  "athlete_profile": {
+    "activity_level": "Muy activo",
+    "sleep_quality": "Adecuado",
+    "recovery_capacity": "Unknown",
+    "stress_level": "Moderado"
+  },
+  "current_readiness": {
+    "score": 90,
+    "status": "excellent",
+    "recommendation": "Día óptimo para entrenamiento de alta intensidad. Tu cuerpo está en peak.",
+    "components": {
+      "sleep": 81.7,
+      "stress": 100.0,
+      "body_battery": 63.0,
+      "load": 100.0
+    },
+    "baseline": {
+      "hrv_mean": null,
+      "hrv_std": null,
+      "rhr_mean": null,
+      "rhr_std": null,
+      "sleep_mean": null,
+      "stress_mean": null,
+      "body_battery_mean": null,
+      "days_available": 4
+    },
+    "overtraining_risk": false,
+    "date": "2026-05-06"
+  }
+}

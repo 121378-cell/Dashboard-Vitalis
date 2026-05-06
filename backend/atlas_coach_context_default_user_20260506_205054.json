@@ -1,0 +1,126 @@
+{
+  "athlete_profile": {
+    "user_id": "default_user",
+    "generated_at": "2026-05-06T20:50:54.277159",
+    "name": "Sergi",
+    "birth_date": "1978-05-30",
+    "age": 47,
+    "total_biometrics_records": 147,
+    "total_activities": 560,
+    "oldest_date": "2024-05-06",
+    "newest_date": "2026-05-06",
+    "days_covered": 730,
+    "sleep": {
+      "average": 6.1472,
+      "std": 0.8717611227837203,
+      "min": 4.016666666666667,
+      "max": 9.066666666666666,
+      "days_with_data": 125
+    },
+    "steps": {
+      "average": 17261.081632653062,
+      "std": 6734.3712142133,
+      "min": 245,
+      "max": 33302,
+      "days_with_data": 147
+    },
+    "hrv": {
+      "average": 0,
+      "std": 0,
+      "min": 0,
+      "max": 0,
+      "days_with_data": 0
+    },
+    "stress": {
+      "average": 36.42857142857143,
+      "std": 7.142387460096027,
+      "min": 12,
+      "max": 57,
+      "days_with_data": 147
+    },
+    "resting_heart_rate": {
+      "average": 47,
+      "std": 2.173942822905026,
+      "min": 43,
+      "max": 52,
+      "days_with_data": 147
+    },
+    "body_battery": {
+      "average": 54.54545454545455,
+      "std": 18.060823399540737,
+      "min": 4.0,
+      "max": 104.0,
+      "days_with_data": 143
+    },
+    "activity_level": "Muy activo",
+    "sleep_quality": "Adecuado",
+    "recovery_capacity": "Unknown",
+    "stress_level": "Moderado",
+    "fitness_level": "Alto",
+    "patterns": {
+      "sleep_consistency": 91.28238877216279,
+      "activity_consistency": 32.656287857867,
+      "recovery_trend": "stable",
+      "stress_patterns": [],
+      "best_training_days": [
+        0
+      ],
+      "rest_days_needed": false
+    },
+    "current_readiness": {
+      "score": 90,
+      "status": "excellent",
+      "recommendation": "Día óptimo para entrenamiento de alta intensidad. Tu cuerpo está en peak.",
+      "components": {
+        "sleep": 81.7,
+        "stress": 100.0,
+        "body_battery": 63.0,
+        "load": 90.0
+      },
+      "baseline": {
+        "hrv_mean": null,
+        "hrv_std": null,
+        "rhr_mean": null,
+        "rhr_std": null,
+        "sleep_mean": null,
+        "stress_mean": null,
+        "body_battery_mean": null,
+        "days_available": 4
+      },
+      "overtraining_risk": false,
+      "date": "2026-05-06"
+    }
+  },
+  "personal_info": {
+    "name": "Sergi",
+    "birth_date": "1978-05-30",
+    "age": 47,
+    "age_group": "middle_aged"
+  },
+  "coach_recommendations": {
+    "training_intensity": "Alta intensidad - El cuerpo está en peak para entrenamiento duro",
+    "recovery_focus": "Recuperación prioritaria - Enfocarse en sueño y estrés",
+    "sleep_optimization": "Priorizar 7-8 horas de sueño para optimizar recuperación",
+    "stress_management": "Incorporar técnicas de relajación post-entrenamiento",
+    "age_appropriate_focus": "Mantener condición física con énfasis en recuperación y prevención de lesiones"
+  },
+  "aging_considerations": {
+    "age": 47,
+    "age_group": "middle_aged",
+    "recovery_needs": "enhanced",
+    "injury_prevention_priority": "high",
+    "training_adaptation": "modified_intensity",
+    "focus_areas": [
+      "mantenimiento_condicion",
+      "movilidad",
+      "prevencion_lesiones"
+    ]
+  },
+  "key_insights": [
+    "Atleta muy activo con alta consistencia en entrenamiento",
+    "Excelente condición física (FC reposo: 47 bpm)",
+    "Alta consistencia en hábitos de sueño",
+    "Estado actual óptimo para máximo rendimiento",
+    "Atleta experimentado (47 años) con enfoque en mantenimiento"
+  ]
+}
