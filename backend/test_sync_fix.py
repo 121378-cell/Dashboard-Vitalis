@@ -1,6 +1,6 @@
 """
 Test de Sincronización Garmin - Dashboard-Vitalis
-====================================================
+===================================================
 
 Este script verifica que la sincronización con Garmin funciona correctamente
 después de aplicar los fixes de sesión persistente.
@@ -17,7 +17,13 @@ Verifica:
 
 import sys
 import os
+import io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -56,7 +62,7 @@ def test_garmin_connection():
         client1, session1 = get_garmin_client(
             email=creds.garmin_email,
             password=creds.garmin_password,
-            session_data=creds.garmin_session,
+            db=db,
             user_id=TEST_USER_ID
         )
         
@@ -79,7 +85,7 @@ def test_garmin_connection():
         client2, session2 = get_garmin_client(
             email=creds.garmin_email,
             password=creds.garmin_password,
-            session_data=creds.garmin_session,
+            db=db,
             user_id=TEST_USER_ID
         )
         

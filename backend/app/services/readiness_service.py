@@ -133,11 +133,26 @@ class ReadinessService:
         
         # Extract today's metrics
         hrv = data.get("hrv")
-        sleep = data.get("sleep")
+        sleep_deep = data.get("sleepDeepHours", 0) or 0
+        sleep_rem = data.get("sleepREMHours", 0) or 0
+        sleep_total = data.get("sleep") or 0
         stress = data.get("stress")
         rhr = data.get("heartRate")
         body_battery = row.body_battery
         training_readiness = row.training_readiness
+
+        # Sleep score - check multiple possible paths
+        sleep_score = data.get("sleepScore")
+        if sleep_score is None and sleep_total > 0:
+            base_sleep_score = cls._score_sleep(sleep_total, 0)
+            recovery_ratio = (sleep_deep + sleep_rem) / sleep_total if sleep_total > 0 else 0
+            if recovery_ratio >= 0.35:
+                sleep_score = min(100, base_sleep_score + 10)
+            elif recovery_ratio >= 0.25:
+                sleep_score = base_sleep_score
+            else:
+                sleep_score = max(0, base_sleep_score - 10)
+            sleep_score = round(sleep_score, 1)
 
         # Garmin's native training_readiness is the single most authoritative signal
         # If available, it already encapsulates HRV + sleep + recovery + load
@@ -148,7 +163,6 @@ class ReadinessService:
 
         # Calculate individual component scores
         hrv_score = cls._score_hrv(hrv, baseline.hrv_mean, baseline.hrv_std) if hrv else 0.0
-        sleep_score = cls._score_sleep(sleep, baseline.sleep_mean) if sleep else 0.0
         stress_score = cls._score_stress(stress) if stress is not None else 0.0
         rhr_score = cls._score_rhr(rhr, baseline.rhr_mean, baseline.rhr_std) if rhr else 0.0
 
@@ -166,7 +180,7 @@ class ReadinessService:
             available_weights['hrv'] = cls.BASE_WEIGHTS['hrv']
             component_scores['hrv'] = round(hrv_score, 1)
 
-        if sleep:
+        if sleep_total:
             available_weights['sleep'] = cls.BASE_WEIGHTS['sleep']
             component_scores['sleep'] = round(sleep_score, 1)
 

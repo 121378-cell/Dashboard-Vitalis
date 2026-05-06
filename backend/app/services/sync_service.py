@@ -70,19 +70,26 @@ class SyncService:
                 hrv = client.get_hrv_data(date_str)
                 time.sleep(2.0)
 
-                # Body Battery (FR245 supports this - uses 'charged'/'drained' keys)
+                # Body Battery - use stats for daily totals + body_battery time series for current level
                 body_battery = None
                 bb_charged = None
                 bb_drained = None
+                bb_most_recent = safe_get(stats, "bodyBatteryMostRecentValue")
+                bb_at_wake = safe_get(stats, "bodyBatteryAtWakeTime")
+                bb_highest = safe_get(stats, "bodyBatteryHighestValue")
+                bb_lowest = safe_get(stats, "bodyBatteryLowestValue")
                 try:
                     bb = client.get_body_battery(date_str, date_str)
                     if bb and isinstance(bb, list):
-                        body_battery = safe_get(bb[0], "charged")
                         bb_charged = safe_get(bb[0], "charged")
                         bb_drained = safe_get(bb[0], "drained")
+                        if body_battery is None:
+                            body_battery = safe_get(bb[0], "charged")
                     time.sleep(1.0)
                 except Exception:
                     pass
+                if body_battery is None and bb_most_recent is not None:
+                    body_battery = bb_most_recent
 
                 # Training Readiness (Garmin's composite score - daily endpoint)
                 training_readiness = None
@@ -97,6 +104,16 @@ class SyncService:
                 # Recovery and Training Status
                 training_status_data = client.get_training_status(date_str)
                 time.sleep(1.0)
+
+                # Daily steps - more reliable than get_stats for same-day
+                daily_steps_data = None
+                try:
+                    daily_steps_data = client.get_daily_steps(date_str, date_str)
+                    if daily_steps_data and isinstance(daily_steps_data, list) and len(daily_steps_data) > 0:
+                        daily_steps_data = daily_steps_data[0]
+                    time.sleep(1.0)
+                except Exception:
+                    daily_steps_data = None
                 
                 recovery_time = safe_get(
                     training_status_data,
@@ -150,32 +167,108 @@ class SyncService:
                 sleep_deep_seconds = safe_get(sleep_dto, "deepSleepSeconds")
                 sleep_rem_seconds = safe_get(sleep_dto, "remSleepSeconds")
                 sleep_light_seconds = safe_get(sleep_dto, "lightSleepSeconds")
+                sleep_rem_data = safe_get(sleep, "remSleepData", default={})
+                sleep_levels = safe_get(sleep, "sleepLevels", default={})
+
+                # Sleep score - check multiple possible paths
+                sleep_score = (
+                    safe_get(sleep_dto, "sleepScores", "overall", "value")
+                    or safe_get(sleep_dto, "sleepScores", "totalDuration", "value")
+                    or safe_get(sleep, "sleepScores", "overall", "value")
+                )
+
+                # Resting heart rate from sleep (most accurate, measured during sleep)
+                resting_hr_sleep = safe_get(sleep_dto, "restingHeartRate")
+                resting_hr_stats = safe_get(stats, "restingHeartRate")
+                resting_hr = resting_hr_sleep or resting_hr_stats
 
                 biometric_data = {
-                    "heartRate": safe_get(stats, "restingHeartRate"),
+                    # Heart rate
+                    "heartRate": resting_hr,
+                    "minHeartRate": safe_get(stats, "minHeartRate"),
+                    "maxHeartRate": safe_get(stats, "maxHeartRate"),
+                    "lastSevenDaysAvgRHR": safe_get(stats, "lastSevenDaysAvgRestingHeartRate"),
+
+                    # HRV
                     "hrv": hrv_val,
                     "hrv_lastNight": hrv_last_night,
+
+                    # Stress
                     "stress": safe_get(stats, "averageStressLevel"),
-                    "sleep": safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds") / 3600
-                    if safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds")
-                    else None,
-                    "sleepScore": safe_get(
-                        sleep, "dailySleepDTO", "sleepScores", "overall", "value"
+                    "maxStress": safe_get(stats, "maxStressLevel"),
+                    "lowStressDuration": safe_get(stats, "lowStressDuration"),
+                    "mediumStressDuration": safe_get(stats, "mediumStressDuration"),
+                    "highStressDuration": safe_get(stats, "highStressDuration"),
+
+                    # Sleep - primary
+                    "sleep": (
+                        safe_get(sleep_dto, "sleepTimeSeconds") / 3600
+                        if safe_get(sleep_dto, "sleepTimeSeconds")
+                        else None
                     ),
+                    "sleepScore": sleep_score,
                     "sleepDeepHours": sleep_deep_seconds / 3600 if sleep_deep_seconds else None,
                     "sleepREMHours": sleep_rem_seconds / 3600 if sleep_rem_seconds else None,
                     "sleepLightHours": sleep_light_seconds / 3600 if sleep_light_seconds else None,
-                    "steps": safe_get(stats, "totalSteps"),
-                    "calories": (
-                        safe_get(stats, "totalKilocalories")
-                        or safe_get(stats, "activeKilocalories")
-                        or safe_get(stats, "bmrKilocalories")
+                    # Sleep time breakdown (seconds stored too)
+                    "sleepDeepSeconds": sleep_deep_seconds,
+                    "sleepREMSeconds": sleep_rem_seconds,
+                    "sleepLightSeconds": sleep_light_seconds,
+                    "sleepingSeconds": safe_get(stats, "sleepingSeconds"),
+                    "sleepRestlessMoments": safe_get(sleep_dto, "restlessMomentsCount"),
+
+                    # Activity - use get_daily_steps as primary (more accurate for same-day)
+                    "steps": (
+                        safe_get(daily_steps_data, "totalSteps")
+                        if daily_steps_data
+                        else safe_get(stats, "totalSteps")
                     ),
+                    "dailyStepGoal": safe_get(daily_steps_data, "stepGoal")
+                    if daily_steps_data
+                    else safe_get(stats, "dailyStepGoal"),
+                    "calories": safe_get(stats, "wellnessKilocalories")
+                    or safe_get(stats, "totalKilocalories")
+                    or safe_get(stats, "activeKilocalories")
+                    or safe_get(stats, "bmrKilocalories"),
+                    "activeSeconds": safe_get(stats, "activeSeconds"),
+                    "highlyActiveSeconds": safe_get(stats, "highlyActiveSeconds"),
+                    "sedentarySeconds": safe_get(stats, "sedentarySeconds"),
+                    "totalDistanceMeters": (
+                        safe_get(daily_steps_data, "totalDistance")
+                        if daily_steps_data
+                        else safe_get(stats, "totalDistanceMeters")
+                    ),
+                    "floorsAscended": safe_get(stats, "floorsAscended"),
+                    "floorsDescended": safe_get(stats, "floorsDescended"),
+                    "moderateIntensityMinutes": safe_get(stats, "moderateIntensityMinutes"),
+                    "vigorousIntensityMinutes": safe_get(stats, "vigorousIntensityMinutes"),
+
+                    # Respiratory
                     "respiration": respiration,
-                    "vo2max": vo2max,
+                    "respirationHighest": safe_get(stats, "highestRespirationValue"),
+                    "respirationLowest": safe_get(stats, "lowestRespirationValue"),
+
+                    # SpO2
                     "spo2": safe_get(stats, "averageSpo2"),
-                    "bodyBatteryCharged": bb_charged,
-                    "bodyBatteryDrained": bb_drained,
+                    "lowestSpo2": safe_get(stats, "lowestSpo2"),
+                    "latestSpo2": safe_get(stats, "latestSpo2"),
+
+                    # VO2 Max
+                    "vo2max": vo2max,
+
+                    # Body battery - daily totals from get_body_battery + stats summary
+                    "bodyBatteryCharged": bb_charged or safe_get(stats, "bodyBatteryChargedValue"),
+                    "bodyBatteryDrained": bb_drained or safe_get(stats, "bodyBatteryDrainedValue"),
+                    "bodyBatteryMostRecentValue": (
+                        bb_most_recent
+                        or safe_get(bb[0], "charged")
+                        if (bb and isinstance(bb, list))
+                        else safe_get(stats, "bodyBatteryMostRecentValue")
+                    ),
+                    "bodyBatteryHighestValue": bb_highest,
+                    "bodyBatteryLowestValue": bb_lowest,
+                    "bodyBatteryDuringSleep": safe_get(stats, "bodyBatteryDuringSleep"),
+                    "bodyBatteryAtWakeTime": bb_at_wake,
                 }
 
                 if not existing:
