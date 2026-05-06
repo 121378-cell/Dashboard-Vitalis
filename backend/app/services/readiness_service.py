@@ -43,6 +43,7 @@ class PersonalBaseline:
     rhr_mean: float = 0.0
     rhr_std: float = 0.0
     stress_mean: float = 0.0
+    body_battery_mean: float = 0.0
     days_available: int = 0
 
 
@@ -135,35 +136,51 @@ class ReadinessService:
         sleep = data.get("sleep")
         stress = data.get("stress")
         rhr = data.get("heartRate")
-        
+        body_battery = row.body_battery
+        training_readiness = row.training_readiness
+
+        # Garmin's native training_readiness is the single most authoritative signal
+        # If available, it already encapsulates HRV + sleep + recovery + load
+        if training_readiness is not None:
+            return cls._calculate_from_garmin_readiness(
+                training_readiness, body_battery, data, row.date
+            )
+
         # Calculate individual component scores
         hrv_score = cls._score_hrv(hrv, baseline.hrv_mean, baseline.hrv_std) if hrv else 0.0
         sleep_score = cls._score_sleep(sleep, baseline.sleep_mean) if sleep else 0.0
         stress_score = cls._score_stress(stress) if stress is not None else 0.0
         rhr_score = cls._score_rhr(rhr, baseline.rhr_mean, baseline.rhr_std) if rhr else 0.0
-        
+
         # Calculate training load score
         load_score = cls._score_training_load(db, user_id, days=7)
-        
+
+        # Body battery energy score
+        body_battery_score = cls._score_body_battery(body_battery)
+
         # Determine adaptive weights based on data availability
         available_weights = {}
         component_scores = {}
-        
+
         if hrv and baseline.hrv_mean > 0:
             available_weights['hrv'] = cls.BASE_WEIGHTS['hrv']
             component_scores['hrv'] = round(hrv_score, 1)
-        
+
         if sleep:
             available_weights['sleep'] = cls.BASE_WEIGHTS['sleep']
             component_scores['sleep'] = round(sleep_score, 1)
-        
+
         if stress is not None:
             available_weights['stress'] = cls.BASE_WEIGHTS['stress']
             component_scores['stress'] = round(stress_score, 1)
-        
+
         if rhr and baseline.rhr_mean > 0:
             available_weights['rhr'] = cls.BASE_WEIGHTS['rhr']
             component_scores['rhr'] = round(rhr_score, 1)
+
+        # Body battery adds energy context
+        if body_battery is not None:
+            component_scores['body_battery'] = round(body_battery_score, 1)
         
         # Renormalize weights if some data is missing
         total_weight = sum(available_weights.values())
@@ -188,11 +205,20 @@ class ReadinessService:
         # load_score: 0-40 = very high load (bad), 60-100 = low load (good)
         if load_score < 40:
             high_load_penalty = 1.0 - (load_score / 40)
-            raw_score *= (1.0 - high_load_penalty * 0.5) # up to -50% for extreme load
+            raw_score *= (1.0 - high_load_penalty * 0.5)
         elif load_score < 60:
             moderate_penalty = 1.0 - (load_score / 60)
-            raw_score *= (1.0 - moderate_penalty * 0.15) # up to -15% for high load
-        
+            raw_score *= (1.0 - moderate_penalty * 0.15)
+
+        # Body battery energy modifier: low battery = energy deficit, reduce score
+        if body_battery is not None:
+            if body_battery < 20:
+                raw_score *= 0.6
+            elif body_battery < 40:
+                raw_score *= 0.8
+            elif body_battery > 90:
+                raw_score *= 1.05
+
         final_score = round(max(0, min(100, raw_score)))
         status = cls._score_to_status(final_score)
         
@@ -219,6 +245,7 @@ class ReadinessService:
                 "rhr_std": round(baseline.rhr_std, 1) if baseline.rhr_std > 0 else None,
                 "sleep_mean": round(baseline.sleep_mean, 1) if baseline.sleep_mean > 0 else None,
                 "stress_mean": round(baseline.stress_mean, 1) if baseline.stress_mean > 0 else None,
+                "body_battery_mean": round(baseline.body_battery_mean, 1) if baseline.body_battery_mean > 0 else None,
                 "days_available": baseline.days_available,
             },
             "overtraining_risk": overtraining_risk,
@@ -241,18 +268,19 @@ class ReadinessService:
             Biometrics.user_id == user_id,
             Biometrics.date >= cutoff
         ).order_by(Biometrics.date.desc()).limit(days).all()
-        
+
         hrv_values = []
         sleep_values = []
         rhr_values = []
         stress_values = []
-        
+        body_battery_values = []
+
         for row in rows:
             if not row.data:
                 continue
             try:
                 data = json.loads(row.data)
-                
+
                 if (hrv := data.get("hrv")) and hrv > 0:
                     hrv_values.append(float(hrv))
                 if (sleep := data.get("sleep")) and sleep > 0:
@@ -261,10 +289,12 @@ class ReadinessService:
                     rhr_values.append(float(rhr))
                 if (stress := data.get("stress")) and stress > 0:
                     stress_values.append(float(stress))
-            
+                if row.body_battery and row.body_battery > 0:
+                    body_battery_values.append(float(row.body_battery))
+
             except (json.JSONDecodeError, ValueError):
                 continue
-        
+
         baseline = PersonalBaseline(days_available=len(rows))
         
         # Calculate statistics for each metric
@@ -283,7 +313,10 @@ class ReadinessService:
         
         if len(stress_values) >= 7:
             baseline.stress_mean = statistics.mean(stress_values)
-        
+
+        if len(body_battery_values) >= 7:
+            baseline.body_battery_mean = statistics.mean(body_battery_values)
+
         return baseline
 
     @staticmethod
@@ -463,6 +496,70 @@ class ReadinessService:
         elif score >= 30:
             return "poor"
         return "rest"
+
+    @classmethod
+    def _calculate_from_garmin_readiness(
+        cls, garmin_readiness: int, body_battery: Optional[float], data: dict, date_str: str
+    ) -> dict:
+        """
+        Use Garmin's native training_readiness as primary signal when available.
+        This score already encapsulates HRV, sleep, recovery, and acute load.
+        Body battery provides energy availability context.
+        """
+        score = garmin_readiness
+        status = cls._score_to_status(score)
+
+        body_battery_score = None
+        if body_battery is not None:
+            body_battery_score = max(0, min(100, body_battery))
+
+        recommendation = cls._generate_recommendation(score, data, None, None)
+
+        components = {
+            "garmin_readiness": score,
+            "body_battery": round(body_battery_score, 1) if body_battery_score else None,
+            "source": "garmin_native",
+        }
+
+        return {
+            "score": score,
+            "status": status,
+            "recommendation": recommendation,
+            "components": components,
+            "baseline": {},
+            "overtraining_risk": score < 50,
+            "date": date_str,
+        }
+
+    @staticmethod
+    def _score_body_battery(body_battery: Optional[float]) -> float:
+        """Score body battery as energy availability (0-100)."""
+        if body_battery is None:
+            return 50.0
+        if body_battery >= 80:
+            return 100.0
+        elif body_battery >= 60:
+            return 80.0 + (body_battery - 60) * 1.0
+        elif body_battery >= 40:
+            return 60.0 + (body_battery - 40) * 1.0
+        elif body_battery >= 20:
+            return 40.0 + (body_battery - 20) * 1.0
+        else:
+            return max(0, body_battery * 2.0)
+
+    @staticmethod
+    def _score_sleep_quality(sleep: Optional[float], deep_hours: Optional[float], rem_hours: Optional[float]) -> float:
+        """Score sleep quality considering duration + sleep architecture (deep + REM)."""
+        base_score = ReadinessService._score_sleep(sleep or 0, 0)
+        if deep_hours is not None and rem_hours is not None:
+            recovery_hours = (deep_hours or 0) + (rem_hours or 0)
+            if recovery_hours >= 2.0:
+                base_score = min(100, base_score + 10)
+            elif recovery_hours >= 1.5:
+                base_score = min(100, base_score + 5)
+            elif recovery_hours < 0.5:
+                base_score = max(0, base_score - 10)
+        return base_score
 
     @staticmethod
     def _generate_recommendation(

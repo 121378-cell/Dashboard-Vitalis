@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float
 from sqlalchemy.sql import func
 from app.db.session import Base
 
@@ -11,10 +11,14 @@ class Biometrics(Base):
     date = Column(String)  # YYYY-MM-DD
     data = Column(String)  # JSON-encoded biometrics
     source = Column(String)
-    
+
     # Advanced metrics added from AI_Fitness
-    recovery_time = Column(Integer, nullable=True) # hours
-    training_status = Column(String, nullable=True) # productive, maintenance, etc.
-    hrv_status = Column(String, nullable=True) # balanced, unbalanced, etc.
-    
+    recovery_time = Column(Integer, nullable=True)
+    training_status = Column(String, nullable=True)
+    hrv_status = Column(String, nullable=True)
+
+    # Garmin advanced metrics
+    body_battery = Column(Float, nullable=True)  # Body battery charge level (0-100)
+    training_readiness = Column(Integer, nullable=True)  # Garmin training readiness score (0-100)
+
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

@@ -70,9 +70,33 @@ class SyncService:
                 hrv = client.get_hrv_data(date_str)
                 time.sleep(2.0)
 
+                # Body Battery (FR245 supports this - uses 'charged'/'drained' keys)
+                body_battery = None
+                bb_charged = None
+                bb_drained = None
+                try:
+                    bb = client.get_body_battery(date_str, date_str)
+                    if bb and isinstance(bb, list):
+                        body_battery = safe_get(bb[0], "charged")
+                        bb_charged = safe_get(bb[0], "charged")
+                        bb_drained = safe_get(bb[0], "drained")
+                    time.sleep(1.0)
+                except Exception:
+                    pass
+
+                # Training Readiness (Garmin's composite score - daily endpoint)
+                training_readiness = None
+                try:
+                    readiness_data = client.get_training_readiness(date_str)
+                    if readiness_data and isinstance(readiness_data, dict):
+                        training_readiness = safe_get(readiness_data, "overallValue")
+                    time.sleep(1.0)
+                except Exception:
+                    pass
+
                 # Recovery and Training Status
                 training_status_data = client.get_training_status(date_str)
-                time.sleep(1.0) # Delay adicional
+                time.sleep(1.0)
                 
                 recovery_time = safe_get(
                     training_status_data,
@@ -112,7 +136,8 @@ class SyncService:
                         time.sleep(1.0)
                     except: vo2max = None
 
-                # HRV fallback
+                # HRV nightly detail (lastNight) — more granular than weekly average
+                hrv_last_night = safe_get(hrv, "lastNight")
                 hrv_val = (
                     safe_get(hrv, "hrvSummary", "weeklyAverage")
                     or safe_get(hrv, "hrvSummary", "lastNightAvg")
@@ -120,9 +145,16 @@ class SyncService:
                 )
                 hrv_status = safe_get(hrv, "hrvSummary", "status")
 
+                # Sleep stages (deep, REM, light) from sleep data
+                sleep_dto = safe_get(sleep, "dailySleepDTO", default={})
+                sleep_deep_seconds = safe_get(sleep_dto, "deepSleepSeconds")
+                sleep_rem_seconds = safe_get(sleep_dto, "remSleepSeconds")
+                sleep_light_seconds = safe_get(sleep_dto, "lightSleepSeconds")
+
                 biometric_data = {
                     "heartRate": safe_get(stats, "restingHeartRate"),
                     "hrv": hrv_val,
+                    "hrv_lastNight": hrv_last_night,
                     "stress": safe_get(stats, "averageStressLevel"),
                     "sleep": safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds") / 3600
                     if safe_get(sleep, "dailySleepDTO", "sleepTimeSeconds")
@@ -130,6 +162,9 @@ class SyncService:
                     "sleepScore": safe_get(
                         sleep, "dailySleepDTO", "sleepScores", "overall", "value"
                     ),
+                    "sleepDeepHours": sleep_deep_seconds / 3600 if sleep_deep_seconds else None,
+                    "sleepREMHours": sleep_rem_seconds / 3600 if sleep_rem_seconds else None,
+                    "sleepLightHours": sleep_light_seconds / 3600 if sleep_light_seconds else None,
                     "steps": safe_get(stats, "totalSteps"),
                     "calories": (
                         safe_get(stats, "totalKilocalories")
@@ -139,6 +174,8 @@ class SyncService:
                     "respiration": respiration,
                     "vo2max": vo2max,
                     "spo2": safe_get(stats, "averageSpo2"),
+                    "bodyBatteryCharged": bb_charged,
+                    "bodyBatteryDrained": bb_drained,
                 }
 
                 if not existing:
@@ -150,6 +187,8 @@ class SyncService:
                 existing.recovery_time = recovery_time
                 existing.training_status = training_status
                 existing.hrv_status = hrv_status
+                existing.body_battery = body_battery
+                existing.training_readiness = training_readiness
                 
                 db.commit() # Commit after each day to save progress
                 consecutive_errors = 0
