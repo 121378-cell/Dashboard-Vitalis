@@ -8,6 +8,7 @@ import { BiometricsPage } from './pages/BiometricsPage';
 import { TrainingPage } from './pages/TrainingPage';
 import { ReadinessPage } from './pages/ReadinessPage';
 import { MemoryPage } from './pages/MemoryPage';
+import { PlanPage } from './pages/PlanPage';
 
 // Initialize React Query Client
 const queryClient = new QueryClient({
@@ -59,6 +60,10 @@ const router = createBrowserRouter([
       {
         path: 'memory',
         element: <MemoryPage />,
+      },
+      {
+        path: 'plan',
+        element: <PlanPage />,
       },
     ],
   },
