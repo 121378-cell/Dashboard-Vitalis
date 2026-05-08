@@ -69,10 +69,20 @@ export const WebDashboardLayout = ({ children }) => {
             `}
           >
             <span className="text-xs">📋</span>
-            <span>Plan</span>
-          </NavLink>
-          <NavLink
-            to="/readiness"
+      <span>Plan</span>
+      </NavLink>
+      <NavLink
+        to="/coach"
+        className={({ isActive }) => `
+          flex items-center gap-3 p-3 rounded-lg text-[var(--color-on-surface-variant)] font-medium
+          ${isActive ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'hover:bg-[var(--color-surface-variant)]'}
+        `}
+      >
+        <span className="text-xs">🤖</span>
+        <span>Coach</span>
+      </NavLink>
+      <NavLink
+        to="/readiness"
             className={({ isActive }) => `
               flex items-center gap-3 p-3 rounded-lg text-[var(--color-on-surface-variant)] font-medium
               ${isActive ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'hover:bg-[var(--color-surface-variant)]'}

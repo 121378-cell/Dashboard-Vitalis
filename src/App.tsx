@@ -9,6 +9,7 @@ import { TrainingPage } from './pages/TrainingPage';
 import { ReadinessPage } from './pages/ReadinessPage';
 import { MemoryPage } from './pages/MemoryPage';
 import { PlanPage } from './pages/PlanPage';
+import { CoachPage } from './pages/CoachPage';
 
 // Initialize React Query Client
 const queryClient = new QueryClient({
@@ -64,6 +65,10 @@ const router = createBrowserRouter([
       {
         path: 'plan',
         element: <PlanPage />,
+      },
+      {
+        path: 'coach',
+        element: <CoachPage />,
       },
     ],
   },
