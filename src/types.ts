@@ -527,3 +527,47 @@ export interface DailyReadinessHistoryEntry {
   biometrics_source: string | null;
   created_at: string;
 }
+
+// Chat Context Types
+export interface ChatContextMeta {
+  data_freshness: string | null;
+  plan_active: boolean;
+  plan_progress: string | null;
+  unread_insights: number;
+  readiness_score: number | null;
+  readiness_color: 'green' | 'blue' | 'yellow' | 'red' | 'gray';
+}
+
+export interface ChatResponse {
+  content: string;
+  provider: string;
+  mode?: string;
+  type?: string;
+  session_id?: number;
+  plan_id?: number;
+  context_meta?: ChatContextMeta;
+}
+
+export interface WelcomeMessage {
+  message: string;
+  generated_at: string;
+}
+
+// Notification Types
+export interface AtlasNotification {
+  id: number;
+  created_at: string | null;
+  notification_type: string;
+  title: string;
+  message: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  channel_app: boolean;
+  channel_telegram: boolean;
+  channel_system: boolean;
+  sent_app: boolean;
+  sent_telegram: boolean;
+  sent_system: boolean;
+  read_at: string | null;
+  action_url: string | null;
+  metadata: Record<string, unknown> | null;
+}

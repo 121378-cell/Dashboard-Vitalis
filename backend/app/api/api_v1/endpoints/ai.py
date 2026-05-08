@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Header
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
-from app.services.ai_service import AIService, build_atlas_system_prompt, detect_conversation_mode, MODE_INSTRUCTIONS
+from app.services.ai_service import AIService, build_coach_context, detect_conversation_mode, MODE_INSTRUCTIONS, generate_welcome_message
 from app.services.session_service import SessionService
 from app.models.session import TrainingSession
 from pydantic import BaseModel
@@ -30,14 +30,15 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
 
     try:
         workout_keywords = ["entreno", "sesión", "workout", "entrena", "ejercicio hoy",
-            "hacer ejercicio", "hacer deporte", "gym hoy", "entrenar"]
+                           "hacer ejercicio", "hacer deporte", "gym hoy", "entrenar"]
         is_workout_request = any(kw in last_message.lower() for kw in workout_keywords)
     except Exception as e:
         logger.error(f"Error detecting workout request: {e}")
         is_workout_request = False
 
-    detected_mode = None
-    if is_workout_request:
+    plan_trigger = any(kw in last_message.lower() for kw in ["generar plan", "plan semanal", "crear plan"])
+
+    if is_workout_request and not plan_trigger:
         try:
             today_str = date.today().isoformat()
             existing_session = db.query(TrainingSession).filter(
@@ -47,13 +48,14 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
 
             if existing_session and existing_session.status in ["planned", "active"]:
                 plan = json.loads(existing_session.plan_json) if existing_session.plan_json else {}
-                detected_mode = "planning"
+                context_result = build_coach_context(db, user_id)
                 return {
                     "content": json.dumps(plan),
                     "provider": "atlas_session",
                     "session_id": existing_session.id,
                     "type": "session_plan",
-                    "mode": "planning"
+                    "mode": "planning",
+                    "context_meta": context_result.get("context_meta", {}),
                 }
             else:
                 plan = SessionService.generate_session_plan(user_id, db, date.today())
@@ -66,41 +68,67 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
                 )
                 db.add(session)
                 db.commit()
-                detected_mode = "planning"
+                context_result = build_coach_context(db, user_id)
                 return {
                     "content": json.dumps(plan),
                     "provider": "atlas_session",
                     "session_id": session.id,
                     "type": "session_plan",
-                    "mode": "planning"
+                    "mode": "planning",
+                    "context_meta": context_result.get("context_meta", {}),
                 }
         except Exception as e:
             pass
 
-    # Build dynamic ATLAS system prompt with real-time context
-    prompt_result = build_atlas_system_prompt(db, user_id)
-    full_system_prompt = prompt_result["prompt"]
-    athlete_name = prompt_result["athlete_name"]
+    if plan_trigger:
+        try:
+            from app.services.training_plan_service import TrainingPlanService
+            goal = "hipertrofia y fuerza"
+            plan_result = TrainingPlanService.generate_weekly_plan(db, user_id, goal)
+            context_result = build_coach_context(db, user_id)
+            if plan_result.get("error"):
+                return {
+                    "content": plan_result["error"],
+                    "provider": "atlas_plan",
+                    "type": "plan_exists",
+                    "mode": "planning",
+                    "plan_id": plan_result.get("plan_id"),
+                    "context_meta": context_result.get("context_meta", {}),
+                }
+            return {
+                "content": json.dumps(plan_result),
+                "provider": "atlas_plan",
+                "type": "weekly_plan",
+                "mode": "planning",
+                "plan_id": plan_result.get("plan_id"),
+                "context_meta": context_result.get("context_meta", {}),
+            }
+        except Exception as e:
+            logger.error(f"Plan generation failed: {e}")
 
-    # Use cached context values from build_atlas_system_prompt (avoids double DB queries)
-    readiness_score = prompt_result.get("readiness_score")
-    bio_summary = prompt_result.get("bio_summary", "")
-    injury_summary = prompt_result.get("injury_summary", "clear")
+    context_result = build_coach_context(db, user_id)
+    full_system_prompt = context_result["prompt"]
+    athlete_name = context_result["athlete_name"]
+
+    readiness_score = context_result.get("readiness_score")
+    bio_summary = context_result.get("bio_summary", "")
+    injury_summary = context_result.get("injury_summary", "clear")
 
     mode = detect_conversation_mode(last_message, bio_summary, injury_summary, readiness_score)
 
     mode_inst = MODE_INSTRUCTIONS.get(mode, "").format(athlete_name=athlete_name)
 
     full_system_prompt = full_system_prompt.replace(
-        "MODO DE CONVERSACIÓN ACTUAL: ANALYSIS",
+        "MODO DE CONVERSACIÓN ACTUAL: {conversation_mode}",
         f"MODO DE CONVERSACIÓN ACTUAL: {mode.upper()}"
     )
+    full_system_prompt = full_system_prompt.replace("{mode_instructions}", mode_inst)
 
-    import re as _re
-    pattern = r'INSTRUCCIÓN DE MODO:.*?(?=\n\nCONTEXTO REAL|CONTEXTO REAL|\Z)'
-    full_system_prompt = _re.sub(pattern, mode_inst, full_system_prompt, flags=_re.DOTALL)
+    if "{conversation_mode}" in full_system_prompt:
+        full_system_prompt = full_system_prompt.replace("{conversation_mode}", mode.upper())
+    if "{mode_instructions}" in full_system_prompt:
+        full_system_prompt = full_system_prompt.replace("{mode_instructions}", mode_inst)
 
-    # Convert Pydantic messages to list of dicts for AIService
     messages_list = [{"role": m.role, "content": m.content} for m in request.messages]
 
     try:
@@ -108,7 +136,8 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
         return {
             "content": result["content"],
             "provider": result["provider"],
-            "mode": mode
+            "mode": mode,
+            "context_meta": context_result.get("context_meta", {}),
         }
     except Exception as e:
         logger.error(f"AI Service failed: {e}")
@@ -116,8 +145,29 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
             "content": "Lo siento, el servicio de IA no está disponible en este momento. Por favor, inténtalo de nuevo más tarde.",
             "provider": "error",
             "error": str(e),
-            "mode": mode
-            }
+            "mode": mode,
+            "context_meta": context_result.get("context_meta", {}),
+        }
+
+@router.get("/welcome-message")
+def welcome_message(db: Session = Depends(get_db), user_id: str = "default_user"):
+    """Get personalized ATLAS welcome message. Cached 15min server-side."""
+    result = generate_welcome_message(db, user_id)
+    return result
+
+@router.get("/context-preview")
+def context_preview(db: Session = Depends(get_db), user_id: str = "default_user"):
+    """Debug endpoint: returns the full system prompt and context meta without calling LLM."""
+    context_result = build_coach_context(db, user_id)
+    return {
+        "system_prompt": context_result["prompt"],
+        "context_meta": context_result.get("context_meta", {}),
+        "athlete_name": context_result.get("athlete_name"),
+        "athlete_age": context_result.get("athlete_age"),
+        "readiness_score": context_result.get("readiness_score"),
+        "bio_summary": context_result.get("bio_summary"),
+        "injury_summary": context_result.get("injury_summary"),
+    }
 
 @router.post("/generate-plan")
 def generate_plan(
@@ -129,7 +179,7 @@ def generate_plan(
     """Generate a 4-week training plan."""
     prompt = f"Genera un plan de 4 semanas para un atleta con objetivo '{objective}' y nivel '{level}'. Responde ÚNICAMENTE con JSON."
     system_instr = "Eres un experto en periodización. Formato JSON: {weeks: [...]}"
-    
+
     try:
         plan_json = ai_service.generate_response(prompt, system_instr)
         return {"plan": json.loads(plan_json)}
@@ -139,8 +189,8 @@ def generate_plan(
 @router.get("/daily-briefing")
 def daily_briefing(db: Session = Depends(get_db), user_id: str = "default_user"):
     """Get the morning summary with deep analysis context."""
-    prompt_result = build_atlas_system_prompt(db, user_id)
-    full_system_prompt = prompt_result["prompt"]
+    context_result = build_coach_context(db, user_id)
+    full_system_prompt = context_result["prompt"]
 
     system_instr = f"{full_system_prompt}\n\nDa un resumen estructurado en 3 secciones: 1. Estado de Recuperación, 2. Análisis de Carga (ACWR), 3. Recomendación del día."
     prompt = "Genera mi Daily Briefing matutino basado en los datos proporcionados. Sé técnico pero motivador."

@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     STRAVA_REDIRECT_URI: str = "http://localhost:8001/api/v1/strava/callback"
     FRONTEND_URL: str = "http://localhost:5173"
     FLY_APP_URL: str = "https://atlas-vitalis-backend.fly.dev"
+
+    # Telegram Bot
+    TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_CHAT_ID: Optional[str] = None
+
+    # Notifications
+    NOTIFICATIONS_ENABLED: bool = True
+    NOTIFICATIONS_TELEGRAM_ENABLED: bool = True
+    NOTIFICATIONS_SYSTEM_ENABLED: bool = True
     
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 

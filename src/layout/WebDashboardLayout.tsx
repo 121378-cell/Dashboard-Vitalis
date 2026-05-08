@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { NotificationCenter } from '../components/NotificationCenter';
 
 export const WebDashboardLayout = ({ children }) => {
   return (
@@ -138,11 +139,14 @@ export const WebDashboardLayout = ({ children }) => {
                 </div>
               </button>
               {/* Dropdown would go here */}
-            </div>
+      </div>
 
-            {/* Refresh button */}
-            <button
-              onClick={() => {}}
+                {/* Notification Center */}
+                <NotificationCenter />
+
+                {/* Refresh button */}
+                <button
+                  onClick={() => {}}
               className="w-10 h-10 rounded-xl glass flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)]"
             >
               <span className="text-xl">↻</span>

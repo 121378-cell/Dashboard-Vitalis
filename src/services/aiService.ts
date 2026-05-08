@@ -1,58 +1,55 @@
-import { CapacitorHttp } from '@capacitor/core';
-import { Message } from "../types";
+import { BACKEND_URL } from '../config';
+import { Message, ChatResponse, WelcomeMessage } from '../types';
 
-const BACKEND_URL = "https://atlas-vitalis-backend.fly.dev/api/v1";
-const GEMINI_API_KEY = "AIzaSyAOQLH9ys29PJK4-SxphRIsJmnXHZP-DvQ";
-const GROQ_API_KEY = "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";
+export async function callAI(messages: Message[], systemPrompt?: string): Promise<ChatResponse> {
+  const res = await fetch(`${BACKEND_URL}/ai/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-user-id': 'default_user' },
+    body: JSON.stringify({
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      system_prompt: systemPrompt,
+    }),
+  });
 
-async function callNative(url: string, data: any, headers: any = {}) {
-  const options = {
-    url,
-    headers: { 'Content-Type': 'application/json', ...headers },
-    data,
-    connectTimeout: 5000,
-    readTimeout: 10000
+  if (!res.ok) {
+    throw new Error(`Chat API failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return {
+    content: data.content,
+    provider: data.provider,
+    mode: data.mode,
+    type: data.type,
+    session_id: data.session_id,
+    plan_id: data.plan_id,
+    context_meta: data.context_meta,
   };
-  return await CapacitorHttp.post(options);
 }
 
-export async function callAI(messages: Message[], systemPrompt: string) {
-  const lastMsg = messages[messages.length - 1]?.content || "Hola";
-  let logs = [];
+export async function getWelcomeMessage(): Promise<WelcomeMessage> {
+  const res = await fetch(`${BACKEND_URL}/ai/welcome-message`, {
+    headers: { 'x-user-id': 'default_user' },
+  });
 
-  // 1. INTENTO GROQ (El más rápido en móvil)
-  try {
-    const res = await callNative(
-      "https://api.groq.com/openai/v1/chat/completions",
-      { 
-        model: "llama-3.1-8b-instant", 
-        messages: [{ role: "user", content: lastMsg }] 
-      },
-      { 'Authorization': `Bearer ${GROQ_API_KEY}` }
-    );
-    if (res.status === 200) return { content: res.data.choices[0].message.content, provider: "Groq (Nativo)" };
-    logs.push(`Groq:${res.status}`);
-  } catch (e: any) { logs.push(`Groq:${e.message}`); }
+  if (!res.ok) {
+    throw new Error(`Welcome API failed: ${res.status}`);
+  }
 
-  // 2. INTENTO GEMINI (Flash Latest)
-  try {
-    const res = await callNative(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
-      { contents: [{ parts: [{ text: lastMsg }] }] }
-    );
-    if (res.status === 200) return { content: res.data.candidates[0].content.parts[0].text, provider: "Gemini (Nativo)" };
-    logs.push(`Gemini:${res.status}`);
-  } catch (e: any) { logs.push(`Gemini:${e.message}`); }
+  return res.json();
+}
 
-  // 3. INTENTO PC BACKEND
-  try {
-    const res = await callNative(
-      `${BACKEND_URL}/ai/chat`,
-      { messages: messages.map(m => ({ role: m.role, content: m.content })), system_prompt: systemPrompt }
-    );
-    if (res.status === 200) return { content: res.data.content, provider: "ATLAS PC" };
-    logs.push(`PC:${res.status}`);
-  } catch (e: any) { logs.push(`PC:${e.message}`); }
+export async function getContextPreview(): Promise<{
+  system_prompt: string;
+  context_meta: Record<string, unknown>;
+}> {
+  const res = await fetch(`${BACKEND_URL}/ai/context-preview`, {
+    headers: { 'x-user-id': 'default_user' },
+  });
 
-  throw new Error(`Chat bloqueado. Logs: ${logs.join(" | ")}`);
+  if (!res.ok) {
+    throw new Error(`Context preview API failed: ${res.status}`);
+  }
+
+  return res.json();
 }

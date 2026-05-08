@@ -30,3 +30,6 @@ numpy>=1.26.0
 
 # Task Scheduling
 apscheduler>=3.10.0
+
+# Notifications
+plyer>=2.1.0

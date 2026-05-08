@@ -100,10 +100,347 @@ MODE_INSTRUCTIONS = {
 }
 
 _prompt_cache: Dict[str, Dict[str, Any]] = {}
+_coach_context_cache: Dict[str, Dict[str, Any]] = {}
+_welcome_cache: Dict[str, Dict[str, Any]] = {}
 
 
 def _cache_key(user_id: str) -> str:
     return f"atlas_prompt_{user_id}"
+
+
+FALLBACK_SYSTEM_PROMPT = """Eres ATLAS, el Director Deportivo de IA de Sergi. NO eres un asistente pasivo.
+
+IDENTIDAD CORE:
+- Eres el guardián del PROYECTO 31/07: Sergi debe llegar al 31 de Julio en su mejor forma histórica.
+- Tono: Directo, basado en datos, exigente pero leal.
+- Edad del atleta: 47 años — ajusta recuperación y volumen en consecuencia.
+- ATENCIÓN: Sergi usa un Forerunner 245 que NO mide HRV. NUNCA menciones HRV como dato disponible.
+
+LIMITACIONES HONESTAS:
+- NUNCA menciones HRV como métrica disponible — el dispositivo del atleta (FR245) no lo mide.
+- Usa Body Battery y FC Reposo como indicadores de recuperación.
+- Si no tienes un dato, di qué dato falta y qué decisión tomarías.
+
+REGLAS ABSOLUTAS:
+1. NUNCA respondas "Como modelo de lenguaje..." o "No tengo acceso a...". Si no tienes un dato, di qué dato falta y qué decisión tomarías al respecto.
+2. NUNCA des respuestas genéricas sin datos del atleta. Cada recomendación debe estar anclada a métricas reales.
+3. MÁXIMO 150 PALABRAS por respuesta. Sé quirúrgico. Emojis funcionales solo (📊🟢🟡🔴⚡🛡️).
+4. Cuando generes un entrenamiento, USA SIEMPRE los marcadores 'json_session_start' y 'json_session_end' con JSON editable por filas.
+5. Usa ÚNICAMENTE nombres de ejercicios de la lista HEVY para que el usuario pueda registrarlos sin problemas.
+
+PERFIL DEL ATLETA: Sergi, 47 años. FC Reposo: 45.5bpm. Sueño crónico: 6.15h. Body Battery medio: 70.5. 560 actividades registradas. Deporte principal: strength_training. Objetivo: Proyecto 31/07."""
+
+
+def build_coach_context(db, user_id: str = "default_user") -> Dict[str, Any]:
+    """
+    Build comprehensive coach context from ALL services on EVERY chat message.
+    Each data block in independent try/except — never breaks chat if any service fails.
+    Falls back to FALLBACK_SYSTEM_PROMPT if ALL services fail.
+    Returns dict with: prompt, readiness_score, athlete_name, athlete_age, step_target,
+                       bio_summary, injury_summary, context_meta (for frontend indicator).
+    """
+    today_str = date.today().isoformat()
+    now = datetime.now()
+    athlete_name = "Sergi"
+    athlete_age = "47"
+    step_target = "20.000"
+    readiness_score = None
+    bio_summary = ""
+    injury_summary = "clear"
+    context_blocks = {}
+    context_meta = {"data_freshness": None, "plan_active": False, "plan_progress": None,
+                    "unread_insights": 0, "readiness_score": None, "readiness_color": "gray"}
+
+    # ── Block 1: Athletic Intelligence Profile (30min cache) ──
+    profile_context = ""
+    profile_data = {}
+    try:
+        from app.services.athletic_intelligence_service import AthleticIntelligenceService
+        ai_cache_key = f"atlas_profile_{user_id}"
+        ai_cached = _coach_context_cache.get(ai_cache_key)
+        if ai_cached and (now - ai_cached["ts"]).total_seconds() < 1800:
+            profile_data = ai_cached["result"]
+        else:
+            profile_data = AthleticIntelligenceService.get_full_athletic_profile(db, user_id)
+            _coach_context_cache[ai_cache_key] = {"result": profile_data, "ts": now}
+
+        identity = profile_data.get("athlete_identity", {})
+        athlete_name = identity.get("name", "Sergi")
+        age_val = identity.get("age")
+        if age_val:
+            athlete_age = str(age_val)
+
+        coach_summary = profile_data.get("coach_context_summary", "")
+        if coach_summary:
+            profile_context = f"--- PERFIL DEL ATLETA ---\n{coach_summary}"
+    except Exception as e:
+        logger.warning(f"build_coach_context: AthleticIntelligence failed: {e}")
+
+    # ── Block 2: Daily Loop (readiness + today status) ──
+    readiness_context = ""
+    daily_data = {}
+    try:
+        from app.services.daily_loop_service import DailyLoopService
+        daily_data = DailyLoopService.run_daily_loop(db, user_id)
+        if not daily_data.get("error"):
+            readiness_score = daily_data.get("readiness_score", 50)
+            category = daily_data.get("readiness_category", "moderate")
+            color = daily_data.get("readiness_color", "yellow")
+            components = daily_data.get("components", {})
+            session_data = daily_data.get("today_session")
+
+            bb_val = components.get("body_battery", {}).get("value")
+            rhr_val = components.get("resting_hr", {}).get("value")
+            sleep_val = components.get("sleep", {}).get("value")
+            stress_val = components.get("stress", {}).get("value")
+            bio_source = daily_data.get("biometrics_source", "partial")
+
+            readiness_context = f"""--- READINESS ({today_str}) ---
+Puntuación: {readiness_score}/100 — Estado: {category.upper()}
+Body Battery: {bb_val if bb_val is not None else 'N/A'} | FC Reposo: {rhr_val if rhr_val is not None else 'N/A'}bpm | Sueño: {sleep_val if sleep_val is not None else 'N/A'}h | Estrés: {stress_val if stress_val is not None else 'N/A'}/100
+Fuente de datos: {bio_source}"""
+
+            if session_data and session_data.get("planned"):
+                sp = session_data["planned"]
+                adapt = session_data.get("adaptation", {})
+                readiness_context += f"\nSesión planificada: {sp.get('title', 'N/A')} ({sp.get('duration_minutes', '?')}min, intensidad {sp.get('intensity', '?')})"
+                if adapt.get("suggestion") != "mantener":
+                    readiness_context += f"\n⚡ Adaptación: {adapt.get('note', '')}"
+
+            context_meta["readiness_score"] = readiness_score
+            context_meta["readiness_color"] = color
+            context_meta["data_freshness"] = f"{bio_source} {now.strftime('%H:%M')}"
+
+            if bb_val is not None and rhr_val is not None:
+                bio_summary = f"BB:{bb_val} FCR:{rhr_val}"
+    except Exception as e:
+        logger.warning(f"build_coach_context: DailyLoop failed: {e}")
+
+    # ── Block 3: Training Plan ──
+    plan_context = ""
+    try:
+        from app.services.training_plan_service import TrainingPlanService
+        current_plan = TrainingPlanService.get_current_plan(db, user_id)
+        if current_plan:
+            progress = current_plan.get("progress", {})
+            completed = progress.get("completed", 0)
+            total = progress.get("total", 7)
+            week_obj = current_plan.get("week_start", "")
+            goal = current_plan.get("plan_data", {}).get("weekly_goal", "N/A")
+            plan_context = f"""--- PLAN DE ENTRENAMIENTO ACTIVO ---
+Semana: {week_obj}
+Objetivo: {goal}
+Progreso: {completed}/{total} sesiones completadas"""
+
+            today_session = None
+            for s in current_plan.get("plan_data", {}).get("sessions", []):
+                if s.get("date") == today_str:
+                    today_session = s
+                    break
+            if today_session:
+                plan_context += f"\nHoy: {today_session.get('title', 'N/A')} ({today_session.get('session_type', '?')}, {today_session.get('duration_minutes', '?')}min)"
+                completed_today = today_session.get("completed", False)
+                plan_context += f" — {'✅ Completada' if completed_today else '⏳ Pendiente'}"
+
+            context_meta["plan_active"] = True
+            context_meta["plan_progress"] = f"{completed}/{total}"
+        else:
+            plan_context = "No hay plan de entrenamiento activo para esta semana."
+    except Exception as e:
+        logger.warning(f"build_coach_context: TrainingPlan failed: {e}")
+
+    # ── Block 4: Recent 5 Activities ──
+    workouts_context = ""
+    try:
+        from app.models.workout import Workout
+        recent_workouts = db.query(Workout).filter(
+            Workout.user_id == user_id
+        ).order_by(Workout.date.desc()).limit(5).all()
+
+        if recent_workouts:
+            w_lines = ["--- ENTRENAMIENTOS RECIENTES ---"]
+            for w in recent_workouts:
+                try:
+                    metrics = json.loads(w.description) if w.description else {}
+                    sport = metrics.get("sport", "actividad").replace("_", " ")
+                    info = f"- {w.date.strftime('%d/%m') if hasattr(w.date, 'strftime') else w.date}: {w.name} ({sport})"
+                    dist = metrics.get("distance", 0)
+                    if dist:
+                        info += f" {round(dist/1000, 2)}km"
+                    dur = w.duration
+                    if dur:
+                        info += f" {round(dur/60, 0)}min"
+                    cal = w.calories
+                    if cal:
+                        info += f" {cal}kcal"
+                    w_lines.append(info)
+                except Exception:
+                    w_lines.append(f"- {w.name}")
+            workouts_context = "\n".join(w_lines)
+        else:
+            workouts_context = "No se han registrado entrenamientos recientes."
+    except Exception as e:
+        logger.warning(f"build_coach_context: Recent workouts failed: {e}")
+
+    # ── Block 5: Unread Notifications (limit 3) ──
+    insights_context = ""
+    try:
+        from app.services.notification_service import NotificationService
+        unread = NotificationService.get_unread(db, limit=3)
+        if unread:
+            i_lines = ["--- INSIGHTS PENDIENTES ---"]
+            for n in unread:
+                emoji = "🔴" if n.get("priority") == "urgent" else "🟡" if n.get("priority") == "high" else "📊"
+                i_lines.append(f"{emoji} {n['title']}: {n['message'][:100]}")
+            insights_context = "\n".join(i_lines)
+            context_meta["unread_insights"] = len(unread)
+    except Exception as e:
+        logger.warning(f"build_coach_context: Notifications failed: {e}")
+
+    # ── Block 6: Injury Prevention ──
+    injury_context = ""
+    try:
+        from app.services.injury_prevention_service import InjuryPreventionService
+        injury_status = InjuryPreventionService.get_current_status(db, user_id)
+        injury_dict = injury_status.to_dict() if hasattr(injury_status, "to_dict") else {}
+        alert_level = injury_dict.get("alert_level", "optimal")
+        active_injuries = injury_dict.get("active_injuries", [])
+        zones_to_avoid = injury_dict.get("zones_to_avoid", [])
+        alerts = injury_dict.get("alerts", [])
+
+        if active_injuries or alert_level != "optimal":
+            parts = [f"--- ALERTA DE LESIÓN: {alert_level.upper()} ---"]
+            for a in alerts:
+                parts.append(f"{'🔴' if a['level'] == 'stop' else '🟡' if a['level'] == 'caution' else '🟠'} {a['reason']} → {a['action_required']}")
+            for inj in active_injuries:
+                parts.append(f"🩹 Lesión activa: {inj.get('zone', 'N/A')} — {inj.get('content', '')}")
+            if zones_to_avoid:
+                parts.append(f"Zonas a evitar: {', '.join(zones_to_avoid)}")
+            injury_context = "\n".join(parts)
+            injury_summary = "active_injury"
+        else:
+            injury_context = "Sin lesiones activas. Estado de prevención: ÓPTIMO 🟢"
+    except Exception as e:
+        logger.warning(f"build_coach_context: InjuryPrevention failed: {e}")
+
+    # ── Block 7: ACWR ──
+    acwr_context = ""
+    try:
+        from app.services.analytics_service import AnalyticsService
+        acwr = AnalyticsService.calculate_acwr(db, user_id)
+        acwr_context = f"""--- CARGA DE ENTRENAMIENTO (ACWR) ---
+Ratio: {acwr.get('ratio', 1.0)} — Estado: {acwr.get('status', 'mantenimiento').upper()}
+{acwr.get('message', '')}"""
+    except Exception as e:
+        logger.warning(f"build_coach_context: ACWR failed: {e}")
+
+    # ── Block 8: Memory ──
+    memory_context = ""
+    try:
+        memory_context = MemoryService.get_memory_context_string(db, user_id, max_tokens=1500)
+    except Exception as e:
+        logger.warning(f"build_coach_context: Memory failed: {e}")
+
+    # ── Block 9: Exercise list ──
+    exercise_context = ""
+    try:
+        from app.services.exercise_service import ExerciseService
+        exercise_context = ExerciseService.get_context_summary()
+    except Exception as e:
+        logger.warning(f"build_coach_context: Exercise list failed: {e}")
+
+    # ── Assemble full prompt ──
+    all_blocks = [readiness_context, injury_context, acwr_context, workouts_context,
+                  plan_context, insights_context, memory_context]
+    has_any_data = any(block.strip() for block in all_blocks)
+
+    if not has_any_data and not profile_context:
+        prompt = FALLBACK_SYSTEM_PROMPT
+    else:
+        mode_inst_placeholder = "{mode_instructions}"
+        prompt = MASTER_SYSTEM_PROMPT.format(
+            athlete_name=athlete_name,
+            athlete_age=athlete_age,
+            step_target=step_target,
+            conversation_mode="{conversation_mode}",
+            mode_instructions=mode_inst_placeholder,
+            today_date=today_str,
+            biometrics_context=readiness_context if readiness_context else "Datos biométricos no disponibles para hoy.",
+            injury_context=injury_context if injury_context else "Sin datos de lesión.",
+            readiness_context="",
+            acwr_context=acwr_context if acwr_context else "Datos ACWR no disponibles.",
+            workouts_context=workouts_context if workouts_context else "Sin entrenamientos recientes.",
+            plan_context=plan_context if plan_context else "",
+            memory_context=memory_context if memory_context else "",
+            profile_context=profile_context if profile_context else f"Atleta: {athlete_name}, {athlete_age} años. Objetivo: Proyecto 31/07.",
+            exercise_context=exercise_context if exercise_context else "",
+        )
+
+    if readiness_score is None:
+        readiness_score = 50
+
+    return {
+        "prompt": prompt,
+        "athlete_name": athlete_name,
+        "athlete_age": athlete_age,
+        "step_target": step_target,
+        "readiness_score": readiness_score,
+        "bio_summary": bio_summary,
+        "injury_summary": injury_summary,
+        "context_meta": context_meta,
+    }
+
+
+def generate_welcome_message(db, user_id: str = "default_user") -> Dict[str, Any]:
+    """Generate a personalized welcome message from ATLAS. Cached 15min."""
+    now = datetime.now()
+    cache_key = f"welcome_{user_id}"
+    cached = _welcome_cache.get(cache_key)
+    if cached and (now - cached["ts"]).total_seconds() < 900:
+        return cached["result"]
+
+    try:
+        context_result = build_coach_context(db, user_id)
+        meta = context_result.get("context_meta", {})
+        readiness = meta.get("readiness_score")
+        plan_active = meta.get("plan_active", False)
+        plan_progress = meta.get("plan_progress")
+
+        hour = now.hour
+        if hour < 12:
+            greeting = "Buenos días"
+        elif hour < 18:
+            greeting = "Buenas tardes"
+        else:
+            greeting = "Buenas noches"
+
+        parts = [f"{greeting}, {context_result['athlete_name']}."]
+
+        if readiness is not None:
+            if readiness >= 70:
+                parts.append(f"Readiness {readiness}/100 🟢 — estás listo para entrenar con intensidad.")
+            elif readiness >= 50:
+                parts.append(f"Readiness {readiness}/100 🟡 — sesión moderada recomendada.")
+            else:
+                parts.append(f"Readiness {readiness}/100 🔴 — prioriza recuperación hoy.")
+
+        if plan_active and plan_progress:
+            parts.append(f"Plan activo: {plan_progress} ✓")
+
+        unread = meta.get("unread_insights", 0)
+        if unread > 0:
+            parts.append(f"Tienes {unread} insight{'s' if unread > 1 else ''} sin revisar.")
+
+        parts.append("¿En qué te puedo ayudar?")
+
+        welcome_msg = " ".join(parts)
+    except Exception as e:
+        logger.warning(f"generate_welcome_message failed, using fallback: {e}")
+        welcome_msg = "Hola, Sergi. Soy ATLAS, tu Director Deportivo. ¿En qué te puedo ayudar?"
+
+    result = {"message": welcome_msg, "generated_at": now.isoformat()}
+    _welcome_cache[cache_key] = {"result": result, "ts": now}
+    return result
 
 
 def detect_conversation_mode(message: str, biometrics_context: str, injury_context: str, readiness_score: Optional[int] = None) -> str:

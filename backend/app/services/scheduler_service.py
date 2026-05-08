@@ -9,6 +9,7 @@ Uses APScheduler to schedule:
 """
 
 import logging
+import os
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -242,26 +243,25 @@ async def run_daily_loop_job():
 
 
 async def hydration_reminder_job():
-    """Send hydration reminder push notifications."""
+    """Send hydration reminder notifications."""
     logger.info("Starting hydration reminder")
     db = SessionLocal()
     try:
-        users = db.query(User).all()
-        for user in users:
-            try:
-                token = db.query(Token).filter(Token.user_id == user.id).first()
-                if token and hasattr(token, 'fcm_token') and token.fcm_token:
-                    from app.services.push_service import push_service
-                    await push_service.send_push(
-                        token=token.fcm_token,
-                        title="\U0001f4a7 Hidratación",
-                        message="Recuerda beber agua. Objetivo: ~625ml en esta toma.",
-                        data={"type": "hydration_reminder", "user_id": user.id}
-                    )
-                    logger.info(f"Sent hydration reminder to user {user.id}")
-            except Exception as e:
-                logger.error(f"Error sending hydration reminder to user {user.id}: {e}", exc_info=True)
-                continue
+        from app.services.notification_service import NotificationService
+        enabled = os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true"
+        if not enabled:
+            logger.info("Notifications disabled, skipping hydration reminder")
+            return
+        NotificationService.send_notification(
+            title="\U0001f4a7 Hidrataci\u00f3n",
+            message="Recuerda beber agua. Objetivo: ~625ml en esta toma.",
+            notification_type="hydration",
+            priority="low",
+            channels=["app", "telegram"],
+            db=db,
+        )
+    except Exception as e:
+        logger.error(f"Error sending hydration reminder: {e}", exc_info=True)
     finally:
         db.close()
     logger.info("Finished hydration reminder")

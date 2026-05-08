@@ -103,6 +103,16 @@ class DailyLoopService:
             }
 
             logger.info(f"Daily loop completado. Readiness: {readiness_score}/100 ({category})")
+
+            try:
+                from app.services.notification_service import NotificationService
+                NotificationService.send_daily_briefing(result, db=db)
+                for insight in insights:
+                    if insight.get("priority") in ("high", "medium"):
+                        NotificationService.send_insight(insight, db=db)
+            except Exception as notif_err:
+                logger.warning(f"Error enviando notificaciones: {notif_err}")
+
             return result
 
         except Exception as e:

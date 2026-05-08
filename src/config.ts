@@ -6,6 +6,7 @@ export const BACKEND_URL =
   "https://atlas-vitalis-backend.fly.dev/api/v1";
 
 export const WS_URL = BACKEND_URL.replace(/^http/, 'ws').replace('/api/v1', '') + '/api/v1/ws/readiness';
+export const WS_NOTIFICATIONS_URL = BACKEND_URL.replace(/^http/, 'ws').replace('/api/v1', '') + '/api/v1/ws/notifications';
 
 // Timeouts
 export const API_TIMEOUT = 8000; // 8 seconds
