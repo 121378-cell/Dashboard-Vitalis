@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Biometrics, ReadinessScore } from '../types';
+import { Biometrics, ReadinessScore, DailyReadinessStatus, DailyReadinessResult, DailyReadinessHistoryEntry } from '../types';
 
 export const useBiometrics = (dateStr?: string) => {
   return useQuery({
@@ -85,6 +85,41 @@ export const useAnalytics = (startDate: string, endDate: string) => {
       const response = await api.get('/analytics/biometrics-range', {
         params: { start_date: startDate, end_date: endDate }
       });
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const useDailyReadiness = () => {
+  return useQuery<DailyReadinessStatus>({
+    queryKey: ['daily-readiness'],
+    queryFn: async () => {
+      const response = await api.get('/daily/status');
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useRunDailyLoop = () => {
+  const queryClient = useQueryClient();
+  return useMutation<DailyReadinessResult>({
+    mutationFn: async () => {
+      const response = await api.post('/daily/run-now');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-readiness'] });
+    },
+  });
+};
+
+export const useDailyReadinessHistory = (days: number = 30) => {
+  return useQuery<DailyReadinessHistoryEntry[]>({
+    queryKey: ['daily-readiness-history', days],
+    queryFn: async () => {
+      const response = await api.get('/daily/history', { params: { days } });
       return response.data;
     },
     staleTime: 10 * 60 * 1000,

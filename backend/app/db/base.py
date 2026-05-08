@@ -10,3 +10,4 @@ from app.models.daily_briefing import DailyBriefing
 from app.models.gamification import Achievement, Streak, XpLog
 from app.models.community import Challenge, ChallengeParticipant, UserPublicProfile
 from app.models.nutrition import NutritionSettings, MealLog, DailyNutritionSummary
+from app.models.adaptive_training_plan import AdaptiveTrainingPlan, AdaptivePlannedSession, AdaptivePlanAdjustment

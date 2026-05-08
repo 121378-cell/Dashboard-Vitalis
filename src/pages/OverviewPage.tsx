@@ -14,6 +14,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { ForecastWidget } from '../components/analytics/ForecastWidget';
 import { InsightCard } from '../components/analytics/InsightCard';
 import { PlateauAlert } from '../components/analytics/PlateauAlert';
+import { ReadinessDashboard } from '../components/ReadinessDashboard';
 
 
 const COLORS = {
@@ -167,6 +168,9 @@ export const OverviewPage = () => {
           <p className="text-xs text-[var(--color-success)] mt-1">Stable baseline</p>
         </div>
       </div>
+
+      {/* Daily Readiness */}
+      <ReadinessDashboard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 52-Week Activity Heatmap */}

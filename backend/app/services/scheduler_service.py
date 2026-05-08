@@ -219,6 +219,54 @@ async def weekly_report():
     logger.info("Finished scheduled weekly report generation")
 
 
+async def run_daily_loop_job():
+    """Run the daily intelligence loop for all users."""
+    logger.info("Starting scheduled daily loop")
+    db = SessionLocal()
+    try:
+        users = db.query(User).all()
+        for user in users:
+            try:
+                from app.services.daily_loop_service import DailyLoopService
+                result = DailyLoopService.run_daily_loop(db, user.id)
+                if not result.get("error"):
+                    logger.info(f"Daily loop completado. Readiness: {result['readiness_score']}/100")
+                else:
+                    logger.error(f"Daily loop error for user {user.id}: {result.get('message')}")
+            except Exception as e:
+                logger.error(f"Error en daily loop para user {user.id}: {e}", exc_info=True)
+                continue
+    finally:
+        db.close()
+    logger.info("Finished scheduled daily loop")
+
+
+async def hydration_reminder_job():
+    """Send hydration reminder push notifications."""
+    logger.info("Starting hydration reminder")
+    db = SessionLocal()
+    try:
+        users = db.query(User).all()
+        for user in users:
+            try:
+                token = db.query(Token).filter(Token.user_id == user.id).first()
+                if token and hasattr(token, 'fcm_token') and token.fcm_token:
+                    from app.services.push_service import push_service
+                    await push_service.send_push(
+                        token=token.fcm_token,
+                        title="\U0001f4a7 Hidratación",
+                        message="Recuerda beber agua. Objetivo: ~625ml en esta toma.",
+                        data={"type": "hydration_reminder", "user_id": user.id}
+                    )
+                    logger.info(f"Sent hydration reminder to user {user.id}")
+            except Exception as e:
+                logger.error(f"Error sending hydration reminder to user {user.id}: {e}", exc_info=True)
+                continue
+    finally:
+        db.close()
+    logger.info("Finished hydration reminder")
+
+
 async def generate_weekly_plan_for_all_users():
     """Generate new weekly training plan for all users every Sunday."""
     logger.info("Starting scheduled weekly plan generation for all users")
@@ -271,6 +319,46 @@ def start_scheduler():
         trigger=CronTrigger(hour=5, minute=30, timezone="UTC"),
         id="generate_morning_briefings",
         name="Generate morning briefings",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_daily_loop_job,
+        trigger=CronTrigger(hour=5, minute=15, timezone="UTC"),
+        id="daily_loop",
+        name="Daily intelligence loop (readiness + adaptation)",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        hydration_reminder_job,
+        trigger=CronTrigger(hour=8, minute=0, timezone="UTC"),
+        id="hydration_reminder_10",
+        name="Hydration reminder 10:00",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        hydration_reminder_job,
+        trigger=CronTrigger(hour=11, minute=0, timezone="UTC"),
+        id="hydration_reminder_13",
+        name="Hydration reminder 13:00",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        hydration_reminder_job,
+        trigger=CronTrigger(hour=14, minute=0, timezone="UTC"),
+        id="hydration_reminder_16",
+        name="Hydration reminder 16:00",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        hydration_reminder_job,
+        trigger=CronTrigger(hour=17, minute=0, timezone="UTC"),
+        id="hydration_reminder_19",
+        name="Hydration reminder 19:00",
         replace_existing=True,
     )
 

@@ -453,3 +453,77 @@ export interface Workout {
   duration?: number;
   calories?: number;
 }
+
+// Daily Loop / Readiness Dashboard Types
+export interface DailyReadinessComponents {
+  body_battery: { value: number | null; score: number; weight: string };
+  resting_hr: { value: number | null; score: number; weight: string; vs_baseline: number | null };
+  sleep: { value: number | null; score: number; weight: string };
+  stress: { value: number | null; score: number; weight: string };
+}
+
+export interface DailyReadinessInsight {
+  id: string;
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  message: string;
+}
+
+export interface DailyReadinessSession {
+  planned: {
+    session_type: string;
+    title: string;
+    duration_minutes: number | null;
+    intensity: string;
+  };
+  adaptation: {
+    suggestion: 'mantener' | 'subir_intensidad' | 'bajar_intensidad' | 'descanso_recomendado';
+    note: string;
+  };
+}
+
+export interface DailyReadinessStatus {
+  has_data: boolean;
+  date?: string;
+  readiness_score?: number;
+  readiness_category?: string;
+  readiness_color?: 'green' | 'blue' | 'yellow' | 'red';
+  components?: DailyReadinessComponents;
+  biometrics_source?: string;
+  adaptation?: {
+    made: boolean;
+    suggestion?: string | null;
+    note?: string | null;
+  };
+  insights?: DailyReadinessInsight[];
+  summary_message?: string;
+  created_at?: string;
+  error?: string;
+}
+
+export interface DailyReadinessResult extends DailyReadinessStatus {
+  today_session?: DailyReadinessSession | null;
+}
+
+export interface DailyReadinessHistoryEntry {
+  date: string;
+  readiness_score: number;
+  readiness_category: string;
+  readiness_color: string;
+  body_battery: number | null;
+  resting_heart_rate: number | null;
+  sleep_hours: number | null;
+  stress_level: number | null;
+  components: {
+    bb_score: number;
+    rhr_score: number;
+    sleep_score: number;
+    stress_score: number;
+  };
+  adaptation_made: boolean;
+  adaptation_suggestion: string | null;
+  adaptation_note: string | null;
+  insights: DailyReadinessInsight[];
+  biometrics_source: string | null;
+  created_at: string;
+}
