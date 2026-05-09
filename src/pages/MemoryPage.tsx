@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Calendar, Plus, Trash2, Download, Upload, Filter } from 'lucide-react';
-import { useMemoryEntries } from '../hooks/useDashboardData';
-import { CustomTooltip } from '../components/charts/CustomTooltip';
+import { Plus, Trash2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '../services/api';
+import { MemoryEntry } from '../types';
 import { ChartSkeleton } from '../components/charts/ChartSkeleton';
 import { ExportButton } from '../components/common/ExportButton';
-import { ChartExportButton } from '../components/common/ChartExportButton';
 
 const MEMORY_TYPES = [
   { value: 'injury', label: 'Injury', color: '#F87171' },
@@ -32,9 +32,10 @@ interface AddMemoryModalProps {
     importance: number;
     source: string;
   }) => void;
+  isSubmitting: boolean;
 }
 
-const AddMemoryModal: React.FC<AddMemoryModalProps> = ({ isOpen, onClose, onAdd }) => {
+const AddMemoryModal: React.FC<AddMemoryModalProps> = ({ isOpen, onClose, onAdd, isSubmitting }) => {
   const [type, setType] = useState('pattern');
   const [content, setContent] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -130,9 +131,10 @@ const AddMemoryModal: React.FC<AddMemoryModalProps> = ({ isOpen, onClose, onAdd 
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-[var(--color-on-primary)] font-medium hover:brightness-110 transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-[var(--color-on-primary)] font-medium hover:brightness-110 transition-colors disabled:opacity-50"
             >
-              Add Memory
+              {isSubmitting ? 'Adding...' : 'Add Memory'}
             </button>
           </div>
         </form>
@@ -141,44 +143,42 @@ const AddMemoryModal: React.FC<AddMemoryModalProps> = ({ isOpen, onClose, onAdd 
   );
 };
 
-const generateMockMemories = () => {
-  const types = MEMORY_TYPES;
-  const memories = [];
-  const now = new Date();
-  
-  for (let i = 0; i < 30; i++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - Math.floor(Math.random() * 90));
-    const type = types[Math.floor(Math.random() * types.length)];
-    const contents = {
-      injury: ['Ankle sprain during sprint', 'Lower back tightness after deadlifts', 'Shoulder impingement from overhead press'],
-      achievement: ['New PR on bench press: 55kg', 'Completed 30-day consistency streak', 'Hit 100kg squat milestone'],
-      pattern: ['Better recovery on high protein days', 'Sleep quality correlates with workout performance', 'Consistent morning training yields best results'],
-      milestone: ['6 months training completed', 'Lost 5kg body fat', 'Gained 2kg lean muscle'],
-      preference: ['Prefer morning workouts', 'Higher volume on upper body days', 'Active recovery on Sundays'],
-      health_alert: ['HRV dropped below baseline for 3 days', 'Resting HR elevated above normal range'],
-    };
-    
-    memories.push({
-      id: i + 1,
-      type: type.value,
-      content: contents[type.value][Math.floor(Math.random() * contents[type.value].length)],
-      date: date.toISOString().split('T')[0],
-      importance: Math.floor(Math.random() * 5) + 5,
-      source: 'auto',
-    });
-  }
-  
-  return memories.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-};
-
 export const MemoryPage = () => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [localMemories, setLocalMemories] = useState(generateMockMemories());
   const memoryRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
-  const { data: memoryData, isLoading } = useMemoryEntries(90);
+  const { data: memoryData, isLoading, isError, error } = useQuery({
+    queryKey: ['memory', 90],
+    queryFn: async () => {
+      const response = await api.get('/memory/summary', { params: { days: 90 } });
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (newMemory: { type: string; content: string; date: string; importance: number; source: string }) => {
+      const response = await api.post('/memory/entry', newMemory);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['memory'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (memoryId: number) => {
+      await api.delete(`/memory/${memoryId}`);
+      return memoryId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['memory'] });
+    },
+  });
+
+  const memories: MemoryEntry[] = memoryData?.memories ?? [];
 
   const toggleType = (type: string) => {
     setSelectedTypes(prev =>
@@ -189,12 +189,12 @@ export const MemoryPage = () => {
   };
 
   const filteredMemories = useMemo(() => {
-    if (selectedTypes.length === 0) return localMemories;
-    return localMemories.filter(m => selectedTypes.includes(m.type));
-  }, [localMemories, selectedTypes]);
+    if (selectedTypes.length === 0) return memories;
+    return memories.filter(m => selectedTypes.includes(m.type));
+  }, [memories, selectedTypes]);
 
   const groupedMemories = useMemo(() => {
-    const grouped: Record<string, any[]> = {};
+    const grouped: Record<string, MemoryEntry[]> = {};
     filteredMemories.forEach(memory => {
       if (!grouped[memory.date]) {
         grouped[memory.date] = [];
@@ -204,31 +204,29 @@ export const MemoryPage = () => {
     return grouped;
   }, [filteredMemories]);
 
-  const handleAddMemory = (newMemory: any) => {
-    setLocalMemories(prev => [
-      { ...newMemory, id: Date.now() },
-      ...prev,
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  const handleAddMemory = (newMemory: { type: string; content: string; date: string; importance: number; source: string }) => {
+    addMutation.mutate(newMemory);
   };
 
   const handleDeleteMemory = (id: number) => {
-    setLocalMemories(prev => prev.filter(m => m.id !== id));
+    deleteMutation.mutate(id);
   };
 
   const exportMemories = () => {
-    const data = localMemories.map(m => ({
+    if (memories.length === 0) return;
+    const data = memories.map(m => ({
       Date: m.date,
       Type: MEMORY_TYPES.find(t => t.value === m.type)?.label || m.type,
       Content: m.content,
       Importance: IMPORTANCE_LEVELS.find(l => l.value === m.importance)?.label || m.importance,
       Source: m.source,
     }));
-    
+
     const csv = [
       Object.keys(data[0]).join(','),
       ...data.map(row => Object.values(row).join(',')),
     ].join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -243,6 +241,19 @@ export const MemoryPage = () => {
           Memory Timeline
         </h1>
         <ChartSkeleton count={3} />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-display font-bold text-[var(--color-text)]">
+          Memory Timeline
+        </h1>
+        <div className="bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 rounded-lg p-4">
+          <p className="text-[var(--color-danger)] text-sm">Error loading memories: {error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
       </div>
     );
   }
@@ -266,7 +277,7 @@ export const MemoryPage = () => {
             <Plus className="w-4 h-4" />
             <span className="text-sm">Add Memory</span>
           </button>
-          <ExportButton data={localMemories} filename="memories" format="csv" onExport={exportMemories} />
+          <ExportButton data={memories} filename="memories" format="csv" onExport={exportMemories} />
         </div>
       </div>
 
@@ -300,23 +311,23 @@ export const MemoryPage = () => {
 
       {/* Timeline */}
       <div ref={memoryRef} className="relative">
-        {Object.entries(groupedMemories).map(([date, memories]) => (
+        {Object.entries(groupedMemories).map(([date, dateMemories]) => (
           <div key={date} className="mb-8">
             <div className="sticky top-0 z-10 bg-[var(--color-background)]/80 backdrop-blur-sm py-2 mb-4">
               <h3 className="text-sm font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
-                {new Date(date).toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                {new Date(date).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
                 })}
               </h3>
             </div>
             <div className="space-y-4">
-              {memories.map(memory => {
+              {dateMemories.map(memory => {
                 const typeInfo = MEMORY_TYPES.find(t => t.value === memory.type);
                 const importanceInfo = IMPORTANCE_LEVELS.find(l => l.value === memory.importance);
-                
+
                 return (
                   <div
                     key={memory.id}
@@ -331,7 +342,8 @@ export const MemoryPage = () => {
                     />
                     <button
                       onClick={() => handleDeleteMemory(memory.id)}
-                      className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--color-danger)]/10 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-all"
+                      disabled={deleteMutation.isPending}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--color-danger)]/10 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-all disabled:opacity-30"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -352,7 +364,7 @@ export const MemoryPage = () => {
                         </p>
                       </div>
                       <span className="text-xs text-[var(--color-text-muted)] ml-2 flex-shrink-0">
-                        {memory.source === 'auto' ? 'Auto' : 'User'}
+                        {memory.source === 'auto' || memory.source === 'garmin_sync' ? 'Auto' : 'User'}
                       </span>
                     </div>
                   </div>
@@ -365,7 +377,7 @@ export const MemoryPage = () => {
         {filteredMemories.length === 0 && (
           <div className="text-center py-12">
             <p className="text-[var(--color-text-muted)]">
-              {selectedTypes.length > 0 ? 'No memories match the selected filters' : 'No memories yet'}
+              {selectedTypes.length > 0 ? 'No memories match the selected filters' : 'No memories yet — add your first memory or sync Garmin data to auto-generate entries'}
             </p>
           </div>
         )}
@@ -375,6 +387,7 @@ export const MemoryPage = () => {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddMemory}
+        isSubmitting={addMutation.isPending}
       />
     </div>
   );

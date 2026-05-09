@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from app.api.deps import get_db, get_current_user_id
 from app.models.biometrics import Biometrics
 from app.models.workout import Workout
 import json
+import logging
 
 router = APIRouter()
+logger = logging.getLogger("app.api.biometrics")
 
 from app.services.analytics_service import AnalyticsService
 
@@ -120,3 +122,54 @@ def upsert_biometrics(
         return {"success": True, "user_id": user_id, "date": date_str, "source": source}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history")
+def get_biometrics_history(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    metric: str = Query(None, description="Filter by metric: hrv, restingHr, sleep, stress, steps, bodyBattery"),
+    days: int = Query(30, ge=1, le=365),
+):
+    start_date = (date.today() - timedelta(days=days)).isoformat()
+
+    bios = db.query(Biometrics).filter(
+        Biometrics.user_id == user_id,
+        Biometrics.date >= start_date,
+    ).order_by(Biometrics.date.asc()).all()
+
+    result = []
+    for b in bios:
+        try:
+            data = json.loads(b.data) if b.data else {}
+        except Exception:
+            continue
+
+        entry = {
+            "date": b.date,
+            "restingHr": data.get("lastSevenDaysAvgRHR") or data.get("heartRate"),
+            "hrv": data.get("hrv") or data.get("hrv_lastNight"),
+            "sleep": data.get("sleep"),
+            "stress": data.get("stress"),
+            "steps": data.get("steps"),
+            "bodyBattery": b.body_battery,
+        }
+
+        if metric:
+            key_map = {
+                "hrv": "hrv",
+                "restingHr": "restingHr",
+                "sleep": "sleep",
+                "stress": "stress",
+                "steps": "steps",
+                "bodyBattery": "bodyBattery",
+            }
+            key = key_map.get(metric)
+            if key and entry.get(key) is not None:
+                result.append({"date": b.date, metric: entry[key]})
+            elif key:
+                pass
+        else:
+            result.append(entry)
+
+    return result

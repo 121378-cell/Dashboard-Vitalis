@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Biometrics, ReadinessScore, DailyReadinessStatus, DailyReadinessResult, DailyReadinessHistoryEntry } from '../types';
+import { DailyReadinessStatus, DailyReadinessResult, DailyReadinessHistoryEntry } from '../types';
 
 export const useBiometrics = (dateStr?: string) => {
   return useQuery({
@@ -11,7 +11,7 @@ export const useBiometrics = (dateStr?: string) => {
       });
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -65,32 +65,6 @@ export const useWorkouts = (limit: number = 20) => {
   });
 };
 
-export const useMemoryEntries = (days: number = 90, types?: string) => {
-  return useQuery({
-    queryKey: ['memory', days, types],
-    queryFn: async () => {
-      const response = await api.get('/memory/summary', {
-        params: { days, types }
-      });
-      return response.data;
-    },
-    staleTime: 30 * 60 * 1000,
-  });
-};
-
-export const useAnalytics = (startDate: string, endDate: string) => {
-  return useQuery({
-    queryKey: ['analytics', startDate, endDate],
-    queryFn: async () => {
-      const response = await api.get('/analytics/biometrics-range', {
-        params: { start_date: startDate, end_date: endDate }
-      });
-      return response.data;
-    },
-    staleTime: 10 * 60 * 1000,
-  });
-};
-
 export const useDailyReadiness = () => {
   return useQuery<DailyReadinessStatus>({
     queryKey: ['daily-readiness'],
@@ -123,5 +97,99 @@ export const useDailyReadinessHistory = (days: number = 30) => {
       return response.data;
     },
     staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const useDashboardKpis = () => {
+  return useQuery({
+    queryKey: ['dashboard-kpis'],
+    queryFn: async () => {
+      const response = await api.get('/dashboard/kpis');
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useActivityHeatmap = (weeks: number = 52) => {
+  return useQuery({
+    queryKey: ['activity-heatmap', weeks],
+    queryFn: async () => {
+      const response = await api.get('/dashboard/activity-heatmap', { params: { weeks } });
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+export const useTrainingDistribution = (days: number = 90) => {
+  return useQuery({
+    queryKey: ['training-distribution', days],
+    queryFn: async () => {
+      const response = await api.get('/dashboard/training-distribution', { params: { days } });
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+export const useReadinessTrendLine = (days: number = 90) => {
+  return useQuery({
+    queryKey: ['readiness-trend-line', days],
+    queryFn: async () => {
+      const response = await api.get('/dashboard/readiness-trend-line', { params: { days } });
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const useMuscleVolume = (weeks: number = 12) => {
+  return useQuery({
+    queryKey: ['muscle-volume', weeks],
+    queryFn: async () => {
+      const response = await api.get('/dashboard/muscle-volume', { params: { weeks } });
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+export const useBiometricsHistory = (days: number = 30, metric?: string) => {
+  return useQuery({
+    queryKey: ['biometrics-history', days, metric],
+    queryFn: async () => {
+      const response = await api.get('/biometrics/history', {
+        params: { days, metric }
+      });
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const useRecentWorkouts = (limit: number = 20, activityType?: string) => {
+  return useQuery({
+    queryKey: ['recent-workouts', limit, activityType],
+    queryFn: async () => {
+      const response = await api.get('/workouts/recent', {
+        params: { limit, activity_type: activityType }
+      });
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const usePersonalRecords = (exercise?: string) => {
+  return useQuery({
+    queryKey: ['personal-records', exercise],
+    queryFn: async () => {
+      const response = await api.get('/workouts/personal-records', {
+        params: { exercise }
+      });
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000,
   });
 };
