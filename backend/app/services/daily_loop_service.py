@@ -132,55 +132,54 @@ class DailyLoopService:
         today_str = today.isoformat()
         yesterday_str = yesterday.isoformat()
 
-        bio_today = db.query(Biometrics).filter(
-            and_(
-                Biometrics.user_id == user_id,
-                Biometrics.date == today_str
-            )
-        ).order_by(Biometrics.timestamp.desc()).first()
+        for check_date_str, source_label in [(today_str, "today"), (yesterday_str, "yesterday")]:
+            row = db.execute(
+                text("SELECT data FROM biometrics WHERE user_id = :uid AND date = :d ORDER BY timestamp DESC LIMIT 1"),
+                {"uid": user_id, "d": check_date_str}
+            ).first()
 
-        bio_yesterday = db.query(Biometrics).filter(
-            and_(
-                Biometrics.user_id == user_id,
-                Biometrics.date == yesterday_str
-            )
-        ).order_by(Biometrics.timestamp.desc()).first()
+            if not row or not row[0]:
+                continue
 
-        target_bio = None
-        if bio_today:
-            target_bio = bio_today
-            biometrics_source = "today"
-        elif bio_yesterday:
-            target_bio = bio_yesterday
-            biometrics_source = "yesterday"
-            logger.warning(f"No hay datos de hoy, usando datos de ayer para user {user_id}")
+            try:
+                raw = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Error parseando data JSON de biometrics ({check_date_str}): {e}")
+                continue
+
+            body_battery = raw.get("bodyBattery") or raw.get("bodyBatteryMostRecentValue")
+            if body_battery is not None:
+                if body_battery > 100:
+                    logger.warning(f"Body Battery corrupto filtrado: {body_battery}")
+                    body_battery = None
+                else:
+                    bb_value = body_battery
+
+            rhr_raw = raw.get("heartRate") or raw.get("lastSevenDaysAvgRHR")
+            if rhr_raw and rhr_raw > 0:
+                rhr_value = rhr_raw
+
+            sleep_raw = raw.get("sleep")
+            if sleep_raw and sleep_raw > 0:
+                sleep_hours = sleep_raw if sleep_raw < 24 else sleep_raw / 3600
+            if not sleep_hours:
+                sleep_from_stats = raw.get("sleepFromStats")
+                if sleep_from_stats and sleep_from_stats > 0:
+                    sleep_hours = sleep_from_stats
+                    logger.info(f"Sleep from sleepFromStats fallback: {sleep_hours}h")
+
+            stress_raw = raw.get("stress")
+            if stress_raw is not None:
+                stress_value = stress_raw
+
+            biometrics_source = source_label
+            if source_label == "yesterday":
+                logger.warning(f"No hay datos de hoy, usando datos de ayer para user {user_id}")
+            break
+
         else:
             logger.warning(f"No hay datos biométricos recientes para user {user_id}")
-            return None, None, None, None, "partial"
-
-        if target_bio.body_battery is not None:
-            bb_value = min(target_bio.body_battery, 100)
-            if target_bio.body_battery > 100:
-                logger.warning(f"Body Battery corrupto filtrado: {target_bio.body_battery}")
-
-        if target_bio.data:
-            try:
-                data = json.loads(target_bio.data)
-
-                rhr_raw = data.get("heartRate") or data.get("lastSevenDaysAvgRHR")
-                if rhr_raw and rhr_raw > 0:
-                    rhr_value = rhr_raw
-
-                sleep_raw = data.get("sleep")
-                if sleep_raw and sleep_raw > 0:
-                    sleep_hours = sleep_raw if sleep_raw < 24 else sleep_raw / 3600
-
-                stress_raw = data.get("stress")
-                if stress_raw is not None:
-                    stress_value = stress_raw
-
-            except (json.JSONDecodeError, TypeError) as e:
-                logger.warning(f"Error parseando data JSON de biometrics: {e}")
+            return None, None, None, None, "none"
 
         return bb_value, rhr_value, sleep_hours, stress_value, biometrics_source
 

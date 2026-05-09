@@ -21,9 +21,9 @@ from garminconnect import Garmin
 # CONFIGURACIÓN DE RUTAS (absolutas para funcionar desde cualquier directorio)
 # ============================================================================
 
-SCRIPT_DIR = Path(__file__).resolve().parent  # .../backend/
-PROJECT_ROOT = SCRIPT_DIR.parent  # .../Dashboard-Vitalis/
-DB_PATH = PROJECT_ROOT / "atlas_v2.db"
+SCRIPT_DIR = Path(__file__).resolve().parent # .../backend/
+PROJECT_ROOT = SCRIPT_DIR.parent # .../Dashboard-Vitalis/
+DB_PATH = SCRIPT_DIR / "atlas_v2.db"  # Mismo path que backend/app/core/config.py
 LOGS_DIR = SCRIPT_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOGS_DIR / "auto_sync.log"
@@ -49,7 +49,6 @@ logging.basicConfig(
 logger = logging.getLogger("auto_sync")
 
 from app.db.session import SessionLocal
-from app.services.athlete_profile_service import AthleteProfileService
 from app.services.session_service import SessionService
 from app.utils.garmin import get_garmin_client
 
@@ -98,10 +97,12 @@ def get_db_connection():
 
 
 def save_biometrics_sqlite(user_id: str, date_str: str, data: Dict):
-    """Guarda datos biométricos usando sqlite3 directo."""
+    """Guarda datos biométricos usando sqlite3 directo.
+    Todo el payload va dentro de la columna 'data' como JSON string.
+    También extrae body_battery a columna propia para queries eficientes.
+    """
     conn = get_db_connection()
     try:
-        # Verificar si ya existe
         existing = conn.execute(
             "SELECT id FROM biometrics WHERE user_id = ? AND date = ?",
             (user_id, date_str),
@@ -110,9 +111,12 @@ def save_biometrics_sqlite(user_id: str, date_str: str, data: Dict):
         recovery_time = data.get("recovery_time_hours")
         training_status = data.get("training_status")
         hrv = data.get("hrv")
+        body_battery = data.get("bodyBattery") or data.get("bodyBatteryMostRecentValue")
+        if body_battery and body_battery > 100:
+            logger.warning(f"Body Battery corrupto filtrado en save: {body_battery}")
+            body_battery = None
 
         if existing:
-            # Actualizar datos existentes - merge JSON
             existing_data_row = conn.execute(
                 "SELECT data FROM biometrics WHERE id = ?", (existing["id"],)
             ).fetchone()
@@ -123,33 +127,34 @@ def save_biometrics_sqlite(user_id: str, date_str: str, data: Dict):
             )
             existing_data.update(data)
             conn.execute(
-                """UPDATE biometrics 
-                   SET data = ?, source = ?, 
-                       recovery_time = ?, training_status = ?, hrv_status = ?
-                   WHERE id = ?""",
+                """UPDATE biometrics
+                SET data = ?, source = 'garmin', timestamp = CURRENT_TIMESTAMP,
+                    recovery_time = ?, training_status = ?, hrv_status = ?,
+                    body_battery = ?
+                WHERE id = ?""",
                 (
                     json.dumps(existing_data),
-                    "garmin",
                     recovery_time,
                     training_status,
                     hrv,
+                    body_battery,
                     existing["id"],
                 ),
             )
         else:
-            # Crear nuevo registro
             conn.execute(
-                """INSERT INTO biometrics 
-                   (user_id, date, data, source, recovery_time, training_status, hrv_status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO biometrics
+                (user_id, date, data, source, timestamp,
+                 recovery_time, training_status, hrv_status, body_battery)
+                VALUES (?, ?, ?, 'garmin', CURRENT_TIMESTAMP, ?, ?, ?, ?)""",
                 (
                     user_id,
                     date_str,
                     json.dumps(data),
-                    "garmin",
                     recovery_time,
                     training_status,
                     hrv,
+                    body_battery,
                 ),
             )
 
@@ -270,15 +275,25 @@ def download_day_stats(client: Garmin, date_obj: date) -> Optional[Dict]:
         return {
             "date": date_str,
             "source": "garmin",
-            "heartRate": safe_get(stats, "restingHeartRate") or 0,
+            "heartRate": safe_get(stats, "restingHeartRate") or None,
             "steps": safe_get(stats, "totalSteps") or 0,
-            "calories": safe_get(stats, "totalCalories") or 0,
-            "activeCalories": safe_get(stats, "activeCalories") or 0,
-            "stress": safe_get(stats, "averageStressLevel") or 0,
-            "spo2": safe_get(stats, "latestSpo2", "value") or None,
-            "respiration": safe_get(stats, "respiration", "value") or None,
-            "vo2max": safe_get(stats, "vo2Max") or None,
-            "bodyBattery": safe_get(stats, "bodyBattery", "value") or None,
+            "calories": safe_get(stats, "totalKilocalories") or 0,
+            "activeCalories": safe_get(stats, "activeKilocalories") or 0,
+            "stress": safe_get(stats, "averageStressLevel") or None,
+            "spo2": safe_get(stats, "averageSpo2") or None,
+            "respiration": safe_get(stats, "avgWakingRespirationValue") or None,
+            "vo2max": safe_get(stats, "vO2MaxValue") or None,
+            "bodyBattery": safe_get(stats, "bodyBatteryMostRecentValue") or None,
+            "bodyBatteryAtWake": safe_get(stats, "bodyBatteryAtWakeTime") or None,
+            "bodyBatteryCharged": safe_get(stats, "bodyBatteryChargedValue") or None,
+            "bodyBatteryLowest": safe_get(stats, "bodyBatteryLowestValue") or None,
+            "sleepFromStats": round((safe_get(stats, "sleepingSeconds") or 0) / 3600, 2),
+            "weight_kg": None,
+            "body_fat_percent": None,
+            "muscle_mass_kg": None,
+            "training_status": None,
+            "recovery_time_hours": None,
+            "training_load": None,
         }
     except Exception as e:
         logger.debug(f"No se pudieron obtener stats para {date_str}: {e}")
@@ -286,14 +301,47 @@ def download_day_stats(client: Garmin, date_obj: date) -> Optional[Dict]:
 
 
 def download_sleep_data(client: Garmin, date_obj: date) -> Optional[Dict]:
-    """Descarga datos de sueño."""
+    """Descarga datos de sueño con fallback si dailySleepDTO no está disponible."""
     date_str = date_obj.isoformat()
 
     try:
         sleep = client.get_sleep_data(date_str)
-
-        if not sleep or "sleepTimeInSeconds" not in str(sleep):
+        if not sleep:
             return None
+
+        dto = safe_get(sleep, "dailySleepDTO")
+        if dto:
+            sleep_seconds = safe_get(dto, "sleepTimeInSeconds") or 0
+            return {
+                "sleep": round(sleep_seconds / 3600, 2),
+                "sleep_score": safe_get(dto, "sleepScore") or None,
+                "deep_sleep_seconds": safe_get(dto, "deepSleepSeconds") or None,
+                "rem_sleep_seconds": safe_get(dto, "remSleepSeconds") or None,
+                "light_sleep_seconds": safe_get(dto, "lightSleepSeconds") or None,
+                "awake_sleep_seconds": safe_get(dto, "awakeSleepSeconds") or None,
+                "sleep_start": safe_get(dto, "sleepStartTimestampLocal") or None,
+                "sleep_end": safe_get(dto, "sleepEndTimestampLocal") or None,
+            }
+
+        sleep_seconds = (
+            safe_get(sleep, "sleepTimeInSeconds")
+            or safe_get(sleep, "totalSleepTimeInSeconds")
+            or 0
+        )
+        if sleep_seconds > 0:
+            return {
+                "sleep": round(sleep_seconds / 3600, 2),
+                "sleep_score": safe_get(sleep, "sleepScore") or None,
+                "deep_sleep_seconds": None,
+                "rem_sleep_seconds": None,
+                "light_sleep_seconds": None,
+                "awake_sleep_seconds": None,
+            }
+
+        return None
+    except Exception as e:
+        logger.warning(f"Error obteniendo sueño {date_obj}: {e}")
+        return None
 
         sleep_time = safe_get(sleep, "dailySleepDTO", "sleepTimeInSeconds") or 0
 
@@ -404,10 +452,15 @@ def sync_biometrics_for_date(client: Garmin, user_id: str, date_obj: date) -> bo
 
         # Sueño
         sleep = download_sleep_data(client, date_obj)
-        if sleep:
+        if sleep and sleep.get("sleep", 0) > 0:
             day_data.update(sleep)
-        api_calls += 1
-        time.sleep(1.5)
+            api_calls += 1
+            time.sleep(1.5)
+        else:
+            sleep_from_stats = day_data.get("sleepFromStats", 0)
+            if sleep_from_stats > 0:
+                day_data["sleep"] = sleep_from_stats
+                logger.info(f"Sleep fallback from sleepFromStats: {sleep_from_stats}h para {date_str}")
 
         # HRV
         hrv = download_hrv_data(client, date_obj)
@@ -536,24 +589,10 @@ def run_daily_sync(user_id: str = DEFAULT_USER_ID) -> int:
         activities_count = sync_activities_for_date(client, user_id, date_obj)
         stats["activities_synced"] += activities_count
 
-    logger.info("\n" + "=" * 60)
-    logger.info("ACTUALIZANDO PERFIL DEL ATLETA")
-    logger.info("=" * 60)
+        # Perfil del atleta: AthleticIntelligenceService lo genera dinámicamente
+        # desde la DB — no necesita actualización manual post-sync.
 
-    # Actualizar perfil del atleta
-    try:
-        profile = AthleteProfileService.update_daily(user_id, db)
-        if profile:
-            logger.info(
-                f"✅ Perfil actualizado: {profile.dias_con_datos} días de datos"
-            )
-        else:
-            logger.warning("⚠️  Perfil no pudo ser actualizado")
-    except Exception as e:
-        logger.error(f"❌ Error actualizando perfil: {e}")
-        stats["errors"] += 1
-
-    # ============================================================================
+        # ============================================================================
     # INTEGRACIÓN CON SISTEMA DE SESIONES
     # ============================================================================
     logger.info("\n" + "=" * 60)

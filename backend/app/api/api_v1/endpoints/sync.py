@@ -61,14 +61,6 @@ def sync_garmin(
     if not health_success and not acts_success:
         raise HTTPException(status_code=500, detail="Failed to sync Garmin data")
 
-    # Actualizar perfil de atleta tras sincronización exitosa
-    try:
-        AthleteProfileService.update_daily(user_id, db)
-    except Exception as e:
-        # No fallar el sync si el perfil falla, solo loguear
-        import logging
-        logging.getLogger("sync").warning(f"No se pudo actualizar perfil: {e}")
-
     return {"success": True, "health": health_success, "activities": acts_success}
 
 
