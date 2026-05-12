@@ -571,3 +571,212 @@ export interface AtlasNotification {
   action_url: string | null;
   metadata: Record<string, unknown> | null;
 }
+
+// Adaptive Training Plan Types
+export interface AdaptivePlanSession {
+  id: number;
+  date: string;
+  day_of_week: string;
+  session_type: 'strength' | 'running' | 'trail_running' | 'mobility' | 'hiit' | 'rest' | 'active_recovery';
+  title: string;
+  description: string;
+  duration_minutes?: number;
+  intensity?: 'low' | 'medium' | 'high';
+  exercises?: PlanSessionExercise[];
+  running_details?: PlanRunningDetails;
+  mobility_details?: PlanMobilityDetails;
+  completed: boolean;
+  garmin_activity_id?: string;
+  user_notes?: string;
+  modified_by_user?: boolean;
+  adaptation_reason?: string;
+}
+
+export interface PlanSessionExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  weight_kg: number;
+  rest_seconds: number;
+  muscle_group: string;
+  notes: string;
+}
+
+export interface PlanRunningDetails {
+  type: string;
+  distance_km: number;
+  target_pace_min_km: string;
+  heart_rate_zone: string;
+  structure: string;
+}
+
+export interface PlanMobilityDetails {
+  focus: string;
+  techniques: string[];
+  key_exercises: string[];
+}
+
+export interface AdaptiveWeeklyPlan {
+  plan_id: number;
+  week_start: string;
+  week_end: string;
+  goal: string;
+  status: string;
+  created_at: string;
+  ai_reasoning: string;
+  progress: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+  plan: {
+    weekly_goal: string;
+    reasoning: string;
+    total_planned_minutes: number;
+    sessions: AdaptivePlanSession[];
+    weekly_notes: string;
+    nutrition_focus: string;
+    sleep_reminder: string;
+  };
+}
+
+export interface GeneratePlanRequest {
+  goal: string;
+  week_start?: string;
+  training_days?: string[];
+  time_available?: Record<string, number>;
+  session_types?: string[];
+  intensity_preference?: string;
+  consider_readiness?: boolean;
+  restrictions?: string;
+}
+
+export interface AdaptSessionRequest {
+  user_request: string;
+}
+
+export interface CompleteSessionRequest {
+  completed: boolean;
+  garmin_activity_id?: string;
+}
+
+export interface ExerciseProgression {
+  exercise_name: string;
+  last_session: {
+    date: string | null;
+    weight: number | null;
+    reps: string | null;
+    sets: number | null;
+  } | null;
+  suggested_weight: number | null;
+  suggested_reps: string | null;
+  progression_note: string;
+  pr_potential: boolean;
+  pr_current: number | null;
+}
+
+export interface PlanHistoryEntry {
+  plan_id: number;
+  week_start: string;
+  week_end: string;
+  goal: string;
+  status: string;
+  created_at: string;
+  completed_sessions: number;
+  total_sessions: number;
+  completion_percentage: number;
+}
+
+// Master Plan Types
+export interface MasterPlanPhase {
+  phase_number: number;
+  name: string;
+  description: string;
+  start_week: number;
+  end_week: number;
+  focus: string[];
+  intensity: string;
+  weekly_volume_hours?: number;
+}
+
+export interface MasterPlanMilestone {
+  week: number;
+  description: string;
+  metric: string;
+  target: string;
+  achieved?: boolean;
+}
+
+export interface MasterPlanPreferences {
+  preferred_days: string[];
+  time_per_session_minutes: number;
+  intensity_preference: string;
+  restrictions: string | null;
+}
+
+export interface MasterPlanWeeklyPlanSummary {
+  id: number;
+  week_start: string;
+  week_end: string;
+  goal: string;
+  status: string;
+  week_number: number;
+  phase_number: number;
+  confirmed_by_user: boolean;
+}
+
+export interface MasterPlan {
+  id: number;
+  title: string;
+  goal: string;
+  status: 'active' | 'completed' | 'cancelled';
+  start_date: string;
+  target_date: string | null;
+  total_weeks: number;
+  current_week: number;
+  completed_weeks: number;
+  phases: MasterPlanPhase[];
+  current_phase: MasterPlanPhase | null;
+  milestones: MasterPlanMilestone[];
+  strategy: string;
+  preferences: MasterPlanPreferences;
+  days_remaining: number | null;
+  current_weekly_plan: MasterPlanWeeklyPlanSummary | null;
+  next_unconfirmed_week: { id: number; week_number: number; phase_number: number; goal: string } | null;
+}
+
+export interface MasterPlanProgress {
+  id: number;
+  title: string;
+  goal: string;
+  status: string;
+  current_week: number;
+  total_weeks: number;
+  completed_weeks: number;
+  completion_pct: number;
+  phase_timeline: MasterPlanPhaseTimeline[];
+  milestones: MasterPlanMilestone[];
+  days_remaining: number | null;
+  start_date: string | null;
+  target_date: string | null;
+}
+
+export interface MasterPlanPhaseTimeline {
+  phase_number: number;
+  name: string;
+  description: string;
+  start_week: number;
+  end_week: number;
+  focus: string[];
+  intensity: string;
+  status: 'completed' | 'current' | 'pending';
+}
+
+export interface CreateMasterPlanRequest {
+  goal: string;
+  target_date?: string | null;
+  preferred_days?: string[];
+  time_per_session_minutes?: number;
+  intensity_preference?: string | null;
+  restrictions?: string | null;
+}

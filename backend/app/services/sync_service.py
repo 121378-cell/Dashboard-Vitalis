@@ -78,6 +78,7 @@ class SyncService:
                 bb_at_wake = safe_get(stats, "bodyBatteryAtWakeTime")
                 bb_highest = safe_get(stats, "bodyBatteryHighestValue")
                 bb_lowest = safe_get(stats, "bodyBatteryLowestValue")
+                bb = None  # Initialize bb to None to avoid NameError if try block fails
                 try:
                     bb = client.get_body_battery(date_str, date_str)
                     if bb and isinstance(bb, list):

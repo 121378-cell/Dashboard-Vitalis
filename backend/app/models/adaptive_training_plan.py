@@ -33,11 +33,16 @@ class AdaptiveTrainingPlan(Base):
     status = Column(String, default='active')  # active/completed/cancelled
     plan_json = Column(Text, nullable=False)  # JSON completo del plan
     ai_reasoning = Column(Text)  # Por qué este plan
-    fitness_snapshot = Column(Text)  # Snapshot del perfil atlético al generar
-    
+    fitness_snapshot = Column(Text) # Snapshot del perfil atlético al generar
+    master_plan_id = Column(Integer, ForeignKey("master_plans.id"), nullable=True)
+    phase_number = Column(Integer, default=1)
+    week_number = Column(Integer, default=1)
+    confirmed_by_user = Column(Boolean, default=False)
+
     # Relaciones
     sessions = relationship("AdaptivePlannedSession", back_populates="plan", cascade="all, delete-orphan")
     adjustments = relationship("AdaptivePlanAdjustment", back_populates="plan", cascade="all, delete-orphan")
+    master_plan = relationship("MasterPlan", back_populates="weeks")
     
     def __repr__(self):
         return f"<AdaptiveTrainingPlan(id={self.id}, week_start={self.week_start_date}, goal={self.goal})>"

@@ -24,7 +24,6 @@ def garmin_login(
         if not db_user:
             db_user = User(id=user_id, name="Sergi")
             db.add(db_user)
-            db_user.full_name = "Sergi"
             db.commit()
 
         # Attempt Garmin Login

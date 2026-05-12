@@ -84,15 +84,23 @@ async def sync_garmin_all_users():
                     
                     # Auto-generate memories from sync
                     from app.services.memory_service import MemoryService
-                    # Get recent data for memory generation
-                    recent_biometrics = db.query().filter().all()  # Simplified
-                    recent_workouts = db.query().filter().all()  # Simplified
+                    from app.models.biometrics import Biometrics
+                    from app.models.workout import Workout
+                    cutoff = (date.today() - timedelta(days=30)).isoformat()
+                    recent_biometrics = db.query(Biometrics).filter(
+                        Biometrics.user_id == user_id,
+                        Biometrics.date >= cutoff
+                    ).order_by(Biometrics.date.desc()).all()
+                    recent_workouts = db.query(Workout).filter(
+                        Workout.user_id == user_id,
+                        Workout.date >= datetime.strptime(cutoff, "%Y-%m-%d")
+                    ).order_by(Workout.date.desc()).limit(20).all()
                     MemoryService.auto_generate_from_sync(
                         db=db,
                         user_id=user_id,
                         biometrics_data=None,
                         workouts_data=[],
-                        recent_biometrics=[]
+                        recent_biometrics=recent_biometrics
                     )
                 else:
                     logger.warning(f"Sync failed for user {user_id}")

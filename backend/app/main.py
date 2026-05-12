@@ -11,6 +11,7 @@ import time
 from app.services.scheduler_service import start_scheduler, shutdown_scheduler
 from app.middleware.monitoring import MonitoringMiddleware, get_metrics
 from app.core.rate_limiter import RateLimiterMiddleware
+from sqlalchemy import text
 
 logger = logging.getLogger("app.main")
 
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI):
             user = db.query(User).filter(User.id == "default_user").first()
             if not user:
                 logger.info("Creating default_user...")
-                user = User(id="default_user", email="sergi.marquez.al@gmail.com", full_name="Sergi")
+                user = User(id="default_user", email="sergi.marquez.al@gmail.com", name="Sergi")
                 db.add(user)
                 db.commit()
             
@@ -115,7 +116,7 @@ def health_check():
     try:
         from app.db.session import SessionLocal
         with SessionLocal() as db:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             db_ok = True
     except Exception:
         pass

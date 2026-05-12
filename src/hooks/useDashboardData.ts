@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { DailyReadinessStatus, DailyReadinessResult, DailyReadinessHistoryEntry } from '../types';
+import { DailyReadinessStatus, DailyReadinessResult, DailyReadinessHistoryEntry, CreateMasterPlanRequest } from '../types';
 
 export const useBiometrics = (dateStr?: string) => {
   return useQuery({
@@ -191,5 +191,157 @@ export const usePersonalRecords = (exercise?: string) => {
       return response.data;
     },
     staleTime: 30 * 60 * 1000,
+  });
+};
+
+export const useCurrentPlan = () => {
+  return useQuery({
+    queryKey: ['current-plan'],
+    queryFn: async () => {
+      const response = await api.get('/plans/current');
+      return response.data;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useGeneratePlan = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (request: Record<string, unknown>) => {
+      const response = await api.post('/plans/generate', request);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-plan'] });
+    },
+  });
+};
+
+export const useAdaptSession = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: number; request: { user_request: string } }) => {
+      const response = await api.post(`/plans/sessions/${sessionId}/adapt`, request);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-plan'] });
+    },
+  });
+};
+
+export const useCompleteSession = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: number; request: { completed: boolean; garmin_activity_id?: string } }) => {
+      const response = await api.put(`/plans/sessions/${sessionId}/complete`, request);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-plan'] });
+    },
+  });
+};
+
+export const useSessionProgression = (sessionId: number | null) => {
+  return useQuery({
+    queryKey: ['session-progression', sessionId],
+    queryFn: async () => {
+      const response = await api.get(`/plans/sessions/${sessionId}/progression`);
+      return response.data.data.progressions;
+    },
+    enabled: sessionId !== null,
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const usePlanHistory = (limit: number = 10) => {
+  return useQuery({
+    queryKey: ['plan-history', limit],
+    queryFn: async () => {
+      const response = await api.get('/plans/history', { params: { limit } });
+      return response.data.data.plans;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+};
+
+export const useActiveMasterPlan = () => {
+  return useQuery({
+    queryKey: ['active-master-plan'],
+    queryFn: async () => {
+      const response = await api.get('/master-plan/active');
+      return response.data;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useMasterPlanProgress = (masterPlanId: number | null) => {
+  return useQuery({
+    queryKey: ['master-plan-progress', masterPlanId],
+    queryFn: async () => {
+      const response = await api.get(`/master-plan/${masterPlanId}/progress`);
+      return response.data.data;
+    },
+    enabled: masterPlanId !== null,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useCreateMasterPlan = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (request: CreateMasterPlanRequest) => {
+      const response = await api.post('/master-plan/create', request);
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-master-plan'] });
+    },
+  });
+};
+
+export const useProposeNextWeek = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (masterPlanId: number) => {
+      const response = await api.post(`/master-plan/${masterPlanId}/propose-next-week`);
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-master-plan'] });
+      queryClient.invalidateQueries({ queryKey: ['master-plan-progress'] });
+    },
+  });
+};
+
+export const useConfirmWeek = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (weeklyPlanId: number) => {
+      const response = await api.post(`/master-plan/weeks/${weeklyPlanId}/confirm`);
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-master-plan'] });
+      queryClient.invalidateQueries({ queryKey: ['master-plan-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['current-plan'] });
+    },
+  });
+};
+
+export const useCancelMasterPlan = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (masterPlanId: number) => {
+      const response = await api.delete(`/master-plan/${masterPlanId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-master-plan'] });
+      queryClient.invalidateQueries({ queryKey: ['master-plan-progress'] });
+    },
   });
 };
