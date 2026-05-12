@@ -68,9 +68,13 @@ class TrainingPlanService:
 
             week_end = week_start + timedelta(days=6)
 
-            days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+            # Mapeo correcto de nombres de días reales a las fechas
+            days_es = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
             dates = [week_start + timedelta(days=i) for i in range(7)]
-            day_date_map = {days[i]: dates[i].isoformat() for i in range(7)}
+            day_date_map = {days_es[d.weekday()]: d.isoformat() for d in dates}
+            
+            # Para el prompt, mantenemos el orden cronológico
+            ordered_days = [days_es[d.weekday()] for d in dates]
 
             existing_plan = db.query(AdaptiveTrainingPlan).filter(
                 and_(
@@ -118,7 +122,7 @@ class TrainingPlanService:
             )
 
             best_days_int = fitness.get('best_training_days', [])
-            best_days_str = [days[day] if 0 <= day < 7 else str(day) for day in best_days_int]
+            best_days_str = [days_es[day] if 0 <= day < 7 else str(day) for day in best_days_int]
 
             day_map = {
                 "monday": "Lunes", "tuesday": "Martes", "wednesday": "Miércoles",
@@ -165,20 +169,18 @@ TIPOS DE SESIÓN DESEADOS: {session_types_formatted}
 INTENSIDAD PREFERIDA: {intensity_preference or "Según perfil"}
 CONSIDERAR READINESS ACTUAL: {"Sí" if consider_readiness else "No"}
 RESTRICCIONES: {restrictions or "Ninguna"}
-SEMANA: {days[0]} {dates[0].strftime('%d/%m')} al {days[6]} {dates[6].strftime('%d/%m')}
+SEMANA: {ordered_days[0]} {dates[0].strftime('%d/%m')} al {ordered_days[6]} {dates[6].strftime('%d/%m')}
 
 FECHAS EXACTAS DE CADA DÍA (DEBES usar estas fechas en el campo "date" de cada sesión):
 {chr(10).join(f"- {{day}}: {{date}}" for day, date in day_date_map.items())}
 
-RESTRICCIONES IMPORTANTES:
-- Atleta masters 47 años: recuperación entre sesiones es prioritaria
-- Déficit sueño crónico: no programar sesiones muy intensas el día después de descanso sin datos
-- Máximo 2 días consecutivos de alta intensidad
-- Incluir al menos 1 sesión de movilidad/flexibilidad por semana (historial muestra 0 — necesidad real)
-- Si ACWR < 0.9: puede aumentar volumen gradualmente esta semana
-- Distribuir fuerza y cardio con al menos 1 día de separación cuando sea posible
-- DEBES programar sesiones EXACTAMENTE en los días especificados por el usuario, con la duración solicitada
-- Los días que no están en la lista del usuario DEBEN ser descanso o recuperación activa
+RESTRICCIONES IMPORTANTES E INQUEBRANTABLES:
+- DÍAS PERMITIDOS: {training_days_formatted}.
+- DEBES programar sesiones de entrenamiento ÚNICAMENTE en los días permitidos.
+- Los días NO incluidos en los permitidos DEBEN programarse como "session_type": "rest" de forma obligatoria, sin excepciones.
+- Atleta masters 47 años: la recuperación es prioritaria, por lo que respetar sus días libres es crítico.
+- Si dos días permitidos son consecutivos y hay conflicto de recuperación, ajusta la intensidad, pero NO cambies el día de entrenamiento.
+- Incluir al menos 1 sesión de movilidad/flexibilidad en la semana.
 
 ESTRUCTURA JSON REQUERIDA:
 {{
@@ -249,7 +251,9 @@ ESTRUCTURA JSON REQUERIDA:
                 logger.error(f"Contenido recibido: {content[:500]}...")
                 raise Exception("El LLM no retornó JSON válido. Por favor intenta de nuevo.")
 
-            # Corregir fechas que el LLM pueda haber devuelto incorrectas
+            # Corregir fechas y forzar descansos en días no seleccionados
+            allowed_days = [day_map.get(d, d) for d in training_days] if training_days else None
+
             for session_data in plan_data.get("sessions", []):
                 llm_date = session_data.get("date", "")
                 day_name = session_data.get("day_of_week", "")
@@ -258,6 +262,19 @@ ESTRUCTURA JSON REQUERIDA:
                     if llm_date != correct_date:
                         logger.warning(f"Fixing LLM date {llm_date} -> {correct_date} for {day_name}")
                         session_data["date"] = correct_date
+
+                # Post-procesado estricto: forzar descanso si no es día permitido
+                if allowed_days and day_name not in allowed_days:
+                    if session_data.get("session_type") not in ["rest", "active_recovery"]:
+                        logger.warning(f"Forcing rest on {day_name} (LLM hallucinated a workout)")
+                        session_data["session_type"] = "rest"
+                        session_data["title"] = "Descanso Programado"
+                        session_data["description"] = "Día libre según tus preferencias de entrenamiento."
+                        session_data["duration_minutes"] = 0
+                        session_data["intensity"] = "low"
+                        session_data.pop("exercises", None)
+                        session_data.pop("running_details", None)
+                        session_data.pop("mobility_details", None)
 
             logger.info("Guardando plan en base de datos...")
             training_plan = AdaptiveTrainingPlan(
