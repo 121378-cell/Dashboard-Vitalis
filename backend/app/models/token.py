@@ -12,3 +12,4 @@ class Token(Base):
     garmin_session = Column(String)          # Garmin session data (JSON)
     hevy_username = Column(String)           # Hevy username
     wger_api_key = Column(String)           # Wger API key
+    fcm_token = Column(String)               # Firebase Cloud Messaging token

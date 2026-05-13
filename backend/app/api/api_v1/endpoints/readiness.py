@@ -25,7 +25,7 @@ from app.services.readiness_service import ReadinessService
 router = APIRouter()
 
 
-@router.get("/readiness", summary="Readiness score actual (v1 legacy)")
+@router.get("/", summary="Readiness score actual (v1 legacy)")
 async def get_readiness_score(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
@@ -85,7 +85,7 @@ async def get_readiness_score(
     return result
 
 
-@router.get("/readiness/score", summary="Readiness score completo (v2)")
+@router.get("/score", summary="Readiness score completo (v2)")
 async def get_readiness_score_v2(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
@@ -129,7 +129,7 @@ async def get_readiness_score_v2(
     return result
 
 
-@router.get("/readiness/trend", summary="Historial de readiness")
+@router.get("/trend", summary="Historial de readiness")
 async def get_readiness_trend(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
@@ -160,7 +160,7 @@ async def get_readiness_trend(
     return trend
 
 
-@router.get("/readiness/forecast", summary="Predicción de readiness")
+@router.get("/forecast", summary="Predicción de readiness")
 async def get_readiness_forecast(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
@@ -192,7 +192,7 @@ async def get_readiness_forecast(
     return forecast
 
 
-@router.post("/readiness/calculate", summary="Calcular readiness manualmente")
+@router.post("/calculate", summary="Calcular readiness manualmente")
 async def calculate_readiness_manual(
     data: dict,
     user_id: str = Depends(get_current_user_id),

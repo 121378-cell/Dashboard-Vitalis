@@ -57,10 +57,15 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   const maxReconnect = 5;
   const reconnectInterval = 3000;
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onNewNotificationRef = useRef(onNewNotification);
+  const isMountedRef = useRef(true);
+  const hasInitializedRef = useRef(false);
+  onNewNotificationRef.current = onNewNotification;
 
   const fetchUnread = useCallback(async () => {
     try {
       const data = await getData<AtlasNotification[]>('/notifications/unread?limit=50');
+      if (!isMountedRef.current) return;
       setNotifications(data);
       setUnreadCount(data.filter((n: AtlasNotification) => !n.read_at).length);
     } catch {
@@ -71,6 +76,7 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   const fetchUnreadCount = useCallback(async () => {
     try {
       const data = await getData<{ count: number }>('/notifications/unread-count');
+      if (!isMountedRef.current) return;
       setUnreadCount(data.count);
     } catch {
       console.warn('[useNotifications] Error fetching unread count');
@@ -102,8 +108,16 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   }, []);
 
   const connect = useCallback(() => {
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
+      return; // already connecting or open
+    }
+
     if (wsRef.current) {
-      wsRef.current.close();
+      try {
+        wsRef.current.close();
+      } catch {
+        // ignore close errors
+      }
     }
 
     try {
@@ -119,10 +133,10 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
         try {
           const msg = JSON.parse(event.data);
 
-          if (msg.type === 'initial' && Array.isArray(msg.data)) {
+          if (msg.type === "initial" && Array.isArray(msg.data)) {
             setNotifications(msg.data);
             setUnreadCount(msg.data.filter((n: AtlasNotification) => !n.read_at).length);
-          } else if (msg.type === 'notification' && msg.data) {
+          } else if (msg.type === "notification" && msg.data) {
             const newNotif = msg.data as AtlasNotification;
             setNotifications(prev => [newNotif, ...prev]);
             if (!newNotif.read_at) {
@@ -130,15 +144,15 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
               setLatestToast(newNotif);
               setTimeout(() => setLatestToast(null), 4000);
             }
-            onNewNotification?.(newNotif);
-          } else if (msg.type === 'marked_read' && msg.id) {
+            onNewNotificationRef.current?.(newNotif);
+          } else if (msg.type === "marked_read" && msg.id) {
             setNotifications(prev =>
               prev.map(n => n.id === msg.id ? { ...n, read_at: new Date().toISOString() } : n)
             );
             setUnreadCount(prev => Math.max(0, prev - 1));
           }
         } catch {
-          console.warn('[useNotifications] Error parsing WS message');
+          console.warn("[useNotifications] Error parsing WS message");
         }
       };
 
@@ -151,14 +165,17 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
       };
 
       ws.onerror = () => {
-        setIsConnected(false);
+        // handled by onclose
       };
     } catch {
       setIsConnected(false);
     }
-  }, [onNewNotification]);
+  }, []);
 
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
     fetchUnread();
     connect();
 
@@ -170,11 +187,18 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
-        wsRef.current.close();
+        try {
+          if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+            wsRef.current.close();
+          }
+        } catch {
+          // ignore
+        }
         wsRef.current = null;
       }
+      isMountedRef.current = false;
     };
-  }, [fetchUnread, fetchUnreadCount, connect]);
+  }, []);
 
   const filteredNotifications = notifications.filter(n => {
     switch (filter) {

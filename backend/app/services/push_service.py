@@ -135,16 +135,8 @@ class PushService:
             # For now, we'll use a workaround by storing in garmin_session or similar
             # But better to extend the model properly
             
-            # Let's check if fcm_token attribute exists, if not we'll need to migrate
-            if hasattr(token_obj, 'fcm_token'):
-                token_obj.fcm_token = fcm_token
-            else:
-                # We'll need to add the column - for now, let's store in a JSON field or extend
-                # Since this is a new feature, we should extend the model properly
-                logger.warning("Token model does not have fcm_token field - need to extend model")
-                # As a temporary solution, we'll store in garmin_session (not ideal but works for now)
-                # In a real implementation, we'd add a proper migration
-                token_obj.garmin_session = fcm_token  # Temporary workaround
+            # We can now safely assign fcm_token directly
+            token_obj.fcm_token = fcm_token
                 
             db.commit()
             logger.info(f"FCM token registered for user {user_id}")
@@ -175,14 +167,8 @@ class PushService:
             ).first()
             
             if token_obj:
-                # Check if fcm_token attribute exists
-                if hasattr(token_obj, 'fcm_token') and token_obj.fcm_token:
+                if token_obj.fcm_token:
                     return token_obj.fcm_token
-                # Fallback to garmin_session if we used it as temporary storage
-                elif hasattr(token_obj, 'garmin_session') and token_obj.garmin_session:
-                    # Basic validation - FCM tokens are usually long strings
-                    if len(token_obj.garmin_session) > 100:  # FCM tokens are typically long
-                        return token_obj.garmin_session
             
             return None
         except Exception as e:
