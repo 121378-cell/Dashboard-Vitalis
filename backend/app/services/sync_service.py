@@ -53,7 +53,7 @@ class SyncService:
                 Biometrics.date == date_str
             ).first()
             
-            if existing and date_str < three_days_ago:
+            if existing and date.fromisoformat(date_str) < three_days_ago:
                 logger.info(f"Skipping stable date: {date_str}")
                 continue
 
