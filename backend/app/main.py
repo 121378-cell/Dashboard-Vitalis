@@ -50,7 +50,41 @@ async def lifespan(app: FastAPI):
         except Exception as me:
             logger.error(f"birth_date migration error: {me}")
 
-        # 4. Bootstrap de credenciales (Plan B para Fly.io)
+        # 4. Migracion de columnas faltantes en tokens
+        try:
+            logger.info("Checking for missing columns in tokens table...")
+            with engine.connect() as conn:
+                result = conn.execute(text("PRAGMA table_info(tokens)"))
+                token_cols = {row[1] for row in result.fetchall()}
+                from app.models.token import Token
+                model_cols = {str(c.name) for c in Token.__table__.columns}
+                missing = model_cols - token_cols
+                if missing:
+                    type_map = {
+                        'VARCHAR': 'VARCHAR', 'STRING': 'VARCHAR',
+                        'TEXT': 'TEXT',
+                        'INTEGER': 'INTEGER',
+                        'FLOAT': 'FLOAT', 'REAL': 'FLOAT',
+                        'BOOLEAN': 'BOOLEAN',
+                        'DATETIME': 'DATETIME', 'DATE': 'DATE',
+                    }
+                    for col_name in missing:
+                        raw_type = str(
+                            next((c.type for c in Token.__table__.columns if c.name == col_name), '')
+                        ).upper().split('(')[0]
+                        safe_type = type_map.get(raw_type, 'VARCHAR')
+                        logger.info(f"Adding missing column tokens.{col_name} ({safe_type})...")
+                        conn.execute(text(
+                            f"ALTER TABLE tokens ADD COLUMN {col_name} {safe_type}"
+                        ))
+                    conn.commit()
+                    logger.info(f"Added missing columns: {', '.join(missing)}")
+                else:
+                    logger.info("All tokens columns present")
+        except Exception as me:
+            logger.error(f"tokens columns migration error: {me}")
+
+        # 5. Bootstrap de credenciales (Plan B para Fly.io)
         from app.db.session import SessionLocal
         from app.models.token import Token
         from app.models.user import User
@@ -79,7 +113,7 @@ async def lifespan(app: FastAPI):
                 db.commit()
                 logger.info("Garmin credentials bootstrapped successfully.")
         
-        # 5. Start the scheduler
+        # 6. Start the scheduler
         logger.info("Starting scheduler...")
         start_scheduler()
         logger.info("Scheduler started successfully.")

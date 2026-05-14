@@ -76,11 +76,12 @@ def update_user_birth_date():
                 print(f"   User: {user[1]}")
                 print(f"   Birth date: {user[2]}")
                 
-                # Calculate age
+                # Calculate age (user[2] is a string from SQLite, parse to date)
                 if user[2]:
                     today = date.today()
-                    birth_date = user[2]
-                    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+                    from datetime import datetime
+                    bd = datetime.strptime(str(user[2]), '%Y-%m-%d').date()
+                    age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
                     print(f"   Current age: {age} years old")
             
             return True
