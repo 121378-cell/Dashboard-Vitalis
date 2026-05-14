@@ -147,7 +147,7 @@ class TrainingPlan(Base):
     target_volume_per_session = Column(Integer, default=15)  # Sets totales
     
     # Relaciones
-    workouts = relationship("Workout", back_populates="plan", cascade="all, delete-orphan")
+    workouts = relationship("PlannedWorkout", back_populates="plan", cascade="all, delete-orphan")
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=sql_func.now())
@@ -159,12 +159,12 @@ class TrainingPlan(Base):
     adaptation_history = Column(JSON, default=list)  # Historial de cambios
 
 
-class Workout(Base):
+class PlannedWorkout(Base):
     """
-    Sesión de entrenamiento individual.
+    Sesión de entrenamiento individual (planificada/generada).
     Contiene bloques de ejercicios con sets.
     """
-    __tablename__ = "workouts"
+    __tablename__ = "planned_workouts"
     __table_args__ = {'extend_existing': True}
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -218,7 +218,7 @@ class ExerciseBlock(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    workout_id = Column(String, ForeignKey("workouts.id"), nullable=False)
+    workout_id = Column(String, ForeignKey("planned_workouts.id"), nullable=False)
     exercise_id = Column(String, ForeignKey("exercise_library.id"), nullable=False)
     
     # Orden de ejecución
@@ -235,7 +235,7 @@ class ExerciseBlock(Base):
     weight_increment_kg = Column(Float, default=0)  # Incremento planificado
     
     # Relaciones
-    workout = relationship("Workout", back_populates="exercise_blocks")
+    workout = relationship("PlannedWorkout", back_populates="exercise_blocks")
     exercise = relationship("ExerciseLibrary")
     sets = relationship("ExerciseSet", back_populates="block", cascade="all, delete-orphan")
     
@@ -308,7 +308,7 @@ class WorkoutFeedback(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    workout_id = Column(String, ForeignKey("workouts.id"), nullable=False, unique=True)
+    workout_id = Column(String, ForeignKey("planned_workouts.id"), nullable=False, unique=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     # Feedback subjetivo
@@ -342,7 +342,7 @@ class TrainingAdaptation(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     plan_id = Column(String, ForeignKey("training_plans.id"), nullable=True)
-    workout_id = Column(String, ForeignKey("workouts.id"), nullable=True)
+    workout_id = Column(String, ForeignKey("planned_workouts.id"), nullable=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     # Razón de adaptación

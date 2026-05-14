@@ -20,7 +20,7 @@ from datetime import datetime
 
 from app.api.deps import get_db, get_current_user_id
 from app.training.domain.models import (
-    Workout, TrainingPlan, ExerciseSet, WorkoutFeedback,
+    PlannedWorkout, TrainingPlan, ExerciseSet, WorkoutFeedback,
     WorkoutStatus, SetStatus, AdaptationReason
 )
 from app.training.schemas import (
@@ -178,9 +178,9 @@ def submit_set_feedback(
     - Actualiza métricas del usuario
     """
     # Obtener set
-    set_data = db.query(ExerciseSet).join(ExerciseBlock).join(Workout).filter(
+    set_data = db.query(ExerciseSet).join(ExerciseBlock).join(PlannedWorkout).filter(
         ExerciseSet.id == request.set_id,
-        Workout.user_id == current_user
+        PlannedWorkout.user_id == current_user
     ).first()
     
     if not set_data:
@@ -237,12 +237,12 @@ def list_workouts(
     current_user: str = Depends(get_current_user_id)
 ):
     """Lista workouts del usuario con filtros opcionales"""
-    query = db.query(Workout).filter(Workout.user_id == current_user)
+    query = db.query(PlannedWorkout).filter(PlannedWorkout.user_id == current_user)
     
     if status:
-        query = query.filter(Workout.status == status)
+        query = query.filter(PlannedWorkout.status == status)
     
-    workouts = query.order_by(Workout.created_at.desc()).limit(limit).all()
+    workouts = query.order_by(PlannedWorkout.created_at.desc()).limit(limit).all()
     return workouts
 
 
@@ -253,9 +253,9 @@ def get_workout(
     current_user: str = Depends(get_current_user_id)
 ):
     """Obtiene detalle completo de un workout"""
-    workout = db.query(Workout).filter(
-        Workout.id == workout_id,
-        Workout.user_id == current_user
+    workout = db.query(PlannedWorkout).filter(
+        PlannedWorkout.id == workout_id,
+        PlannedWorkout.user_id == current_user
     ).first()
     
     if not workout:
@@ -275,9 +275,9 @@ def update_workout(
     current_user: str = Depends(get_current_user_id)
 ):
     """Actualiza información de un workout"""
-    workout = db.query(Workout).filter(
-        Workout.id == workout_id,
-        Workout.user_id == current_user
+    workout = db.query(PlannedWorkout).filter(
+        PlannedWorkout.id == workout_id,
+        PlannedWorkout.user_id == current_user
     ).first()
     
     if not workout:
@@ -303,9 +303,9 @@ def delete_workout(
     current_user: str = Depends(get_current_user_id)
 ):
     """Elimina un workout"""
-    workout = db.query(Workout).filter(
-        Workout.id == workout_id,
-        Workout.user_id == current_user
+    workout = db.query(PlannedWorkout).filter(
+        PlannedWorkout.id == workout_id,
+        PlannedWorkout.user_id == current_user
     ).first()
     
     if not workout:
@@ -340,9 +340,9 @@ def submit_workout_feedback(
     - rpe_accuracy
     """
     # Verificar workout
-    workout = db.query(Workout).filter(
-        Workout.id == workout_id,
-        Workout.user_id == current_user
+    workout = db.query(PlannedWorkout).filter(
+        PlannedWorkout.id == workout_id,
+        PlannedWorkout.user_id == current_user
     ).first()
     
     if not workout:
@@ -448,9 +448,9 @@ def push_to_external_app(
     Adapter layer para compatibilidad con APIs externas.
     """
     # Obtener workout
-    workout = db.query(Workout).filter(
-        Workout.id == request.workout_id,
-        Workout.user_id == current_user
+    workout = db.query(PlannedWorkout).filter(
+        PlannedWorkout.id == request.workout_id,
+        PlannedWorkout.user_id == current_user
     ).first()
     
     if not workout:

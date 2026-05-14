@@ -12,3 +12,4 @@ from app.models.community import Challenge, ChallengeParticipant, UserPublicProf
 from app.models.nutrition import NutritionSettings, MealLog, DailyNutritionSummary
 from app.models.adaptive_training_plan import AdaptiveTrainingPlan, AdaptivePlannedSession, AdaptivePlanAdjustment
 from app.models.master_plan import MasterPlan
+from app.training.domain.models import PlannedWorkout

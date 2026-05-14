@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 # Test fixtures y mocks
 from app.training.domain.models import (
-    ExerciseLibrary, Workout, ExerciseBlock, ExerciseSet,
+    ExerciseLibrary, PlannedWorkout, ExerciseBlock, ExerciseSet,
     WorkoutType, MuscleGroup, SetStatus, WorkoutStatus
 )
 from app.training.schemas import (
@@ -306,12 +306,12 @@ def test_training_constants_import():
 def test_models_import():
     """Test: Importación correcta de modelos"""
     from app.training import (
-        ExerciseLibrary, Workout, ExerciseSet,
+        ExerciseLibrary, PlannedWorkout, ExerciseSet,
         SetStatus, WorkoutType
     )
     
     assert ExerciseLibrary is not None
-    assert Workout is not None
+    assert PlannedWorkout is not None
 
 
 def test_use_cases_import():

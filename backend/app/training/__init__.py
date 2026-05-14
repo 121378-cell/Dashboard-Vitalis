@@ -6,7 +6,7 @@ Módulo principal del sistema de entrenamiento inteligente.
 """
 
 from app.training.domain.models import (
-    ExerciseLibrary, TrainingPlan, Workout, ExerciseBlock, ExerciseSet,
+    ExerciseLibrary, TrainingPlan, PlannedWorkout, ExerciseBlock, ExerciseSet,
     WorkoutFeedback, TrainingAdaptation, UserTrainingProfile,
     SetStatus, WorkoutStatus, WorkoutType, MuscleGroup, AdaptationReason
 )
@@ -28,7 +28,7 @@ from app.training.use_cases import (
 
 __all__ = [
     # Domain
-    "ExerciseLibrary", "TrainingPlan", "Workout", "ExerciseBlock", "ExerciseSet",
+    "ExerciseLibrary", "TrainingPlan", "PlannedWorkout", "ExerciseBlock", "ExerciseSet",
     "WorkoutFeedback", "TrainingAdaptation", "UserTrainingProfile",
     "SetStatus", "WorkoutStatus", "WorkoutType", "MuscleGroup", "AdaptationReason",
     # Schemas

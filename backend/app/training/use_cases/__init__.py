@@ -19,7 +19,7 @@ import random
 import logging
 
 from app.training.domain.models import (
-    ExerciseLibrary, TrainingPlan, Workout, ExerciseBlock, ExerciseSet,
+    ExerciseLibrary, TrainingPlan, PlannedWorkout, ExerciseBlock, ExerciseSet,
     WorkoutFeedback, TrainingAdaptation, UserTrainingProfile,
     SetStatus, WorkoutStatus, WorkoutType, MuscleGroup, AdaptationReason
 )
@@ -345,7 +345,7 @@ class WorkoutAdapter:
     
     def adapt_workout(
         self,
-        workout: Workout,
+        workout: PlannedWorkout,
         request: TrainingAdaptationRequest
     ) -> List[Dict[str, Any]]:
         """
@@ -421,7 +421,7 @@ class WorkoutAdapter:
         
         return analysis
     
-    def _adapt_for_low_readiness(self, workout: Workout, readiness: float) -> List[Dict]:
+    def _adapt_for_low_readiness(self, workout: PlannedWorkout, readiness: float) -> List[Dict]:
         """Reduce intensidad y volumen para readiness bajo"""
         changes = []
         
@@ -441,7 +441,7 @@ class WorkoutAdapter:
         
         return changes
     
-    def _adapt_for_time_constraint(self, workout: Workout, minutes: int) -> List[Dict]:
+    def _adapt_for_time_constraint(self, workout: PlannedWorkout, minutes: int) -> List[Dict]:
         """Reduce ejercicios para ajustarse a tiempo disponible"""
         changes = []
         
@@ -464,7 +464,7 @@ class WorkoutAdapter:
         
         return changes
     
-    def _reduce_volume(self, workout: Workout, factor: float) -> List[Dict]:
+    def _reduce_volume(self, workout: PlannedWorkout, factor: float) -> List[Dict]:
         """Reduce volumen por factor dado"""
         changes = []
         
@@ -487,7 +487,7 @@ class WorkoutAdapter:
         
         return changes
     
-    def _reduce_intensity(self, workout: Workout, rpe_reduction: float) -> List[Dict]:
+    def _reduce_intensity(self, workout: PlannedWorkout, rpe_reduction: float) -> List[Dict]:
         """Reduce intensidad (RPE)"""
         changes = []
         
@@ -508,7 +508,7 @@ class WorkoutAdapter:
     
     def _apply_manual_changes(
         self,
-        workout: Workout,
+        workout: PlannedWorkout,
         changes: Dict[str, Any]
     ) -> List[Dict]:
         """Aplica cambios manuales solicitados"""
@@ -538,7 +538,7 @@ class WorkoutAdapter:
     
     def _log_adaptation(
         self,
-        workout: Workout,
+        workout: PlannedWorkout,
         request: TrainingAdaptationRequest,
         changes: List[Dict]
     ):
@@ -620,8 +620,8 @@ class TrainingAnalyzer:
         end: datetime
     ) -> float:
         """Calcula volumen total (kg) en período"""
-        sets = self.db.query(ExerciseSet).join(ExerciseBlock).join(Workout).filter(
-            Workout.user_id == user_id,
+        sets = self.db.query(ExerciseSet).join(ExerciseBlock).join(PlannedWorkout).filter(
+            PlannedWorkout.user_id == user_id,
             ExerciseSet.status == SetStatus.COMPLETED,
             ExerciseSet.completed_at >= start,
             ExerciseSet.completed_at <= end
@@ -645,8 +645,8 @@ class TrainingAnalyzer:
         """Analiza tendencias de RPE"""
         start = datetime.utcnow() - timedelta(days=days)
         
-        sets = self.db.query(ExerciseSet).join(ExerciseBlock).join(Workout).filter(
-            Workout.user_id == user_id,
+        sets = self.db.query(ExerciseSet).join(ExerciseBlock).join(PlannedWorkout).filter(
+            PlannedWorkout.user_id == user_id,
             ExerciseSet.status == SetStatus.COMPLETED,
             ExerciseSet.completed_at >= start,
             ExerciseSet.actual_rpe != None
@@ -688,10 +688,10 @@ class TrainingEntityFactory:
     def create_workout_from_schema(
         schema: WorkoutCreate,
         user_id: str
-    ) -> Workout:
-        """Crea modelo Workout desde schema"""
+    ) -> PlannedWorkout:
+        """Crea modelo PlannedWorkout desde schema"""
         
-        workout = Workout(
+        workout = PlannedWorkout(
             user_id=user_id,
             plan_id=schema.plan_id,
             name=schema.name,
