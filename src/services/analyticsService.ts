@@ -7,7 +7,7 @@ import type {
   MonthlyInsightsResponse,
 } from '../types';
 
-const BASE = '/api/v1/analytics';
+const BASE = '/analytics';
 
 export const analyticsService = {
   getCorrelations: (days = 90) =>

@@ -41,7 +41,7 @@ class SyncService:
                 return False
 
         today = date.today().isoformat()
-        three_days_ago = (date.today() - timedelta(days=3)).isoformat()
+        three_days_ago = date.today() - timedelta(days=3)
 
         success = True
         consecutive_errors = 0

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getData, postData } from '../services/api';
+import { BACKEND_URL, getAuthToken } from '../config';
 
 export interface AtlasNotification {
   id: number;
@@ -39,7 +40,6 @@ export interface UseNotificationsReturn {
   dismissToast: () => void;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://atlas-vitalis-backend.fly.dev/api/v1';
 const WS_BASE = BACKEND_URL.replace(/^http/, 'ws').replace('/api/v1', '');
 const WS_URL = `${WS_BASE}/api/v1/ws/notifications`;
 
@@ -60,7 +60,7 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onNewNotificationRef = useRef(onNewNotification);
   const isMountedRef = useRef(true);
-  const hasInitializedRef = useRef(false);
+  isMountedRef.current = true;
   onNewNotificationRef.current = onNewNotification;
 
   const fetchUnread = useCallback(async () => {
@@ -109,6 +109,7 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   }, []);
 
   const connect = useCallback(() => {
+    if (!isMountedRef.current) return;
     if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
       return; // already connecting or open
     }
@@ -120,9 +121,10 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
         // ignore close errors
       }
     }
-
     try {
-      const ws = new WebSocket(WS_URL);
+	      const token = getAuthToken();
+	      const wsUrl = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
+	      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -177,9 +179,6 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   }, []);
 
   useEffect(() => {
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
-
     fetchUnread();
     connect();
 
@@ -195,7 +194,9 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
       }
       if (wsRef.current) {
         try {
-          if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+          // Solo cerrar conexiones completamente abiertas
+          // Si esta CONNECTING, dejamos que el browser la gestione
+          if (wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.close();
           }
         } catch {

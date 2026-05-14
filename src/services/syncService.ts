@@ -1,15 +1,7 @@
 import axios from 'axios';
 import { offlineStorage, SyncQueueItem } from './offlineStorage';
 import { HCBiometrics, HCWorkout } from './healthConnectService';
-import { getAuthToken } from '../config';
-
-// URL única del backend (misma que usa App.tsx)
-const RAW_BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL ||
-  import.meta.env.VITE_API_URL ||
-  '/api/v1';
-
-const BACKEND_URL = String(RAW_BACKEND_URL).replace(/\/+$/, '');
+import { BACKEND_URL, getAuthToken } from '../config';
 
 export class SyncService {
   

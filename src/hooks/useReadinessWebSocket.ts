@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { WS_URL as WS_READINESS_URL, getAuthToken } from '../config';
 
 /**
  * Tipos de eventos WebSocket para Readiness Score
@@ -127,9 +128,6 @@ export function useReadinessWebSocket(
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentAttemptRef = useRef(0);
-
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://atlas-vitalis-backend.fly.dev/api/v1';
-  const WS_URL = BACKEND_URL.replace(/^http/, 'ws').replace('/api/v1', '') + '/api/v1/ws/readiness';
 
   /**
    * Calcula el delay de reconexión con backoff exponencial
@@ -283,8 +281,9 @@ export function useReadinessWebSocket(
 
     try {
       // Construir URL con query params
-      const url = new URL(WS_URL);
-      if (token) url.searchParams.append('token', token);
+      const url = new URL(WS_READINESS_URL);
+      const authToken = token || getAuthToken();
+      if (authToken) url.searchParams.append('token', authToken);
       
       console.log('[useReadinessWebSocket] Conectando a:', url.toString());
       
@@ -300,7 +299,7 @@ export function useReadinessWebSocket(
       setError('Error iniciando conexión WebSocket');
       setIsConnecting(false);
     }
-  }, [WS_URL, token, handleOpen, handleMessage, handleError, handleClose]);
+  }, [WS_READINESS_URL, token, handleOpen, handleMessage, handleError, handleClose]);
 
   /**
    * Fuerza reconexión manual
