@@ -1,7 +1,14 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { NotificationCenter } from '../components/NotificationCenter';
+import { clearAuthToken } from '../config';
 
 export const WebDashboardLayout = ({ children }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    clearAuthToken();
+    navigate('/login', { replace: true });
+  };
   return (
     <div className="flex h-screen bg-[var(--color-background)]">
       {/* Sidebar */}
@@ -104,9 +111,18 @@ export const WebDashboardLayout = ({ children }) => {
         </nav>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[var(--color-outline-variant)]/10">
-          {/* Version or other info */}
-          <p className="text-[10px] text-[var(--color-on-surface-variant)]/70">
+        <div className="p-4 border-t border-[var(--color-outline-variant)]/10 space-y-2">
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 p-3 rounded-lg text-[var(--color-on-surface-variant)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-all duration-200 font-medium text-sm"
+            title="Cerrar sesión"
+          >
+            <span className="text-xs">🚪</span>
+            <span>Cerrar Sesión</span>
+          </button>
+          {/* Version */}
+          <p className="text-[10px] text-[var(--color-on-surface-variant)]/70 text-center">
             v1.0.0
           </p>
         </div>
@@ -134,22 +150,35 @@ export const WebDashboardLayout = ({ children }) => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            {/* User selector (placeholder for future multi-user) */}
-            <div className="relative">
+          <div className="flex items-center gap-2">
+            {/* User selector */}
+            <div className="relative group">
               <button
-                className="flex items-center gap-2 p-2 bg-[var(--color-surface-variant)] rounded-lg hover:bg-[var(--color-surface-variant)]/75 transition-colors"
+                className="flex items-center gap-2 p-2 bg-[var(--color-surface-variant)] rounded-lg hover:bg-[var(--color-surface-variant)]/75 transition-colors cursor-default"
               >
                 <span className="w-8 h-8 bg-[var(--color-primary)] rounded-full flex items-center justify-center text-[var(--color-on-primary)] text-sm">
                   S
                 </span>
-                <div>
+                <div className="text-left">
                   <span className="text-xs font-medium text-[var(--color-text)]">Sergi</span>
-                  <span className="text-[10px] text-[var(--color-on-surface-variant)]">default_user</span>
+                  <span className="text-[10px] text-[var(--color-on-surface-variant)] block">default_user</span>
                 </div>
               </button>
-              {/* Dropdown would go here */}
-      </div>
+              {/* Dropdown menu on hover */}
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--color-surface)] border border-[var(--color-outline)] rounded-xl shadow-2xl shadow-black/40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                <div className="p-2 border-b border-[var(--color-outline)]/50">
+                  <p className="text-xs font-medium text-[var(--color-text)] px-3 py-1">Sergi</p>
+                  <p className="text-[10px] text-[var(--color-text-muted)] px-3 pb-1">default_user</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors"
+                >
+                  <span>🚪</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
 
                 {/* Notification Center */}
                 <NotificationCenter />
