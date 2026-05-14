@@ -27,7 +27,20 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables initialized successfully.")
         
-        # 2. Bootstrap de credenciales (Plan B para Fly.io)
+        # 2. Migracion de planned_workouts (tabla del training engine)
+        try:
+            logger.info("Running planned_workouts migration...")
+            from migrate_planned_workouts import (
+                create_planned_workouts_table,
+                migrate_adaptive_sessions
+            )
+            create_planned_workouts_table()
+            migrate_adaptive_sessions()
+            logger.info("planned_workouts migration completed.")
+        except Exception as me:
+            logger.error(f"planned_workouts migration error: {me}")
+
+        # 3. Bootstrap de credenciales (Plan B para Fly.io)
         from app.db.session import SessionLocal
         from app.models.token import Token
         from app.models.user import User
@@ -56,7 +69,7 @@ async def lifespan(app: FastAPI):
                 db.commit()
                 logger.info("Garmin credentials bootstrapped successfully.")
         
-        # 3. Start the scheduler
+        # 4. Start the scheduler
         logger.info("Starting scheduler...")
         start_scheduler()
         logger.info("Scheduler started successfully.")
