@@ -57,6 +57,7 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   const maxReconnect = 5;
   const reconnectInterval = 3000;
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onNewNotificationRef = useRef(onNewNotification);
   const isMountedRef = useRef(true);
   const hasInitializedRef = useRef(false);
@@ -142,7 +143,10 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
             if (!newNotif.read_at) {
               setUnreadCount(prev => prev + 1);
               setLatestToast(newNotif);
-              setTimeout(() => setLatestToast(null), 4000);
+              if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+              toastTimeoutRef.current = setTimeout(() => {
+                if (isMountedRef.current) setLatestToast(null);
+              }, 4000);
             }
             onNewNotificationRef.current?.(newNotif);
           } else if (msg.type === "marked_read" && msg.id) {
@@ -185,6 +189,9 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
       clearInterval(pollInterval);
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
       }
       if (wsRef.current) {
         try {

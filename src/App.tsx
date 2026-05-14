@@ -1,17 +1,17 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { WebDashboardLayout } from './layout/WebDashboardLayout';
-import { OverviewPage } from './pages/OverviewPage';
-import { BiometricsPage } from './pages/BiometricsPage';
-import { TrainingPage } from './pages/TrainingPage';
-import { ReadinessPage } from './pages/ReadinessPage';
-import { MemoryPage } from './pages/MemoryPage';
-import { PlanPage } from './pages/PlanPage';
-import { CoachPage } from './pages/CoachPage';
 
-// Initialize React Query Client
+const OverviewPage = lazy(() => import('./pages/OverviewPage').then(m => ({ default: m.OverviewPage })));
+const BiometricsPage = lazy(() => import('./pages/BiometricsPage').then(m => ({ default: m.BiometricsPage })));
+const TrainingPage = lazy(() => import('./pages/TrainingPage').then(m => ({ default: m.TrainingPage })));
+const ReadinessPage = lazy(() => import('./pages/ReadinessPage').then(m => ({ default: m.ReadinessPage })));
+const MemoryPage = lazy(() => import('./pages/MemoryPage').then(m => ({ default: m.MemoryPage })));
+const PlanPage = lazy(() => import('./pages/PlanPage').then(m => ({ default: m.PlanPage })));
+const CoachPage = lazy(() => import('./pages/CoachPage').then(m => ({ default: m.CoachPage })));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -25,63 +25,40 @@ const queryClient = new QueryClient({
   },
 });
 
-// Dashboard Layout Wrapper
 const DashboardLayout = () => (
   <WebDashboardLayout>
     <Outlet />
   </WebDashboardLayout>
 );
 
-// Router Configuration
+const PageFallback = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+    <span style={{ color: 'var(--muted-foreground, #888)' }}>Cargando...</span>
+  </div>
+);
+
 const router = createBrowserRouter([
   {
     path: '/',
     element: <DashboardLayout />,
     children: [
-      {
-        index: true,
-        element: <OverviewPage />,
-      },
-      {
-        path: 'overview',
-        element: <OverviewPage />,
-      },
-      {
-        path: 'biometrics',
-        element: <BiometricsPage />,
-      },
-      {
-        path: 'training',
-        element: <TrainingPage />,
-      },
-      {
-        path: 'readiness',
-        element: <ReadinessPage />,
-      },
-      {
-        path: 'memory',
-        element: <MemoryPage />,
-      },
-      {
-        path: 'plan',
-        element: <PlanPage />,
-      },
-      {
-        path: 'coach',
-        element: <CoachPage />,
-      },
+      { index: true, element: <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> },
+      { path: 'overview', element: <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> },
+      { path: 'biometrics', element: <Suspense fallback={<PageFallback />}><BiometricsPage /></Suspense> },
+      { path: 'training', element: <Suspense fallback={<PageFallback />}><TrainingPage /></Suspense> },
+      { path: 'readiness', element: <Suspense fallback={<PageFallback />}><ReadinessPage /></Suspense> },
+      { path: 'memory', element: <Suspense fallback={<PageFallback />}><MemoryPage /></Suspense> },
+      { path: 'plan', element: <Suspense fallback={<PageFallback />}><PlanPage /></Suspense> },
+      { path: 'coach', element: <Suspense fallback={<PageFallback />}><CoachPage /></Suspense> },
     ],
   },
 ]);
 
-// Root App Component
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
-  );
-};
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <RouterProvider router={router} />
+    <ReactQueryDevtools initialIsOpen={false} />
+  </QueryClientProvider>
+);
 
 export default App;

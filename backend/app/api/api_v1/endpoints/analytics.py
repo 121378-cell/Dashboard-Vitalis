@@ -1,19 +1,21 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.services.analytics_service import AnalyticsService
 from app.services.athletic_intelligence_service import AthleticIntelligenceService
 from typing import Optional
 from datetime import timedelta
 import time
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/correlations")
 def get_correlations(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     days: int = Query(90, ge=30, le=365),
 ):
     return AnalyticsService.find_personal_correlations(db, user_id, days)
@@ -22,7 +24,7 @@ def get_correlations(
 @router.get("/readiness-forecast")
 def get_readiness_forecast(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     days_ahead: int = Query(3, ge=1, le=7),
 ):
     return AnalyticsService.forecast_readiness(db, user_id, days_ahead)
@@ -31,7 +33,7 @@ def get_readiness_forecast(
 @router.get("/plateaus")
 def get_plateaus(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     exercise: Optional[str] = Query(None),
     weeks: int = Query(6, ge=4, le=12),
 ):
@@ -41,7 +43,7 @@ def get_plateaus(
 @router.get("/optimal-volume")
 def get_optimal_volume(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
 ):
     return AnalyticsService.find_optimal_volume(db, user_id)
 
@@ -49,7 +51,7 @@ def get_optimal_volume(
 @router.get("/insights")
 def get_insights(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
 ):
     return AnalyticsService.get_monthly_insights(db, user_id)
 
@@ -67,7 +69,7 @@ _CACHE_DURATION = 30 * 60  # 30 segundos
 @router.get("/intelligence/profile")
 def get_athletic_profile(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Obtiene el perfil atlético completo del atleta.
@@ -113,7 +115,7 @@ def get_athletic_profile(
 @router.get("/intelligence/overreaching-check")
 def get_overreaching_check(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Obtiene solo el análisis de riesgo de sobreentrenamiento.

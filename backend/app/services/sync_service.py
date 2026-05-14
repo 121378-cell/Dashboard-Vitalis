@@ -86,9 +86,9 @@ class SyncService:
                         bb_drained = safe_get(bb[0], "drained")
                         if body_battery is None:
                             body_battery = safe_get(bb[0], "charged")
-                    time.sleep(1.0)
-                except Exception:
-                    pass
+                        time.sleep(1.0)
+                except Exception as e:
+                    logger.debug(f"Body Battery fetch failed for {date_str}: {e}")
                 if body_battery is None and bb_most_recent is not None:
                     body_battery = bb_most_recent
 
@@ -98,9 +98,9 @@ class SyncService:
                     readiness_data = client.get_training_readiness(date_str)
                     if readiness_data and isinstance(readiness_data, dict):
                         training_readiness = safe_get(readiness_data, "overallValue")
-                    time.sleep(1.0)
-                except Exception:
-                    pass
+                        time.sleep(1.0)
+                except Exception as e:
+                    logger.debug(f"Training Readiness fetch failed for {date_str}: {e}")
 
                 # Recovery and Training Status
                 training_status_data = client.get_training_status(date_str)
@@ -112,8 +112,9 @@ class SyncService:
                     daily_steps_data = client.get_daily_steps(date_str, date_str)
                     if daily_steps_data and isinstance(daily_steps_data, list) and len(daily_steps_data) > 0:
                         daily_steps_data = daily_steps_data[0]
-                    time.sleep(1.0)
-                except Exception:
+                        time.sleep(1.0)
+                except Exception as e:
+                    logger.debug(f"Daily steps fetch failed for {date_str}: {e}")
                     daily_steps_data = None
                 
                 recovery_time = safe_get(
@@ -137,7 +138,9 @@ class SyncService:
                             resp_data, "avgWakingRespirationValue"
                         ) or safe_get(resp_data, "avgSleepRespirationValue")
                         time.sleep(1.0)
-                    except: respiration = None
+                    except Exception as e:
+                        logger.debug(f"Respiration data fetch failed for {date_str}: {e}")
+                        respiration = None
 
                 # VO2 Max fallback
                 vo2max = safe_get(stats, "vo2Max")
@@ -152,7 +155,9 @@ class SyncService:
                                 vo2max = vo2max_precise
                                 break
                         time.sleep(1.0)
-                    except: vo2max = None
+                    except Exception as e:
+                        logger.debug(f"VO2 Max fetch failed for {date_str}: {e}")
+                        vo2max = None
 
                 # HRV nightly detail (lastNight) — more granular than weekly average
                 hrv_last_night = safe_get(hrv, "lastNight")
@@ -340,8 +345,8 @@ class SyncService:
                             "sleep": data.get("sleep"),
                             "hrv": data.get("hrv")
                         }
-                    except:
-                        pass
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.debug(f"Memory Engine: Failed to parse biometric data: {e}")
                 
                 # Auto-generate memories
                 memories = MemoryService.auto_generate_from_sync(
@@ -357,8 +362,6 @@ class SyncService:
                     
             except Exception as e:
                 logger.error(f"Memory Engine error during sync: {e}")
-                # Don't fail the sync if memory generation fails
-                pass
 
         return success
 

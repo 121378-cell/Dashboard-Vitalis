@@ -360,16 +360,51 @@ class AthleteProfileService:
     def get_profile_dict(cls, db: Session, user_id: str) -> Dict[str, Any]:
         """
         Obtiene el perfil del atleta como diccionario.
-        
+
         Args:
             db: Sesión de base de datos
             user_id: ID del usuario
-        
+
         Returns:
             Perfil del atleta como diccionario
         """
         profile = cls.get_profile(db, user_id)
         return profile.to_dict()
+
+    @classmethod
+    def get_profile_summary(cls, user_id: str, db: Session) -> str:
+        """
+        Obtiene un resumen textual del perfil del atleta para contexto de IA.
+
+        Args:
+            user_id: ID del usuario
+            db: Sesión de base de datos
+
+        Returns:
+            Resumen legible del perfil, o 'Perfil no disponible' si falla
+        """
+        try:
+            profile = cls.get_profile(db, user_id)
+            parts = []
+            if profile.name:
+                parts.append(f"Atleta: {profile.name}")
+            if profile.age:
+                parts.append(f"{profile.age} años")
+            if profile.activity_level:
+                parts.append(f"Nivel: {profile.activity_level}")
+            if profile.steps and profile.steps.average:
+                parts.append(f"{profile.steps.average:.0f} pasos/día")
+            if profile.sleep and profile.sleep.average:
+                parts.append(f"Sueño: {profile.sleep.average:.1f}h")
+            if profile.hrv and profile.hrv.average:
+                parts.append(f"HRV: {profile.hrv.average:.0f}ms")
+            if profile.fitness_level:
+                parts.append(f"Fitness: {profile.fitness_level}")
+            if profile.recovery_capacity:
+                parts.append(f"Recuperación: {profile.recovery_capacity}")
+            return " | ".join(parts) if parts else "Perfil no disponible"
+        except Exception:
+            return "Perfil no disponible"
     
     @classmethod
     def get_coach_context(cls, db: Session, user_id: str) -> Dict[str, Any]:

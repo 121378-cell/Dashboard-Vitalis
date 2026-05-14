@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.services.notification_service import NotificationService
 
 router = APIRouter()
@@ -102,7 +102,7 @@ class FCMTokenResponse(BaseModel):
 def register_fcm_token(
     token_data: FCMTokenRegister,
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
 ):
     try:
         from app.services.push_service import push_service
@@ -120,7 +120,7 @@ def register_fcm_token(
 @router.get("/briefing/today")
 def get_today_briefing(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
 ):
     try:
         from app.models.daily_briefing import DailyBriefing

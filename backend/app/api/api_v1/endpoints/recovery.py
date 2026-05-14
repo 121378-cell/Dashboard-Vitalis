@@ -83,7 +83,7 @@ class RecoveryStatusResponse(BaseModel):
 
 @router.get("/status", response_model=RecoveryStatusResponse)
 async def get_recovery_status(
-    user_id: str = get_current_user_id(),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     status = InjuryPreventionService.get_current_status(db, user_id)
@@ -92,7 +92,7 @@ async def get_recovery_status(
 
 @router.get("/session", response_model=RecoverySessionResponse)
 async def get_recovery_session(
-    user_id: str = get_current_user_id(),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     status = InjuryPreventionService.get_current_status(db, user_id)
@@ -106,7 +106,7 @@ async def get_recovery_session(
 @router.post("/report-pain")
 async def report_pain(
     body: PainReportRequest,
-    user_id: str = get_current_user_id(),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     result = InjuryPreventionService.report_pain(
@@ -134,7 +134,7 @@ async def report_pain(
 
 @router.get("/injury-history", response_model=List[InjuryRecord])
 async def get_injury_history(
-    user_id: str = get_current_user_id(),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     injuries = InjuryPreventionService.get_injury_history(db, user_id)
@@ -144,7 +144,7 @@ async def get_injury_history(
 @router.post("/acknowledge-alert")
 async def acknowledge_alert(
     body: AcknowledgeAlertRequest,
-    user_id: str = get_current_user_id(),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     """
@@ -173,7 +173,7 @@ async def acknowledge_alert(
 
 @router.get("/injury-patterns")
 async def get_injury_patterns(
-    user_id: str = get_current_user_id(),
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     """

@@ -41,6 +41,17 @@ _RATE_LIMITS: Dict[str, Tuple[int, int]] = {
     "POST:/api/v1/ai/chat": (30, 60),
     "POST:/api/v1/sync/garmin": (10, 3600),
     "POST:/api/v1/auth/garmin/login": (5, 3600),
+    "POST:/api/v1/ai/briefing": (15, 60),
+    "POST:/api/v1/ai/weekly-report": (5, 3600),
+    "GET:/api/v1/biometrics": (60, 60),
+    "GET:/api/v1/workouts": (60, 60),
+    "GET:/api/v1/readiness": (60, 60),
+    "GET:/api/v1/notifications": (60, 60),
+    "POST:/api/v1/notifications": (30, 60),
+    "GET:/api/v1/analytics": (30, 60),
+    "POST:/api/v1/memory": (30, 60),
+    "POST:/api/v1/plan": (20, 60),
+    "GET:/api/v1/plan": (60, 60),
 }
 
 _buckets: Dict[str, _TokenBucket] = {}

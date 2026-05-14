@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.models.token import Token
 from app.models.user import User
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ class ServiceSettings(BaseModel):
     hevy_username: Optional[str] = None
 
 @router.get("/services")
-def get_services(db: Session = Depends(get_db), user_id: str = "default_user"):
+def get_services(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     creds = db.query(Token).filter(Token.user_id == user_id).first()
     if not creds:
         return {"wger_api_key": "", "hevy_username": ""}
@@ -23,7 +23,7 @@ def get_services(db: Session = Depends(get_db), user_id: str = "default_user"):
     }
 
 @router.post("/services")
-def save_services(settings: ServiceSettings, db: Session = Depends(get_db), user_id: str = "default_user"):
+def save_services(settings: ServiceSettings, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     creds = db.query(Token).filter(Token.user_id == user_id).first()
     if not creds:
         creds = Token(user_id=user_id)
@@ -38,7 +38,7 @@ def save_services(settings: ServiceSettings, db: Session = Depends(get_db), user
     return {"success": True}
 
 @router.get("/profile")
-def get_profile(db: Session = Depends(get_db), user_id: str = "default_user"):
+def get_profile(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Devuelve el perfil guardado del usuario."""
     user = db.query(User).filter(User.id == user_id).first()
     token = db.query(Token).filter(Token.user_id == user_id).first()
@@ -62,7 +62,7 @@ def get_profile(db: Session = Depends(get_db), user_id: str = "default_user"):
 def save_profile(
     name: str = Body(...),
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """Guarda el nombre del perfil del usuario."""
     user = db.query(User).filter(User.id == user_id).first()

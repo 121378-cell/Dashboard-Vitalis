@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional, List
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.services.memory_service import MemoryService
 
 router = APIRouter()
@@ -46,7 +46,7 @@ def get_memory_summary(
     days: int = 90,
     types: Optional[str] = None,  # comma-separated list
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Get memory summary for AI context injection.
@@ -63,7 +63,7 @@ def get_memory_summary(
 def create_memory_entry(
     request: MemoryEntryRequest,
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """Manually add a memory entry."""
     valid_types = ("injury", "achievement", "pattern", "preference", "milestone", "health_alert")
@@ -94,7 +94,7 @@ def create_memory_entry(
 def delete_memory_entry(
     memory_id: int,
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """Delete a specific memory entry."""
     success = MemoryService.delete_memory(db, user_id, memory_id)

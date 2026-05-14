@@ -592,8 +592,7 @@ class TrainingPlannerService:
             return 6
 
     async def _get_athlete_profile(self, db: Session, user_id: str) -> Dict[str, Any]:
-        profile_service = AthleteProfileService()
-        profile = profile_service.get_profile_summary(user_id, db)
+        profile = AthleteProfileService.get_profile_dict(db, user_id)
         if not profile:
             return {
                 "days_per_week": 4,

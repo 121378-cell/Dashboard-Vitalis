@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.models.token import Token
 from app.models.user import User
 from app.utils.garmin import get_garmin_client
@@ -50,12 +50,12 @@ def garmin_login(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status")
-def get_auth_status(db: Session = Depends(get_db), user_id: str = "default_user"):
+def get_auth_status(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     token = db.query(Token).filter(Token.user_id == user_id).first()
     return {"authenticated": bool(token and token.garmin_email)}
 
 @router.post("/disconnect")
-def disconnect(db: Session = Depends(get_db), user_id: str = "default_user"):
+def disconnect(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     db.query(Token).filter(Token.user_id == user_id).delete()
     db.commit()
     return {"success": True}

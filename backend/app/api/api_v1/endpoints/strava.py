@@ -6,7 +6,7 @@ Documentación: https://developers.strava.com/docs/authentication/
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.models.token import Token
 from app.models.user import User
 from app.core.config import settings
@@ -136,7 +136,7 @@ async def strava_callback(
 @router.get("/status")
 async def strava_status(
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Verifica si el usuario tiene Strava conectado.
@@ -164,7 +164,7 @@ async def strava_status(
 @router.post("/disconnect")
 async def strava_disconnect(
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Desconecta Strava del usuario.
@@ -187,7 +187,7 @@ async def strava_disconnect(
 async def get_strava_activities(
     limit: int = 30,
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Obtiene las últimas actividades de Strava del usuario.
@@ -249,7 +249,7 @@ async def get_strava_activities(
 async def sync_strava_activities(
     days: int = 30,
     db: Session = Depends(get_db),
-    user_id: str = "default_user"
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Sincroniza actividades de Strava a Atlas Workouts.

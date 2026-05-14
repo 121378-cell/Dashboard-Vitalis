@@ -1,5 +1,6 @@
 import logging
 import re
+import threading
 import time
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -10,6 +11,28 @@ from app.core.config import settings
 from app.services.memory_service import MemoryService
 
 logger = logging.getLogger("app.services.ai_service")
+
+
+class ThreadSafeCache:
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            return self._cache.get(key)
+
+    def set(self, key: str, value: Dict[str, Any]) -> None:
+        with self._lock:
+            self._cache[key] = value
+
+    def delete(self, key: str) -> None:
+        with self._lock:
+            self._cache.pop(key, None)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._cache.clear()
 
 MASTER_SYSTEM_PROMPT = """Eres ATLAS, el Director Deportivo de IA de {athlete_name}. NO eres un asistente pasivo.
 
@@ -99,9 +122,9 @@ MODE_INSTRUCTIONS = {
 - 2-3 frases. Contundente.""",
 }
 
-_prompt_cache: Dict[str, Dict[str, Any]] = {}
-_coach_context_cache: Dict[str, Dict[str, Any]] = {}
-_welcome_cache: Dict[str, Dict[str, Any]] = {}
+_prompt_cache = ThreadSafeCache()
+_coach_context_cache = ThreadSafeCache()
+_welcome_cache = ThreadSafeCache()
 
 
 def _cache_key(user_id: str) -> str:
@@ -162,7 +185,7 @@ def build_coach_context(db, user_id: str = "default_user") -> Dict[str, Any]:
             profile_data = ai_cached["result"]
         else:
             profile_data = AthleticIntelligenceService.get_full_athletic_profile(db, user_id)
-            _coach_context_cache[ai_cache_key] = {"result": profile_data, "ts": now}
+            _coach_context_cache.set(ai_cache_key, {"result": profile_data, "ts": now})
 
         identity = profile_data.get("athlete_identity", {})
         athlete_name = identity.get("name", "Sergi")
@@ -274,7 +297,8 @@ Progreso: {completed}/{total} sesiones completadas"""
                     if cal:
                         info += f" {cal}kcal"
                     w_lines.append(info)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"build_coach_context: Workout parse failed for '{w.name}': {e}")
                     w_lines.append(f"- {w.name}")
             workouts_context = "\n".join(w_lines)
         else:
@@ -439,7 +463,7 @@ def generate_welcome_message(db, user_id: str = "default_user") -> Dict[str, Any
         welcome_msg = "Hola, Sergi. Soy ATLAS, tu Director Deportivo. ¿En qué te puedo ayudar?"
 
     result = {"message": welcome_msg, "generated_at": now.isoformat()}
-    _welcome_cache[cache_key] = {"result": result, "ts": now}
+    _welcome_cache.set(cache_key, {"result": result, "ts": now})
     return result
 
 
@@ -505,8 +529,8 @@ def build_atlas_system_prompt(db, user_id: str) -> Dict[str, Any]:
         user_obj = db.query(User).filter(User.id == user_id).first()
         if user_obj and user_obj.name:
             athlete_name = user_obj.name
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"build_atlas_system_prompt: User lookup failed: {e}")
 
     try:
         profile_summary = AthleteProfileService.get_profile_summary(user_id, db)
@@ -518,8 +542,8 @@ def build_atlas_system_prompt(db, user_id: str) -> Dict[str, Any]:
             steps_match = _re.search(r'([\d.,]+)\s*pasos/día', profile_summary)
             if steps_match:
                 step_target = steps_match.group(1).replace(",", ".")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"build_atlas_system_prompt: AthleteProfileService failed: {e}")
 
     readiness_result = ReadinessService.calculate(db, user_id)
     readiness_score = readiness_result.get("score") or 50
@@ -602,7 +626,8 @@ Ratio: {acwr.get('ratio', 1.0)} — Estado: {acwr.get('status', 'mantenimiento')
                     info += f"Dist: {round(dist/1000, 2)}km. "
                 info += f"Dur: {round(w.duration/60, 1)}min. Cal: {w.calories}."
                 w_lines.append(info)
-            except Exception:
+            except Exception as e:
+                logger.debug(f"build_atlas_system_prompt: Workout parse failed for '{w.name}': {e}")
                 w_lines.append(f"- {w.name}. Dur: {w.duration}s.")
         workouts_context = "\n".join(w_lines)
     else:
@@ -621,14 +646,15 @@ Ratio: {acwr.get('ratio', 1.0)} — Estado: {acwr.get('status', 'mantenimiento')
 Nombre: {plan.get('session_name', 'N/A')}
 Duración: {plan.get('estimated_duration_min', 0)}min
 Ejercicios: {len(plan.get('exercises', []))}"""
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"build_atlas_system_prompt: Training session lookup failed: {e}")
 
     memory_context = MemoryService.get_memory_context_string(db, user_id, max_tokens=1500)
 
     try:
         profile_context = AthleteProfileService.get_profile_summary(user_id, db)
-    except Exception:
+    except Exception as e:
+        logger.debug(f"build_atlas_system_prompt: Profile summary failed: {e}")
         profile_context = f"Atleta: {athlete_name}, {athlete_age} años. Objetivo: Proyecto 31/07."
 
     exercise_context = ExerciseService.get_context_summary()
@@ -660,11 +686,11 @@ Ejercicios: {len(plan.get('exercises', []))}"""
         try:
             bd = json.loads(today_bio.data)
             bio_summary = f"HRV:{bd.get('hrv', 0)} FCR:{bd.get('heartRate', 0)}"
-        except Exception:
-            pass
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.debug(f"build_atlas_system_prompt: Bio data parse failed: {e}")
     injury_summary = "active_injury" if active_injuries else "clear"
 
-    _prompt_cache[key] = {
+    _prompt_cache.set(key, {
         "result": {
             "prompt": prompt,
             "athlete_name": athlete_name,
@@ -675,9 +701,10 @@ Ejercicios: {len(plan.get('exercises', []))}"""
             "injury_summary": injury_summary,
         },
         "ts": datetime.now(),
-    }
+    })
 
-    return _prompt_cache[key]["result"]
+    cached = _prompt_cache.get(key)
+    return cached["result"] if cached else {"prompt": prompt, "athlete_name": athlete_name, "athlete_age": athlete_age, "step_target": step_target, "readiness_score": readiness_score, "bio_summary": bio_summary, "injury_summary": injury_summary}
 
 class AIService:
     def __init__(self):
@@ -757,7 +784,8 @@ class AIService:
             import requests
             response = requests.get(f"{settings.OLLAMA_BASE_URL}/api/tags", timeout=2)
             return response.status_code == 200
-        except:
+        except Exception as e:
+            logger.debug(f"Ollama availability check failed: {e}")
             return False
 
     def _generate_openai_compatible(self, client: OpenAI, model: str, messages: List[Dict], system_instruction: str = None, timeout: int = 30) -> str:
@@ -961,11 +989,9 @@ class AIService:
                 if bio.data:
                     try:
                         data = json.loads(bio.data)
-                        # We don't store readiness directly in biometrics, so we'll estimate
-                        # In a real implementation, we'd join with daily_briefings or readiness table
-                        readiness_scores.append(70)  # placeholder
-                    except:
-                        pass
+                        readiness_scores.append(70) # placeholder
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.debug(f"Skipping biometric record with invalid data: {e}")
             
             avg_readiness = sum(readiness_scores) / len(readiness_scores) if readiness_scores else 70
             

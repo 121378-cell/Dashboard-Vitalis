@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.services.sync_service import SyncService
 from app.services.athlete_profile_service import AthleteProfileService
 from app.utils.garmin_exceptions import (
@@ -16,7 +16,7 @@ router = APIRouter()
 @router.post("/garmin")
 def sync_garmin(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     days: int = Query(1, description="Number of days to sync (max 7)"),
 ):
     """Sync Garmin health and activity data."""
@@ -65,7 +65,7 @@ def sync_garmin(
 
 
 @router.post("/wger")
-def sync_wger(db: Session = Depends(get_db), user_id: str = "default_user"):
+def sync_wger(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     success = SyncService.sync_wger_workouts(db, user_id)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to sync Wger data")
@@ -73,7 +73,7 @@ def sync_wger(db: Session = Depends(get_db), user_id: str = "default_user"):
 
 
 @router.post("/hevy")
-def sync_hevy(db: Session = Depends(get_db), user_id: str = "default_user"):
+def sync_hevy(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     success = SyncService.sync_hevy_workouts(db, user_id)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to sync Hevy data")

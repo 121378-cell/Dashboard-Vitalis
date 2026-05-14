@@ -26,13 +26,19 @@ from app.services.analytics_service import AnalyticsService
 # 1. Readiness Score — never crashes on empty/null biometric data
 # ---------------------------------------------------------------------------
 class TestReadinessNullSafety:
+    def _make_bio_mock(self, data_dict):
+        bio = MagicMock(spec=["data", "date", "user_id", "body_battery", "training_readiness"])
+        bio.data = json.dumps(data_dict)
+        bio.date = date.today().isoformat()
+        bio.user_id = "test_user"
+        bio.body_battery = None
+        bio.training_readiness = None
+        return bio
+
     def test_null_hrv(self):
         svc = ReadinessService()
         db = MagicMock()
-        bio = MagicMock()
-        bio.data = json.dumps({"hrv": None, "heartRate": 55, "sleep": 7.5, "stress": 30, "steps": 8000})
-        bio.date = date.today().isoformat()
-        bio.user_id = "test_user"
+        bio = self._make_bio_mock({"hrv": None, "heartRate": 55, "sleep": 7.5, "stress": 30, "steps": 8000})
         db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [bio]
         db.query.return_value.filter.return_value.first.return_value = bio
         result = svc.calculate(db, "test_user", date_str=date.today().isoformat())
@@ -43,10 +49,7 @@ class TestReadinessNullSafety:
     def test_all_null_fields(self):
         svc = ReadinessService()
         db = MagicMock()
-        bio = MagicMock()
-        bio.data = json.dumps({"hrv": None, "heartRate": None, "sleep": None, "stress": None, "steps": None})
-        bio.date = date.today().isoformat()
-        bio.user_id = "test_user"
+        bio = self._make_bio_mock({"hrv": None, "heartRate": None, "sleep": None, "stress": None, "steps": None})
         db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [bio]
         db.query.return_value.filter.return_value.first.return_value = bio
         result = svc.calculate(db, "test_user", date_str=date.today().isoformat())
@@ -55,10 +58,8 @@ class TestReadinessNullSafety:
     def test_empty_data_string(self):
         svc = ReadinessService()
         db = MagicMock()
-        bio = MagicMock()
+        bio = self._make_bio_mock({})
         bio.data = "{}"
-        bio.date = date.today().isoformat()
-        bio.user_id = "test_user"
         db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [bio]
         db.query.return_value.filter.return_value.first.return_value = bio
         result = svc.calculate(db, "test_user", date_str=date.today().isoformat())

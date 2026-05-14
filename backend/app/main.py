@@ -36,7 +36,11 @@ async def lifespan(app: FastAPI):
             user = db.query(User).filter(User.id == "default_user").first()
             if not user:
                 logger.info("Creating default_user...")
-                user = User(id="default_user", email="sergi.marquez.al@gmail.com", name="Sergi")
+                user = User(
+            id="default_user",
+            email=os.getenv("ATLAS_USER_EMAIL", "user@example.com"),
+            name=os.getenv("ATLAS_USER_NAME", "Athlete"),
+        )
                 db.add(user)
                 db.commit()
             
@@ -79,8 +83,7 @@ async def fix_https_redirect(request: Request, call_next):
         request.scope["scheme"] = "https"
     return await call_next(request)
 
-# CORS configuration
-# Production: fly.dev + Capacitor mobile origins + local dev
+# CORS configuration — exact origins only, no wildcards
 origins = [
     "https://dashboard-vitalis.vercel.app",
     "https://dashboard-vitalis-git-main-sergimarquezbrugal-2353.vercel.app",
@@ -90,9 +93,6 @@ origins = [
     "http://localhost",
     "capacitor://localhost",
     "ionic://localhost",
-    "https://*.fly.dev",
-    "capacitor://",
-    "ionic://",
 ]
 
 if settings.ALLOW_ALL_ORIGINS:
@@ -104,9 +104,21 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "x-user-id"],
 )
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 _start_time = time.time()
 

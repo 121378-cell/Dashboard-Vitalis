@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 
-from app.db.session import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.services.athlete_profile_service import AthleteProfileService
 
 router = APIRouter()
@@ -23,7 +23,7 @@ router = APIRouter()
 
 @router.get("/athlete-profile")
 def get_athlete_profile(
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -45,7 +45,7 @@ def get_athlete_profile(
 
 @router.get("/athlete-profile/coach-context")
 def get_coach_context(
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """

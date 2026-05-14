@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Header
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user_id
 from app.services.ai_service import AIService, build_coach_context, detect_conversation_mode, MODE_INSTRUCTIONS, generate_welcome_message
 from app.services.session_service import SessionService
 from app.models.session import TrainingSession
@@ -24,7 +24,7 @@ class ChatRequest(BaseModel):
     system_prompt: Optional[str] = None
 
 @router.post("/chat")
-def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "default_user"):
+def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Enhanced coaching chat with dynamic ATLAS persona, mode detection, and session generation."""
     last_message = request.messages[-1].content if request.messages else ""
 
@@ -150,13 +150,13 @@ def chat(request: ChatRequest, db: Session = Depends(get_db), user_id: str = "de
         }
 
 @router.get("/welcome-message")
-def welcome_message(db: Session = Depends(get_db), user_id: str = "default_user"):
+def welcome_message(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Get personalized ATLAS welcome message. Cached 15min server-side."""
     result = generate_welcome_message(db, user_id)
     return result
 
 @router.get("/context-preview")
-def context_preview(db: Session = Depends(get_db), user_id: str = "default_user"):
+def context_preview(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Debug endpoint: returns the full system prompt and context meta without calling LLM."""
     context_result = build_coach_context(db, user_id)
     return {
@@ -172,7 +172,7 @@ def context_preview(db: Session = Depends(get_db), user_id: str = "default_user"
 @router.post("/generate-plan")
 def generate_plan(
     db: Session = Depends(get_db),
-    user_id: str = "default_user",
+    user_id: str = Depends(get_current_user_id),
     objective: str = "hipertrofia",
     level: str = "intermedio"
 ):
@@ -187,7 +187,7 @@ def generate_plan(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/daily-briefing")
-def daily_briefing(db: Session = Depends(get_db), user_id: str = "default_user"):
+def daily_briefing(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Get the morning summary with deep analysis context."""
     context_result = build_coach_context(db, user_id)
     full_system_prompt = context_result["prompt"]
