@@ -19,8 +19,11 @@ class Settings(BaseSettings):
     GARMIN_PASSWORD: Optional[str] = None
     GARMIN_TOKEN_DIR: str = "/data/.garth"
     
-    # CORS
-    ALLOW_ALL_ORIGINS: bool = False
+    # JWT Secret (cambiar en produccion)
+    SECRET_KEY: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 * 24 * 60  # 30 days
+    JWT_ADMIN_PASSWORD: Optional[str] = None  # Password para login single-user
     
     # AI Providers
     GEMINI_API_KEY: Optional[str] = None

@@ -110,7 +110,7 @@ manager = ConnectionManager()
 
 # ==================== ENDPOINT WEBSOCKET ====================
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.api.deps import get_current_user_id_from_token
@@ -152,10 +152,16 @@ async def readiness_websocket(
         "message": "Tu readiness ha bajado. Considera descanso."
     }
     """
-    # TODO: Validar token JWT para obtener user_id
-    # Por ahora usamos default_user para testing
-    user_id = "default_user"  # En producción: decode_jwt(token)
-    
+    # Validar token JWT del query parameter
+    try:
+        user_id = get_current_user_id_from_token(token)
+    except HTTPException:
+        await websocket.close(code=4001, reason="Token invalido o expirado")
+        return
+    except Exception:
+        await websocket.close(code=4001, reason="Error de autenticacion")
+        return
+
     await manager.connect(websocket, user_id)
     
     try:

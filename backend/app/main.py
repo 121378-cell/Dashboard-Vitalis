@@ -95,9 +95,6 @@ origins = [
     "ionic://localhost",
 ]
 
-if settings.ALLOW_ALL_ORIGINS:
-    origins = ["*"]
-
 app.add_middleware(MonitoringMiddleware)
 app.add_middleware(RateLimiterMiddleware)
 app.add_middleware(
