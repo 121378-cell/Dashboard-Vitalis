@@ -8,7 +8,7 @@ class Token(Base):
 
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     # Columnas que coinciden con la base de datos SQLite real
-    garmin_email = Column(String)           # Garmin email
+    garmin_email = Column(EncryptedString())  # Garmin email (auto-encrypted)
     garmin_password = Column(EncryptedString())  # Garmin password (auto-encrypted)
     garmin_session = Column(String)          # Garmin session data (JSON)
     hevy_username = Column(String)           # Hevy username

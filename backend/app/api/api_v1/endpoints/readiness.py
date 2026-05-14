@@ -16,8 +16,11 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime, timedelta
 import json
+import logging
 
 from app.api.deps import get_db, get_current_user_id
+
+logger = logging.getLogger("app.api.readiness")
 from app.models.biometrics import Biometrics
 from app.models.user import User
 from app.services.readiness_service import ReadinessService
@@ -46,7 +49,8 @@ async def get_readiness_score(
     
     try:
         bio_data = json.loads(latest_biometric.data) if latest_biometric.data else {}
-    except:
+    except Exception as e:
+        logger.warning(f"Error parsing biometric data: {e}")
         bio_data = {}
     
     seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -62,8 +66,8 @@ async def get_readiness_score(
                 data = json.loads(b.data)
                 if data.get("steps"):
                     steps_7d.append(data["steps"])
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Error parsing steps data: {e}")
     
     steps_avg_7d = sum(steps_7d) / len(steps_7d) if steps_7d else 10000
     

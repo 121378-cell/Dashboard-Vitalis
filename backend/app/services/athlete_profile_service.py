@@ -190,8 +190,8 @@ class AthleteProfileService:
                     data = json.loads(bio.data)
                     if data.get("sleep"):
                         sleep_values.append(data["sleep"])
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error parsing sleep data: {e}")
         
         if len(sleep_values) >= 7:
             sleep_std = statistics.stdev(sleep_values) if len(sleep_values) >= 2 else 0
@@ -205,8 +205,8 @@ class AthleteProfileService:
                     data = json.loads(bio.data)
                     if data.get("steps"):
                         steps_values.append(data["steps"])
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error parsing steps data: {e}")
         
         if len(steps_values) >= 7:
             steps_std = statistics.stdev(steps_values) if len(steps_values) >= 2 else 0
@@ -280,8 +280,8 @@ class AthleteProfileService:
                     if bio.body_battery:
                         body_battery_values.append(bio.body_battery)
                         
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error parsing biometric data in get_profile: {e}")
         
         # Calcular estadísticas
         sleep_stats = cls.calculate_statistics(sleep_values)
@@ -319,8 +319,8 @@ class AthleteProfileService:
                 oldest = datetime.strptime(oldest_date, "%Y-%m-%d").date()
                 newest = datetime.strptime(newest_date, "%Y-%m-%d").date()
                 days_covered = (newest - oldest).days
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Error parsing date range: {e}")
         
         # Extraer información personal del usuario
         name = user.name if user else None

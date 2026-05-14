@@ -6,11 +6,21 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # --- Carga robusta de la clave de cifrado ---
-# Se lee de la variable de entorno FERNET_KEY. Si no existe, el sistema 
-# genera una clave temporal para desarrollo (INSEGURA para producción).
+# Se lee de la variable de entorno FERNET_KEY o de settings.FERNET_KEY (desde .env).
+# Si no existe, el sistema genera una clave temporal para desarrollo (INSEGURA).
 
 try:
     _ENCRYPTION_KEY = os.getenv("FERNET_KEY")
+    if not _ENCRYPTION_KEY:
+        # Fallback: leer desde pydantic settings (carga .env vía python-dotenv)
+        try:
+            from app.core.config import settings
+            _ENCRYPTION_KEY = settings.FERNET_KEY
+        except ImportError:
+            pass
+        except Exception:
+            pass
+    
     if not _ENCRYPTION_KEY:
         # Generar una clave temporal para desarrollo
         from cryptography.fernet import Fernet

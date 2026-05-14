@@ -27,12 +27,19 @@ session.json
 *.p12
 *.pfx
 
+# Directorios de tokens Garmin
+.garth/
+backend/.garth*/
+backend/.garth/
+
 # Bases de datos SQLite y datos locales
 *.db
 *.sqlite
 *.sqlite3
 *.db-journal
 *.db-wal
+*.db-shm
+*.db-shm-wal
 database/
 data/
 backups/
@@ -44,6 +51,28 @@ debug_*.json
 export_*.json
 diagnostic_*.json
 sync_report_*.json
+
+# JSON exports de datos
+*_profile_*.json
+*_summary_*.json
+*coach_context_*.json
+garmin_export.json
+qa_test_report.json
+metadata.json
+
+# Scripts con credenciales o sensibles (no versionar)
+start_vitalis_v2.bat
+Verificar-Vitalis.ps1
+verificar_vitalis.py
+strava_oauth_example.py
+debug_atlas.py
+
+# Scripts de utilidad que gestionan credenciales Garmin
+backend/generate_garmin_tokens.py
+backend/run_garmin_test.py
+backend/run_garmin_test_with_delay.py
+backend/run_sync.py
+backend/tests/test_garmin_connection.py
 
 # ================================================
 # 📦 DEPENDENCIAS
@@ -193,6 +222,11 @@ Thumbs.db
 .cache/
 .temp/
 .tmp/
+
+# Configuración local de agentes AI
+.claude/
+.kilo/
+.factory/
 
 # Archivos del sistema operativo
 Spotlight-V100

@@ -127,8 +127,8 @@ class AthleticIntelligenceService:
                     try:
                         desc_data = json.loads(workout.description)
                         sport = desc_data.get("sport", "unknown")
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
                 
                 # Clasificar por tipo
                 if sport == "strength_training":
@@ -172,8 +172,8 @@ class AthleticIntelligenceService:
                         desc_data = json.loads(workout.description)
                         if desc_data.get("sport") == "strength_training":
                             recent_strength_filtered.append(workout)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             # Sesiones de fuerza anteriores
             previous_strength = db.query(Workout).filter(
@@ -193,8 +193,8 @@ class AthleticIntelligenceService:
                         desc_data = json.loads(workout.description)
                         if desc_data.get("sport") == "strength_training":
                             previous_strength_filtered.append(workout)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             # Calcular duración media
             if recent_strength_filtered:
@@ -225,8 +225,8 @@ class AthleticIntelligenceService:
                         rhr = data.get("heartRate")
                         if rhr and rhr > 0:
                             rhr_values.append(rhr)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             if rhr_values:
                 result["resting_hr_avg"] = sum(rhr_values) / len(rhr_values)
@@ -273,8 +273,8 @@ class AthleticIntelligenceService:
                                 continue
                             
                             valid_running_sessions.append(workout)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             # Calcular estadísticas de running
             if valid_running_sessions:
@@ -288,8 +288,8 @@ class AthleticIntelligenceService:
                             distance = desc_data.get("distance", 0)
                             total_distance += distance
                             total_duration += workout.duration or 0
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Error parsing running stats: {e}")
                 
                 if total_duration > 0:
                     result["avg_running_pace_min_km"] = (total_duration / 60) / (total_distance / 1000) if total_distance > 0 else None
@@ -328,8 +328,8 @@ class AthleticIntelligenceService:
                         desc_data = json.loads(workout.description)
                         sport = desc_data.get("sport", "unknown")
                         sport_counts[sport] = sport_counts.get(sport, 0) + 1
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             if sport_counts:
                 result["primary_sport"] = max(sport_counts.items(), key=lambda x: x[1])[0]
@@ -394,8 +394,8 @@ class AthleticIntelligenceService:
                         sleep = data.get("sleep")
                         if sleep and sleep > 0:
                             recent_sleep_values.append(sleep)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             # Extraer datos de sueño históricos
             historical_sleep_values = []
@@ -406,8 +406,8 @@ class AthleticIntelligenceService:
                         sleep = data.get("sleep")
                         if sleep and sleep > 0:
                             historical_sleep_values.append(sleep)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             # Calcular promedios
             if recent_sleep_values:
@@ -444,8 +444,8 @@ class AthleticIntelligenceService:
                         sleep = data.get("sleep")
                         if sleep:
                             sleep_debt += max(0, 7.5 - sleep)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             result["sleep_debt_7d_hours"] = sleep_debt
             
@@ -547,8 +547,8 @@ class AthleticIntelligenceService:
                         rhr = data.get("heartRate")
                         if rhr and rhr > 0:
                             rhr_values.append(rhr)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             if rhr_values:
                 rhr_avg = sum(rhr_values) / len(rhr_values)
@@ -571,8 +571,8 @@ class AthleticIntelligenceService:
                             rhr = data.get("heartRate")
                             if rhr and rhr > rhr_avg + 3:
                                 rhr_fatigue_days += 1
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Error parsing running stats: {e}")
                 
                 result["rhr_fatigue_days_recent"] = rhr_fatigue_days
             
@@ -585,8 +585,8 @@ class AthleticIntelligenceService:
                         stress = data.get("stress")
                         if stress is not None:
                             stress_values.append(stress)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             if stress_values:
                 result["stress_avg_30d"] = sum(stress_values) / len(stress_values)
@@ -765,8 +765,8 @@ class AthleticIntelligenceService:
                         rhr = data.get("heartRate")
                         if rhr and rhr > 0:
                             rhr_values.append(rhr)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             if rhr_values:
                 rhr_avg = sum(rhr_values) / len(rhr_values)
@@ -793,8 +793,8 @@ class AthleticIntelligenceService:
                         sleep = data.get("sleep")
                         if sleep and sleep < 6:
                             poor_sleep_count += 1
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing workout data: {e}")
             
             if poor_sleep_count >= 2:
                 additional_risk_factors += 1

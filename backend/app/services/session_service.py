@@ -192,8 +192,8 @@ class SessionService:
         try:
             readiness_data = AnalyticsService.get_readiness_score(db, user_id)
             readiness_score = readiness_data.get("score", 50)
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Error getting readiness score: {e}")
         
         # 2. Obtener perfil del atleta
         profile_summary = AthleteProfileService.get_profile_summary(user_id, db)

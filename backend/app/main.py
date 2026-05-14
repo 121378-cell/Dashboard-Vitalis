@@ -19,7 +19,7 @@ logger = logging.getLogger("app.main")
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("ATLAS starting up...")
-    logger.info(f"Database URL: {settings.DATABASE_URL}")
+    logger.info(f"Database: SQLite database ready")
     
     # 1. Crear tablas si no existen (Indispensable para nuevos volúmenes en Fly.io)
     try:
@@ -130,8 +130,8 @@ def health_check():
         with SessionLocal() as db:
             db.execute(text("SELECT 1"))
             db_ok = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Health check DB error: {e}")
     return {
         "status": "ok" if db_ok else "degraded",
         "db": "ok" if db_ok else "error",
