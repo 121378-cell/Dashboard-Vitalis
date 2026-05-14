@@ -33,6 +33,7 @@ cpus = 1
 
 [checks]
 [checks.health]
+type = "http"
 grace_period = "30s"
 interval = "15s"
 method = "get"
