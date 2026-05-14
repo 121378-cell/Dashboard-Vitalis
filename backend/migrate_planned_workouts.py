@@ -102,7 +102,8 @@ def create_planned_workouts_table():
             conn.commit()
 
             logger.info("Table planned_workouts created successfully")
-            return True    except Exception as e:
+            return True
+    except Exception as e:
         logger.exception("Error creating table")
         return False
 
@@ -187,7 +188,8 @@ def migrate_adaptive_sessions():
 
             conn.commit()
             logger.info(f"Migrated {migrated} sessions to planned_workouts")
-            return True    except Exception as e:
+            return True
+    except Exception as e:
         logger.exception("Error migrating data")
         return False
 
@@ -235,7 +237,8 @@ def verify():
             for row_vals in cursor.fetchall():
                 logger.info(f"  {row_vals[1]:35s} {row_vals[2]:10s} nullable={not bool(row_vals[3])}")
 
-            return True    except Exception as e:
+            return True
+    except Exception as e:
         logger.exception("Error verifying migration")
         return False
 
