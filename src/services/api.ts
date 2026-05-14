@@ -1,11 +1,9 @@
 // ATLAS API Service
 // =================
-// Axios instance with interceptors for auth and error handling
+// Axios instance with interceptors for auth (JWT Bearer token) and error handling
 
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { BACKEND_URL, API_TIMEOUT } from '../config';
-
-const USER_ID = 'default_user';
+import { BACKEND_URL, API_TIMEOUT, getAuthToken, clearAuthToken } from '../config';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -13,15 +11,16 @@ const api: AxiosInstance = axios.create({
   timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
-    'x-user-id': USER_ID,
   },
 });
 
-// Request interceptor - add auth headers
+// Request interceptor - add JWT Bearer token
 api.interceptors.request.use(
   (config) => {
-    // Add user ID header
-    config.headers['x-user-id'] = USER_ID;
+    const token = getAuthToken();
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
     
     // Log in development
     if (import.meta.env.DEV) {
@@ -46,7 +45,8 @@ api.interceptors.response.use(
     }
     
     if (error.response?.status === 401) {
-      console.warn('[API] Unauthorized - check credentials');
+      console.warn('[API] Unauthorized - token may be expired. Use /auth/jwt/login to get a new one.');
+      clearAuthToken();
     }
     
     if (error.response?.status === 429) {

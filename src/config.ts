@@ -42,6 +42,33 @@ export const TOKENS = {
   },
 } as const;
 
+// Auth token management (JWT)
+const AUTH_TOKEN_KEY = 'ATLAS_JWT_TOKEN';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+  } catch {
+    console.warn('[Auth] No se pudo guardar el token en localStorage');
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    console.warn('[Auth] No se pudo limpiar el token');
+  }
+}
+
 // Readiness score thresholds
 export const READINESS_THRESHOLDS = {
   excellent: 85,

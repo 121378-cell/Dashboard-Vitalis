@@ -1,10 +1,13 @@
-import { BACKEND_URL } from '../config';
 import { Message, ChatResponse, WelcomeMessage } from '../types';
+import { BACKEND_URL, getAuthToken } from '../config';
 
 export async function callAI(messages: Message[], systemPrompt?: string): Promise<ChatResponse> {
   const res = await fetch(`${BACKEND_URL}/ai/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': 'default_user' },
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Authorization': `Bearer ${getAuthToken() ?? ''}` 
+    },
     body: JSON.stringify({
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       system_prompt: systemPrompt,
@@ -29,7 +32,7 @@ export async function callAI(messages: Message[], systemPrompt?: string): Promis
 
 export async function getWelcomeMessage(): Promise<WelcomeMessage> {
   const res = await fetch(`${BACKEND_URL}/ai/welcome-message`, {
-    headers: { 'x-user-id': 'default_user' },
+    headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` },
   });
 
   if (!res.ok) {
@@ -44,7 +47,7 @@ export async function getContextPreview(): Promise<{
   context_meta: Record<string, unknown>;
 }> {
   const res = await fetch(`${BACKEND_URL}/ai/context-preview`, {
-    headers: { 'x-user-id': 'default_user' },
+    headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` },
   });
 
   if (!res.ok) {

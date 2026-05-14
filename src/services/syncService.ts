@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { offlineStorage, SyncQueueItem } from './offlineStorage';
 import { HCBiometrics, HCWorkout } from './healthConnectService';
+import { getAuthToken } from '../config';
 
 // URL única del backend (misma que usa App.tsx)
 const RAW_BACKEND_URL =
@@ -16,7 +17,7 @@ export class SyncService {
   async syncBiometricsToBackend(biometrics: HCBiometrics | any) {
     try {
       const response = await axios.post(`${BACKEND_URL}/biometrics/`, biometrics, {
-        headers: { 'x-user-id': 'default_user' }
+        headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` }
       });
       return response.data;
     } catch (error) {
@@ -30,7 +31,7 @@ export class SyncService {
   async fetchTodayPlan() {
     try {
       const response = await axios.get(`${BACKEND_URL}/sessions/today`, {
-        headers: { 'x-user-id': 'default_user' }
+        headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` }
       });
       return response.data;
     } catch (error) {
@@ -43,7 +44,7 @@ export class SyncService {
   async syncWorkoutCompleted(workout: HCWorkout | any) {
     try {
       const response = await axios.post(`${BACKEND_URL}/workouts/`, workout, {
-        headers: { 'x-user-id': 'default_user' }
+        headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` }
       });
       return response.data;
     } catch (error) {
@@ -82,11 +83,11 @@ export class SyncService {
   private async syncItem(item: SyncQueueItem) {
     if (item.type === 'biometrics') {
       await axios.post(`${BACKEND_URL}/biometrics/`, item.data, {
-        headers: { 'x-user-id': 'default_user' }
+        headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` }
       });
     } else if (item.type === 'workouts') {
       await axios.post(`${BACKEND_URL}/workouts/`, item.data, {
-        headers: { 'x-user-id': 'default_user' }
+        headers: { 'Authorization': `Bearer ${getAuthToken() ?? ''}` }
       });
     }
   }
