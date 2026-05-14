@@ -4,6 +4,7 @@ import threading
 import time
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
+from sqlalchemy.orm import Session
 from google import genai
 from google.genai import types
 from openai import OpenAI
