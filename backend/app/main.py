@@ -40,7 +40,17 @@ async def lifespan(app: FastAPI):
         except Exception as me:
             logger.error(f"planned_workouts migration error: {me}")
 
-        # 3. Bootstrap de credenciales (Plan B para Fly.io)
+        # 3. Migracion de birth_date (columna faltante en users)
+        try:
+            logger.info("Running birth_date migration...")
+            from migrate_birth_date import migrate as migrate_birth_date, update_user_birth_date
+            migrate_birth_date()
+            update_user_birth_date()
+            logger.info("birth_date migration completed.")
+        except Exception as me:
+            logger.error(f"birth_date migration error: {me}")
+
+        # 4. Bootstrap de credenciales (Plan B para Fly.io)
         from app.db.session import SessionLocal
         from app.models.token import Token
         from app.models.user import User
@@ -69,7 +79,7 @@ async def lifespan(app: FastAPI):
                 db.commit()
                 logger.info("Garmin credentials bootstrapped successfully.")
         
-        # 4. Start the scheduler
+        # 5. Start the scheduler
         logger.info("Starting scheduler...")
         start_scheduler()
         logger.info("Scheduler started successfully.")
