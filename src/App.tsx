@@ -3,6 +3,8 @@ import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { WebDashboardLayout } from './layout/WebDashboardLayout';
+import { AuthGuard } from './components/AuthGuard';
+import { LoginPage } from './pages/LoginPage';
 
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const BiometricsPage = lazy(() => import('./pages/BiometricsPage').then(m => ({ default: m.BiometricsPage })));
@@ -39,17 +41,26 @@ const PageFallback = () => (
 
 const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
     path: '/',
-    element: <DashboardLayout />,
+    element: <AuthGuard />,
     children: [
-      { index: true, element: <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> },
-      { path: 'overview', element: <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> },
-      { path: 'biometrics', element: <Suspense fallback={<PageFallback />}><BiometricsPage /></Suspense> },
-      { path: 'training', element: <Suspense fallback={<PageFallback />}><TrainingPage /></Suspense> },
-      { path: 'readiness', element: <Suspense fallback={<PageFallback />}><ReadinessPage /></Suspense> },
-      { path: 'memory', element: <Suspense fallback={<PageFallback />}><MemoryPage /></Suspense> },
-      { path: 'plan', element: <Suspense fallback={<PageFallback />}><PlanPage /></Suspense> },
-      { path: 'coach', element: <Suspense fallback={<PageFallback />}><CoachPage /></Suspense> },
+      {
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> },
+          { path: 'overview', element: <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> },
+          { path: 'biometrics', element: <Suspense fallback={<PageFallback />}><BiometricsPage /></Suspense> },
+          { path: 'training', element: <Suspense fallback={<PageFallback />}><TrainingPage /></Suspense> },
+          { path: 'readiness', element: <Suspense fallback={<PageFallback />}><ReadinessPage /></Suspense> },
+          { path: 'memory', element: <Suspense fallback={<PageFallback />}><MemoryPage /></Suspense> },
+          { path: 'plan', element: <Suspense fallback={<PageFallback />}><PlanPage /></Suspense> },
+          { path: 'coach', element: <Suspense fallback={<PageFallback />}><CoachPage /></Suspense> },
+        ],
+      },
     ],
   },
 ]);
