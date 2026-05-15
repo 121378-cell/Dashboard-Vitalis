@@ -124,17 +124,17 @@ def get_today_briefing(
 ):
     try:
         from app.models.daily_briefing import DailyBriefing
-        from datetime import date
+        from datetime import datetime
         import json
 
-        today = date.today()
+        today_start = datetime.combine(datetime.today(), datetime.min.time())
         briefing = db.query(DailyBriefing).filter(
             DailyBriefing.user_id == user_id,
-            DailyBriefing.date == today
+            DailyBriefing.date == today_start
         ).first()
 
         if not briefing:
-            return {"date": today.isoformat(), "content": {}, "message": "No briefing available for today"}
+            return {"date": today_start.date().isoformat(), "content": {}, "message": "No briefing available for today"}
 
         content = json.loads(briefing.content) if briefing.content else {}
         return {"date": briefing.date.isoformat(), "content": content}
