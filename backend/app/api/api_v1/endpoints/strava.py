@@ -233,13 +233,14 @@ async def get_strava_activities(
             "count": len(activities),
             "activities": activities
         }
-        
     except httpx.HTTPStatusError as e:
-        logger.error(f"Error de Strava API: {e}")
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"Error de Strava: {e.response.text}"
-        )
+            logger.error(f"Error de Strava API: {e}")
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"Error de Strava: {e.response.text}"
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error obteniendo actividades: {e}")
         raise HTTPException(status_code=500, detail=str(e))
