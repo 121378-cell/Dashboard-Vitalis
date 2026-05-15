@@ -386,6 +386,14 @@ class TestJwtLoginEndpoint:
         assert resp.status_code == 401
         assert "invalid" in resp.json()["detail"].lower()
 
+    def test_login_missing_password(self, client):
+        """Login sin password → 422 (Body(...) required)."""
+        resp = client.post(
+            self.API_PATH,
+            json={"email": "test@test.com"},
+        )
+        assert resp.status_code == 422
+
 
 # ===========================================================================
 # POST /jwt/register
@@ -444,6 +452,14 @@ class TestJwtRegisterEndpoint:
             )
         assert resp.status_code == 200
         assert "access_token" in resp.json()
+
+    def test_register_missing_name(self, client):
+        """Registro sin name → 422 (Body(...) required)."""
+        resp = client.post(
+            self.API_PATH,
+            json={"email": "test@test.com", "password": "pass123"},
+        )
+        assert resp.status_code == 422
 
 
 # ===========================================================================
@@ -525,3 +541,21 @@ class TestJwtRefreshEndpoint:
         )
         assert resp.status_code == 401
         assert "no encontrado" in resp.json()["detail"].lower()
+
+    def test_refresh_expired_token(self, client):
+        """Refresh token expirado → 401."""
+        from jose import jwt as jose_jwt
+        expire = datetime.utcnow() - timedelta(days=1)
+        expired_token = jose_jwt.encode(
+            {"sub": "test_user", "exp": expire, "type": "refresh"},
+            settings.SECRET_KEY,
+            algorithm=settings.JWT_ALGORITHM,
+        )
+
+        resp = client.post(
+            self.API_PATH,
+            content=json.dumps(expired_token),
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 401
+        assert "invalido" in resp.json()["detail"].lower()
