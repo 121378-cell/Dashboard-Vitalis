@@ -15,10 +15,17 @@ import os
 import io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Fix Windows console encoding
+# Fix Windows console encoding — use reconfigure() instead of replacing stdout/stderr
+# to avoid 'I/O operation on closed file' errors when imported by Uvicorn.
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 from app.db.session import engine
 from sqlalchemy import text

@@ -17,19 +17,39 @@ logger = logging.getLogger("app.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # --- Crash-safe logging: write directly to a file so errors survive stderr loss ---
+    _crash_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lifespan_crash.log')
+    _crash_log = open(_crash_log_path, 'a', encoding='utf-8')
+    def _log_crash(msg: str):
+        try:
+            _crash_log.write(f"{msg}\n")
+            _crash_log.flush()
+        except Exception:
+            pass
+
+    _log_crash("=== LIFESPAN START ===")
+
     # Startup
-    logger.info("ATLAS starting up...")
-    logger.info(f"Database: SQLite database ready")
-    
-    # 1. Crear tablas si no existen (Indispensable para nuevos volúmenes en Fly.io)
     try:
-        logger.info("Initializing database tables...")
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables initialized successfully.")
+        logger.info("ATLAS starting up...")
+        logger.info("Database: SQLite database ready")
+        _log_crash("ATLAS starting up...")
         
+        # 1. Crear tablas si no existen (Indispensable para nuevos volúmenes en Fly.io)
+        try:
+            logger.info("Initializing database tables...")
+            _log_crash("Step 1: Creating tables...")
+            Base.metadata.create_all(bind=engine)
+            logger.info("Database tables initialized successfully.")
+            _log_crash("Step 1: Tables created OK")
+        except Exception as e:
+            _log_crash(f"Step 1 FAILED: {e}")
+            logger.error(f"Database table initialization error: {e}")
+
         # 2. Migracion de planned_workouts (tabla del training engine)
         try:
             logger.info("Running planned_workouts migration...")
+            _log_crash("Step 2: planned_workouts migration...")
             from migrate_planned_workouts import (
                 create_planned_workouts_table,
                 migrate_adaptive_sessions
@@ -37,22 +57,28 @@ async def lifespan(app: FastAPI):
             create_planned_workouts_table()
             migrate_adaptive_sessions()
             logger.info("planned_workouts migration completed.")
+            _log_crash("Step 2: planned_workouts migration OK")
         except Exception as me:
+            _log_crash(f"Step 2 FAILED: {me}")
             logger.error(f"planned_workouts migration error: {me}")
 
         # 3. Migracion de birth_date (columna faltante en users)
         try:
             logger.info("Running birth_date migration...")
+            _log_crash("Step 3: birth_date migration...")
             from migrate_birth_date import migrate as migrate_birth_date, update_user_birth_date
             migrate_birth_date()
             update_user_birth_date()
             logger.info("birth_date migration completed.")
+            _log_crash("Step 3: birth_date migration OK")
         except Exception as me:
+            _log_crash(f"Step 3 FAILED: {me}")
             logger.error(f"birth_date migration error: {me}")
 
         # 4. Migracion de columnas faltantes en tokens
         try:
             logger.info("Checking for missing columns in tokens table...")
+            _log_crash("Step 4: tokens columns check...")
             with engine.connect() as conn:
                 result = conn.execute(text("PRAGMA table_info(tokens)"))
                 token_cols = {row[1] for row in result.fetchall()}
@@ -81,51 +107,76 @@ async def lifespan(app: FastAPI):
                     logger.info(f"Added missing columns: {', '.join(missing)}")
                 else:
                     logger.info("All tokens columns present")
+            _log_crash("Step 4: tokens columns OK")
         except Exception as me:
+            _log_crash(f"Step 4 FAILED: {me}")
             logger.error(f"tokens columns migration error: {me}")
 
         # 5. Bootstrap de credenciales (Plan B para Fly.io)
-        from app.db.session import SessionLocal
-        from app.models.token import Token
-        from app.models.user import User
-        
-        with SessionLocal() as db:
-            user = db.query(User).filter(User.id == "default_user").first()
-            if not user:
-                logger.info("Creating default_user...")
-                user = User(
-            id="default_user",
-            email=os.getenv("ATLAS_USER_EMAIL", "user@example.com"),
-            name=os.getenv("ATLAS_USER_NAME", "Athlete"),
-        )
-                db.add(user)
-                db.commit()
+        try:
+            _log_crash("Step 5: Bootstrapping credentials...")
+            from app.db.session import SessionLocal
+            from app.models.token import Token
+            from app.models.user import User
             
-            token = db.query(Token).filter(Token.user_id == "default_user").first()
-            if not token:
-                logger.info("Bootstrapping Garmin credentials from Environment Variables...")
-                token = Token(
-                    user_id="default_user",
-                    garmin_email=os.getenv("GARMIN_EMAIL"),
-                    garmin_password=os.getenv("GARMIN_PASSWORD")
-                )
-                db.add(token)
-                db.commit()
-                logger.info("Garmin credentials bootstrapped successfully.")
-        
+            with SessionLocal() as db:
+                user = db.query(User).filter(User.id == "default_user").first()
+                if not user:
+                    logger.info("Creating default_user...")
+                    user = User(
+                        id="default_user",
+                        email=os.getenv("ATLAS_USER_EMAIL", "user@example.com"),
+                        name=os.getenv("ATLAS_USER_NAME", "Athlete"),
+                    )
+                    db.add(user)
+                    db.commit()
+                
+                token = db.query(Token).filter(Token.user_id == "default_user").first()
+                if not token:
+                    logger.info("Bootstrapping Garmin credentials from Environment Variables...")
+                    token = Token(
+                        user_id="default_user",
+                        garmin_email=os.getenv("GARMIN_EMAIL"),
+                        garmin_password=os.getenv("GARMIN_PASSWORD")
+                    )
+                    db.add(token)
+                    db.commit()
+                    logger.info("Garmin credentials bootstrapped successfully.")
+            _log_crash("Step 5: Credentials bootstrap OK")
+        except Exception as e:
+            _log_crash(f"Step 5 FAILED: {e}")
+            logger.error(f"Bootstrap credentials error: {e}")
+
         # 6. Start the scheduler
-        logger.info("Starting scheduler...")
-        start_scheduler()
-        logger.info("Scheduler started successfully.")
-        
+        try:
+            logger.info("Starting scheduler...")
+            _log_crash("Step 6: Starting scheduler...")
+            start_scheduler()
+            logger.info("Scheduler started successfully.")
+            _log_crash("Step 6: Scheduler started OK")
+        except Exception as e:
+            _log_crash(f"Step 6 FAILED: {e}")
+            logger.error(f"Scheduler start error: {e}")
+
+        _log_crash("=== LIFESPAN STARTUP COMPLETE ===")
+
     except Exception as e:
-        logger.error(f"Error during bootstrap: {e}")
+        _log_crash(f"CRITICAL: Lifespan startup error: {e}")
+        logger.error(f"CRITICAL: Lifespan startup error: {e}")
+    finally:
+        try:
+            _crash_log.close()
+        except Exception:
+            pass
 
     yield
     # Shutdown
     logger.info("ATLAS shutting down...")
-    shutdown_scheduler()
-    logger.info("Scheduler shut down.")
+    try:
+        shutdown_scheduler()
+        logger.info("Scheduler shut down.")
+    except Exception as e:
+        logger.error(f"Scheduler shutdown error: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
