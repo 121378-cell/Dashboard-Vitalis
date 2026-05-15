@@ -133,6 +133,8 @@ def _create_intervention(
     created_at=None,
     responded_at=None,
     executed_at=None,
+    is_active=True,
+    decision_deadline=None,
 ):
     """Crea un AtlasIntervention de prueba."""
     now = created_at or datetime.now(timezone.utc)
@@ -149,6 +151,8 @@ def _create_intervention(
         executed_at=executed_at,
         response=response,
         outcome_score=outcome_score,
+        is_active=is_active,
+        decision_deadline=decision_deadline,
     )
     db_session.add(intervention)
     db_session.commit()
@@ -356,3 +360,119 @@ class TestTriggerEndpoint:
             json={},
         )
         assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Tests: GET /interventions/pending
+# ---------------------------------------------------------------------------
+
+
+class TestPendingEndpoint:
+    """GET /interventions/pending"""
+
+    API_PATH = "/api/v1/interventions/pending"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_pending_with_data(self, client, db_session):
+        """Intervenciones pendientes → 200 + listado ordenado DESC."""
+        # Crear 2 pendientes (sin deadline → no expiran)
+        i1 = _create_intervention(db_session, status="pending", created_at=datetime.now(timezone.utc))
+        i2 = _create_intervention(
+            db_session, status="pending",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        # Deberían venir ordenados DESC por created_at
+        assert data[0]["id"] == i1.id  # i1 más reciente
+        assert data[1]["id"] == i2.id
+        assert data[0]["status"] == "pending"
+
+    def test_pending_empty(self, client):
+        """Sin intervenciones → 200 + []."""
+        resp = client.get(self.API_PATH, headers={"x-user-id": "empty_user"})
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_pending_other_user(self, client, db_session):
+        """Intervenciones de otro usuario → vacío."""
+        _create_intervention(db_session, user_id="other_user", status="pending")
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_pending_excludes_responded(self, client, db_session):
+        """Intervenciones no-pending no aparecen."""
+        _create_intervention(db_session, status="accepted", response="accepted")
+        _create_intervention(db_session, status="rejected", response="rejected")
+        _create_intervention(db_session, status="executed")
+        _create_intervention(db_session, status="pending")  # Solo esta debería aparecer
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["status"] == "pending"
+
+    def test_pending_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(self.API_PATH)
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Tests: GET /interventions/active
+# ---------------------------------------------------------------------------
+
+
+class TestActiveEndpoint:
+    """GET /interventions/active"""
+
+    API_PATH = "/api/v1/interventions/active"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_active_with_data(self, client, db_session):
+        """Intervenciones activas recientes → 200 + listado."""
+        i1 = _create_intervention(db_session, status="pending", created_at=datetime.now(timezone.utc))
+        i2 = _create_intervention(
+            db_session, status="accepted", response="accepted",
+            created_at=datetime.now(timezone.utc) - timedelta(days=1),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        assert data[0]["id"] == i1.id  # Más reciente primero
+        assert data[1]["id"] == i2.id
+
+    def test_active_empty(self, client):
+        """Sin intervenciones → 200 + []."""
+        resp = client.get(self.API_PATH, headers={"x-user-id": "empty_user"})
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_active_excludes_old(self, client, db_session):
+        """Intervención de hace 10 días → no listada."""
+        _create_intervention(
+            db_session, status="pending",
+            created_at=datetime.now(timezone.utc) - timedelta(days=10),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_active_excludes_inactive(self, client, db_session):
+        """Intervención con is_active=False → no listada."""
+        _create_intervention(
+            db_session, status="pending", is_active=False,
+            created_at=datetime.now(timezone.utc),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_active_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(self.API_PATH)
+        assert resp.status_code == 401
