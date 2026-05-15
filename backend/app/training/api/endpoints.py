@@ -16,6 +16,7 @@ Diseño:
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from sqlalchemy import or_
 from datetime import datetime
 
 from app.api.deps import get_db, get_current_user_id
@@ -29,7 +30,7 @@ from app.training.schemas import (
     SetFeedbackRequest, ExerciseSetUpdate,
     WorkoutFeedbackCreate, WorkoutFeedbackResponse,
     ExternalWorkoutPush, ExternalWorkoutPull, IntegrationResponse,
-    UserTrainingStats, FatigueAnalysis
+    UserTrainingStats, FatigueAnalysis, ExerciseLibraryCreate, ExerciseLibraryResponse
 )
 from app.training.use_cases import (
     WorkoutGenerator, WorkoutAdapter, TrainingAnalyzer,
@@ -500,10 +501,15 @@ def list_exercises(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user_id)
 ):
-    """Lista ejercicios disponibles con filtros"""
+    """Lista ejercicios disponibles con filtros (globales + custom del usuario)"""
     from app.training.domain.models import ExerciseLibrary
     
-    query = db.query(ExerciseLibrary)
+    query = db.query(ExerciseLibrary).filter(
+        or_(
+            ExerciseLibrary.is_custom == False,
+            ExerciseLibrary.user_id == current_user
+        )
+    )
     
     if muscle_group:
         query = query.filter(ExerciseLibrary.primary_muscle == muscle_group)
@@ -517,10 +523,33 @@ def list_exercises(
         {
             "id": e.id,
             "name": e.name,
-            "primary_muscle": e.primary_muscle.value,
-            "exercise_type": e.exercise_type.value,
+            "primary_muscle": e.primary_muscle.value if hasattr(e.primary_muscle, 'value') else e.primary_muscle,
+            "exercise_type": e.exercise_type.value if hasattr(e.exercise_type, 'value') else e.exercise_type,
             "recommended_rpe": e.recommended_rpe_range,
-            "difficulty": e.difficulty_level
+            "difficulty": e.difficulty_level,
+            "is_custom": e.is_custom
         }
         for e in exercises
     ]
+
+@router.post("/exercises/custom", response_model=ExerciseLibraryResponse)
+def create_custom_exercise(
+    exercise: ExerciseLibraryCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user_id)
+):
+    """Crea un ejercicio personalizado para el usuario actual."""
+    from app.training.domain.models import ExerciseLibrary
+    
+    # Crear entidad
+    new_exercise = ExerciseLibrary(
+        **exercise.model_dump(exclude={"is_custom", "user_id"}),
+        is_custom=True,
+        user_id=current_user
+    )
+    
+    db.add(new_exercise)
+    db.commit()
+    db.refresh(new_exercise)
+    
+    return new_exercise

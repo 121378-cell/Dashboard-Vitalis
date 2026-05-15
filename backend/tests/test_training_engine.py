@@ -7,7 +7,7 @@ Ejecutar: cd backend && pytest tests/test_training_engine.py -v
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 # Test fixtures y mocks
@@ -271,7 +271,7 @@ def test_create_workout_from_schema():
         name="Test Workout",
         description="Test",
         workout_type=WorkoutType.STRENGTH,
-        scheduled_date=datetime.utcnow(),
+        scheduled_date=datetime.now(timezone.utc),
         estimated_duration_minutes=60,
         readiness_score_at_creation=85.0,
         exercise_blocks=[block_schema]

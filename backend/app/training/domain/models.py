@@ -115,6 +115,10 @@ class ExerciseLibrary(Base):
     video_url = Column(String)
     image_url = Column(String)
     
+    # Custom Exercises
+    is_custom = Column(Boolean, default=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    
     # Relaciones
     created_at = Column(DateTime(timezone=True), server_default=sql_func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=sql_func.now())

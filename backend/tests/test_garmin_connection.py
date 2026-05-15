@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def test_garmin_connection():
+def check_garmin_connection():
     """Test Garmin connection with provided credentials"""
     # Load environment variables
     load_dotenv()
@@ -75,7 +75,7 @@ def test_garmin_connection():
 
 
 if __name__ == "__main__":
-    if test_garmin_connection():
+    if check_garmin_connection():
         logger.info("Garmin connection test passed!")
         sys.exit(0)
     else:

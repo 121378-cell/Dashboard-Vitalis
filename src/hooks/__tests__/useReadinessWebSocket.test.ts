@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useReadinessWebSocket } from '../useReadinessWebSocket';
 
 // Mock WebSocket with proper event handler typing
@@ -46,7 +46,9 @@ describe('useReadinessWebSocket', () => {
     }));
 
     // Simulate open
-    mockWebSocket.onopen?.(new Event('open'));
+    act(() => {
+      mockWebSocket.onopen?.(new Event('open'));
+    });
     
     await waitFor(() => expect(onConnect).toHaveBeenCalled());
   });
@@ -60,7 +62,9 @@ describe('useReadinessWebSocket', () => {
     }));
 
     // Simulate connection
-    mockWebSocket.onopen?.(new Event('open'));
+    act(() => {
+      mockWebSocket.onopen?.(new Event('open'));
+    });
     
     // Simulate data message
     const mockData = {
@@ -74,9 +78,11 @@ describe('useReadinessWebSocket', () => {
       version: '2.0'
     };
 
-    mockWebSocket.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ type: 'readiness_update', data: mockData, change: 5 })
-    }));
+    act(() => {
+      mockWebSocket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'readiness_update', data: mockData, change: 5 })
+      }));
+    });
 
     await waitFor(() => {
       expect(result.current.data?.readiness_score).toBe(75);
@@ -92,11 +98,15 @@ describe('useReadinessWebSocket', () => {
       onStatusChange 
     }));
 
-    mockWebSocket.onopen?.(new Event('open'));
+    act(() => {
+      mockWebSocket.onopen?.(new Event('open'));
+    });
     
-    mockWebSocket.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ type: 'status_change', from: 'high', to: 'low' })
-    }));
+    act(() => {
+      mockWebSocket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ type: 'status_change', from: 'high', to: 'low' })
+      }));
+    });
 
     await waitFor(() => {
       expect(onStatusChange).toHaveBeenCalledWith('high', 'low');
@@ -111,7 +121,9 @@ describe('useReadinessWebSocket', () => {
       onError 
     }));
 
-    mockWebSocket.onerror?.(new Event('error'));
+    act(() => {
+      mockWebSocket.onerror?.(new Event('error'));
+    });
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(false);
@@ -127,13 +139,17 @@ describe('useReadinessWebSocket', () => {
   it('allows manual reconnect', async () => {
     const { result } = renderHook(() => useReadinessWebSocket({ userId: 'test-user' }));
 
-    mockWebSocket.onopen?.(new Event('open'));
+    act(() => {
+      mockWebSocket.onopen?.(new Event('open'));
+    });
     
     await waitFor(() => expect(result.current.isConnected).toBe(true));
 
     // Manually trigger close event before testing disconnect
-    mockWebSocket.onclose?.();
-    result.current.disconnect();
+    act(() => {
+      mockWebSocket.onclose?.();
+      result.current.disconnect();
+    });
     
     // Note: isConnected may still be true due to async state updates in jsdom
     // Just verify disconnect was called
@@ -143,16 +159,20 @@ describe('useReadinessWebSocket', () => {
   it('updates lastUpdate timestamp on data receive', async () => {
     const { result } = renderHook(() => useReadinessWebSocket({ userId: 'test-user' }));
 
-    mockWebSocket.onopen?.(new Event('open'));
+    act(() => {
+      mockWebSocket.onopen?.(new Event('open'));
+    });
     
     const beforeUpdate = result.current.lastUpdate;
 
-    mockWebSocket.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ 
-        type: 'readiness_update', 
-        data: { readiness_score: 80, status: 'high' } 
-      })
-    }));
+    act(() => {
+      mockWebSocket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ 
+          type: 'readiness_update', 
+          data: { readiness_score: 80, status: 'high' } 
+        })
+      }));
+    });
 
     await waitFor(() => {
       expect(result.current.lastUpdate).not.toEqual(beforeUpdate);
