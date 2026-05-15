@@ -16,3 +16,4 @@ from app.training.domain.models import PlannedWorkout
 
 # ─── Living ATLAS ───────────────────────────────────────────────────────────
 from app.models.atlas_event import AtlasEvent
+from app.models.athlete_state import AthleteState
