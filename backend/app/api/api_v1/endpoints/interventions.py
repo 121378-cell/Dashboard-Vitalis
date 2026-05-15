@@ -14,6 +14,7 @@ from typing import Optional
 
 from app.api.deps import get_db, get_current_user_id
 from app.services.intervention_service import InterventionService
+from app.services.intervention_outcome_service import InterventionOutcomeService
 from app.db.session import SessionLocal
 from app.models.atlas_intervention import AtlasIntervention
 
@@ -61,6 +62,26 @@ class TriggerInterventionRequest(BaseModel):
     intervention_type: str
     message: Optional[str] = None
     payload: Optional[dict] = None
+
+
+class OutcomeStatsResponse(BaseModel):
+    total: int
+    type_stats: list[dict]
+    avg_score: Optional[float] = None
+    acceptance_rate: float
+    outcome_distribution: dict
+
+
+class BestChannelResponse(BaseModel):
+    channel: str
+    avg_score: float
+    sample_size: int
+
+
+class BestTimingResponse(BaseModel):
+    timing: str
+    avg_score: float
+    sample_size: int
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +165,45 @@ def get_stats(
 ):
     """Estadísticas de intervenciones."""
     return InterventionService.get_stats(user_id)
+
+
+@router.get("/outcome-stats", response_model=OutcomeStatsResponse)
+def get_outcome_stats(
+    intervention_type: Optional[str] = Query(default=None, description="Filter by intervention type"),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Estadísticas de efectividad de intervenciones (outcome scores)."""
+    return InterventionOutcomeService.get_outcome_stats(
+        user_id=user_id,
+        intervention_type=intervention_type,
+    )
+
+
+@router.get("/outcome-stats/best-channel", response_model=BestChannelResponse)
+def get_best_channel(
+    intervention_type: str = Query(..., description="Intervention type to analyze"),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Mejor canal de entrega para un tipo de intervención basado en outcomes históricos."""
+    return InterventionOutcomeService.get_best_channel(
+        user_id=user_id,
+        intervention_type=intervention_type,
+    )
+
+
+@router.get("/outcome-stats/best-timing", response_model=BestTimingResponse)
+def get_best_timing(
+    intervention_type: str = Query(..., description="Intervention type to analyze"),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Mejor franja horaria para un tipo de intervención basado en outcomes históricos."""
+    return InterventionOutcomeService.get_best_timing(
+        user_id=user_id,
+        intervention_type=intervention_type,
+    )
 
 
 @router.post("/respond/{intervention_id}")
