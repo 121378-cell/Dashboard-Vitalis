@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user_id
 from app.services.injury_prevention_service import (
     AlertLevel,
+    BODY_ZONES,
     InjuryPreventionService,
     RecoverySession,
 )
@@ -205,7 +206,7 @@ async def get_injury_patterns(
         zone = None
         pain_level = 0
         for tag in (m.tags or []):
-            if tag in InjuryPreventionService.BODY_ZONES:
+            if tag in BODY_ZONES:
                 zone = tag
             if tag.startswith("pain_level_"):
                 try:
