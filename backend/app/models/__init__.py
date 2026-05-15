@@ -11,3 +11,4 @@ from .training_plan import WeeklyPlan as PlanWeeklyPlan, PlanSession, PersonalRe
 from .nutrition import NutritionSettings, MealLog, DailyNutritionSummary
 from .atlas_event import AtlasEvent
 from .athlete_state import AthleteState
+from .atlas_intervention import AtlasIntervention

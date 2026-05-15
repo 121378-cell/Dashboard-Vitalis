@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.api_v1.endpoints import auth, workouts, biometrics, ai, sync, settings, readiness, readiness_ws, sessions, strava, memory, notifications, notifications_ws, community, planner, nutrition, recovery, analytics, athlete_profile, training_plans, daily_loop, dashboard, master_plan
+from app.api.api_v1.endpoints import auth, workouts, biometrics, ai, sync, settings, readiness, readiness_ws, sessions, strava, memory, notifications, notifications_ws, community, planner, nutrition, recovery, analytics, athlete_profile, training_plans, daily_loop, dashboard, master_plan, interventions
 
 api_router = APIRouter()
 
@@ -26,3 +26,4 @@ api_router.include_router(training_plans.router, prefix="/plans", tags=["trainin
 api_router.include_router(daily_loop.router, prefix="/daily", tags=["daily-loop"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(master_plan.router, prefix="/master-plan", tags=["master-plan"])
+api_router.include_router(interventions.router, prefix="/interventions", tags=["interventions"])
