@@ -66,15 +66,25 @@ def sync_garmin(
 
 @router.post("/wger")
 def sync_wger(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
-    success = SyncService.sync_wger_workouts(db, user_id)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to sync Wger data")
-    return {"success": True}
+    try:
+        success = SyncService.sync_wger_workouts(db, user_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to sync Wger data")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Wger sync error: {e}")
 
 
 @router.post("/hevy")
 def sync_hevy(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
-    success = SyncService.sync_hevy_workouts(db, user_id)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to sync Hevy data")
-    return {"success": True}
+    try:
+        success = SyncService.sync_hevy_workouts(db, user_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to sync Hevy data")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hevy sync error: {e}")
