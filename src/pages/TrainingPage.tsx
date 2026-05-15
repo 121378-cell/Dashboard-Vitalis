@@ -9,6 +9,7 @@ import { ChartSkeleton } from '../components/charts/ChartSkeleton';
 import { ExportButton } from '../components/common/ExportButton';
 import { ChartExportButton } from '../components/common/ChartExportButton';
 import { useMuscleVolume, usePersonalRecords, useTrainingDistribution } from '../hooks/useDashboardData';
+import { ExerciseSelector } from '../components/ExerciseSelector';
 
 const COLORS = {
   primary: '#E8FF47',
@@ -80,6 +81,10 @@ export const TrainingPage = () => {
 
   return (
     <div className="space-y-6">
+      <div className="mb-8">
+        <ExerciseSelector />
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold text-[var(--color-text)]">
