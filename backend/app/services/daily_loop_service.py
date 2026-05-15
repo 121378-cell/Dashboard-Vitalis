@@ -113,6 +113,32 @@ class DailyLoopService:
             except Exception as notif_err:
                 logger.warning(f"Error enviando notificaciones: {notif_err}")
 
+            # ── Living ATLAS: emitir evento y actualizar estado ──
+            try:
+                from app.services.event_bus_service import emit
+                emit(
+                    user_id=user_id,
+                    event_type="daily_loop_completed",
+                    payload={
+                        "readiness_score": readiness_score,
+                        "readiness_category": category,
+                        "insights_count": len(insights),
+                        "adaptation_made": (
+                            session_data.get("adaptation", {}).get("suggestion") != "mantener"
+                            if session_data else False
+                        ),
+                    },
+                    source="daily_loop"
+                )
+            except Exception as ev_err:
+                logger.warning(f"Error emitiendo evento daily_loop: {ev_err}")
+
+            try:
+                from app.services.athlete_state_service import AthleteStateService
+                AthleteStateService.compute_state(user_id)
+            except Exception as state_err:
+                logger.warning(f"Error computando estado del atleta: {state_err}")
+
             return result
 
         except Exception as e:

@@ -410,4 +410,105 @@ class NotificationService:
         }
 
 
+    # ── Living ATLAS: Intervention Delivery ──
+
+    @staticmethod
+    def send_intervention(
+        intervention,
+        title: str,
+        message: str,
+        priority: str = "medium",
+        channels: Optional[List[str]] = None,
+        db: Optional[Session] = None,
+    ) -> Dict[str, Any]:
+        """Envía una notificación vinculada a una intervención de ATLAS."""
+        if channels is None:
+            from app.core.autonomy_policy import AutonomyLevel
+            try:
+                level = intervention.autonomy_level if hasattr(intervention, 'autonomy_level') else 1
+                if level == AutonomyLevel.AUTONOMOUS or level == 1:
+                    channels = ["app"]
+                elif level == AutonomyLevel.PROPOSAL or level == 2:
+                    channels = ["app", "system"]
+                else:
+                    channels = ["app", "telegram", "system"]
+            except Exception:
+                channels = ["app"]
+
+        inter_id = intervention.id if hasattr(intervention, 'id') else None
+
+        result = NotificationService.send_notification(
+            title=title,
+            message=message,
+            notification_type="intervention",
+            priority=priority,
+            channels=channels,
+            action_url="/dashboard?tab=live",
+            metadata={"intervention_id": inter_id},
+            db=db,
+        )
+
+        # Registrar delivered_at en la intervención
+        if inter_id and result.get("id"):
+            try:
+                NotificationService._update_intervention_delivery(
+                    intervention_id=inter_id,
+                    field="delivered_at",
+                    db=db,
+                )
+            except Exception as e:
+                logger.warning(f"Error registrando delivery de intervención {inter_id}: {e}")
+
+        return result
+
+    @staticmethod
+    def _update_intervention_delivery(
+        intervention_id: int,
+        field: str,
+        value: Optional[str] = None,
+        db: Optional[Session] = None,
+    ):
+        """Actualiza campos de tracking (delivered_at/opened_at) en una intervención."""
+        if db is None:
+            from app.db.session import SessionLocal
+            db = SessionLocal()
+            own_session = True
+        else:
+            own_session = False
+
+        try:
+            from app.models.atlas_intervention import AtlasIntervention
+            from datetime import datetime, timezone
+
+            intervention = db.query(AtlasIntervention).filter(
+                AtlasIntervention.id == intervention_id
+            ).first()
+
+            if intervention:
+                now = value or datetime.now(timezone.utc)
+                if field == "delivered_at" and not intervention.delivered_at:
+                    intervention.delivered_at = now
+                elif field == "opened_at" and not intervention.opened_at:
+                    intervention.opened_at = now
+                db.commit()
+        except Exception as e:
+            logger.warning(f"Error updating intervention {intervention_id} field {field}: {e}")
+            db.rollback()
+        finally:
+            if own_session:
+                db.close()
+
+    @staticmethod
+    def mark_intervention_opened(
+        intervention_id: int,
+        db: Optional[Session] = None,
+    ):
+        """Registra que el usuario abrió una intervención."""
+        NotificationService._update_intervention_delivery(
+            intervention_id=intervention_id,
+            field="opened_at",
+            db=db,
+        )
+
+
 notification_service = NotificationService()
