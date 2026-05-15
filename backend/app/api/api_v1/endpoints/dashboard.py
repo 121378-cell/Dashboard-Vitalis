@@ -342,7 +342,7 @@ def get_muscle_volume(
         if not w.date:
             continue
         w_date = w.date if isinstance(w.date, datetime) else datetime.strptime(str(w.date)[:10], "%Y-%m-%d")
-        week_idx = (w_date - (date.today() - timedelta(days=days))).days // 7
+        week_idx = (w_date.date() - (date.today() - timedelta(days=days))).days // 7
         if week_idx < 0:
             week_idx = 0
         week_label = f"W{week_idx + 1}"
