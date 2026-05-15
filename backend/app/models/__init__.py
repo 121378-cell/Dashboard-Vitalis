@@ -9,3 +9,4 @@ from .community import Challenge, ChallengeParticipant, UserPublicProfile
 from .memory import AtlasMemory
 from .training_plan import WeeklyPlan as PlanWeeklyPlan, PlanSession, PersonalRecord
 from .nutrition import NutritionSettings, MealLog, DailyNutritionSummary
+from .atlas_event import AtlasEvent

@@ -13,3 +13,6 @@ from app.models.nutrition import NutritionSettings, MealLog, DailyNutritionSumma
 from app.models.adaptive_training_plan import AdaptiveTrainingPlan, AdaptivePlannedSession, AdaptivePlanAdjustment
 from app.models.master_plan import MasterPlan
 from app.training.domain.models import PlannedWorkout
+
+# ─── Living ATLAS ───────────────────────────────────────────────────────────
+from app.models.atlas_event import AtlasEvent
