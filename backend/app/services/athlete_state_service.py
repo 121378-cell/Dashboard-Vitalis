@@ -9,7 +9,7 @@ en un diagnóstico semántico del momento del atleta.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy import desc
@@ -85,7 +85,7 @@ class AthleteStateService:
             AthleState persistido, o None si no hay datos suficientes
         """
         try:
-            today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
             # 1. Recopilar datos raw de cada fuente
             with SessionLocal() as db:
@@ -228,7 +228,7 @@ class AthleteStateService:
             Lista de snapshots ordenados por fecha descendente
         """
         try:
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
             with SessionLocal() as db:
                 return (
                     db.query(AthleteState)
@@ -249,7 +249,7 @@ class AthleteStateService:
     def _get_recent_workouts(user_id: str, days: int) -> list[Workout]:
         """Obtiene workouts completados en los últimos N días."""
         try:
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
             with SessionLocal() as db:
                 return (
                     db.query(Workout)
@@ -285,7 +285,7 @@ class AthleteStateService:
     def _get_recent_biometrics(user_id: str, days: int) -> list[Biometrics]:
         """Obtiene registros biométricos recientes."""
         try:
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
             with SessionLocal() as db:
                 return (
                     db.query(Biometrics)
@@ -354,7 +354,7 @@ class AthleteStateService:
             if not completed_workouts:
                 return "disconnected"
             workout_count = len([w for w in completed_workouts
-                                 if w.date >= datetime.utcnow() - timedelta(days=7)])
+                                 if w.date >= datetime.now(timezone.utc) - timedelta(days=7)])
             if workout_count >= 5:
                 return "consistent"
             if workout_count >= 3:
@@ -391,8 +391,7 @@ class AthleteStateService:
         if not workouts:
             return "neutral"
 
-        # Calcular tendencia semanal (workouts por semana)
-        now = datetime.utcnow()
+        # Calcular tendencia semanal (workouts por semana)            now = datetime.now(timezone.utc)
         week1_cutoff = now - timedelta(days=7)
         week2_cutoff = now - timedelta(days=14)
 

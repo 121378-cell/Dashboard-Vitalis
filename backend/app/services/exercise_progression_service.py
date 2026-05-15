@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -38,7 +38,7 @@ def _find_exercise_in_workout_description(description: str, exercise_name: str) 
 
 
 def get_progression_suggestion(db: Session, user_id: str, exercise_name: str) -> dict:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     four_weeks_ago = now - timedelta(weeks=4)
     today = date.today()
 

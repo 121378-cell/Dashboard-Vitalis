@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict, Optional
@@ -17,7 +17,7 @@ class CommunityService:
         }[period]
         
         # Calculate start date for periodic challenges
-        start_date = datetime.utcnow() - period_timedelta if period_timedelta else None
+        start_date = datetime.now(timezone.utc) - period_timedelta if period_timedelta else None
         
         # Get active challenges for this period
         active_challenges = self._get_active_challenges(start_date)
@@ -72,7 +72,7 @@ class CommunityService:
         query = self.session.query(Challenge)
         if start_date:
             query = query.filter(Challenge.start_date >= start_date)
-        return query.filter(Challenge.end_date < datetime.utcnow() + timedelta(days=1)).all()
+        return query.filter(Challenge.end_date < datetime.now(timezone.utc) + timedelta(days=1)).all()
     
     def get_active_challenges(self) -> List[Dict]:
         """Get active challenges for display in frontend"""

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.token import Token
 from app.models.workout import Workout
 from app.core.config import settings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 import httpx
 import logging
@@ -42,7 +42,7 @@ class StravaService:
             }
         
         # Verificar si token expiró
-        if token.strava_expires_at and datetime.utcnow() > token.strava_expires_at:
+        if token.strava_expires_at and datetime.now(timezone.utc) > token.strava_expires_at:
             refreshed = await StravaService._refresh_token(token, db)
             if not refreshed:
                 return {
@@ -54,7 +54,7 @@ class StravaService:
         
         try:
             # Calcular timestamp para 'after'
-            after_timestamp = int((datetime.utcnow() - timedelta(days=days)).timestamp())
+            after_timestamp = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp())
             
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -160,7 +160,7 @@ class StravaService:
             date_obj = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
             date_str = date_obj.strftime("%Y-%m-%d")
         except:
-            date_str = datetime.utcnow().strftime("%Y-%m-%d")
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
         # Verificar si ya existe (evitar duplicados)
         existing = db.query(Workout).filter(
