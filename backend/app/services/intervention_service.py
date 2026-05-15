@@ -14,7 +14,7 @@ Autor: ATLAS Team
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy import func as sa_func
@@ -144,7 +144,7 @@ class InterventionService:
             )
 
             # 3. Persistir
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             deadline = now + timedelta(hours=24) if level in (
                 AutonomyLevel.PROPOSAL, AutonomyLevel.VALIDATION,
             ) else None
@@ -206,7 +206,7 @@ class InterventionService:
 
                 if success:
                     intervention.status = "executed"
-                    intervention.executed_at = datetime.utcnow()
+                    intervention.executed_at = datetime.now(timezone.utc)
 
                 db.commit()
                 return success
@@ -292,7 +292,7 @@ class InterventionService:
 
                 intervention.response = response
                 intervention.response_data = response_data or {}
-                intervention.responded_at = datetime.utcnow()
+                intervention.responded_at = datetime.now(timezone.utc)
 
                 if response == "accepted":
                     intervention.status = "accepted"
@@ -304,7 +304,7 @@ class InterventionService:
                     db.commit()
                 elif response == "snoozed":
                     # Reprogramar para 4h después
-                    intervention.decision_deadline = datetime.utcnow() + timedelta(hours=4)
+                    intervention.decision_deadline = datetime.now(timezone.utc) + timedelta(hours=4)
                     db.commit()
 
                 return True
@@ -322,7 +322,7 @@ class InterventionService:
         """Intervenciones pendientes (no expiradas)."""
         try:
             with SessionLocal() as db:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 return db.query(AtlasIntervention).filter(
                     AtlasIntervention.user_id == user_id,
                     AtlasIntervention.status == "pending",
@@ -342,7 +342,7 @@ class InterventionService:
         """Intervenciones activas (pending + accepted + executed recientes)."""
         try:
             with SessionLocal() as db:
-                cutoff = datetime.utcnow() - timedelta(days=7)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=7)
                 return db.query(AtlasIntervention).filter(
                     AtlasIntervention.user_id == user_id,
                     AtlasIntervention.created_at >= cutoff,
@@ -363,7 +363,7 @@ class InterventionService:
         """Historial de intervenciones."""
         try:
             with SessionLocal() as db:
-                cutoff = datetime.utcnow() - timedelta(days=days)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=days)
                 query = db.query(AtlasIntervention).filter(
                     AtlasIntervention.user_id == user_id,
                     AtlasIntervention.created_at >= cutoff,
@@ -423,7 +423,7 @@ class InterventionService:
         """Marca como expiradas las intervenciones pendientes vencidas."""
         try:
             with SessionLocal() as db:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 expired = db.query(AtlasIntervention).filter(
                     AtlasIntervention.status == "pending",
                     AtlasIntervention.decision_deadline.isnot(None),
@@ -450,7 +450,7 @@ class InterventionService:
         """Archiva intervenciones antiguas."""
         try:
             with SessionLocal() as db:
-                cutoff = datetime.utcnow() - timedelta(days=days)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=days)
                 old = db.query(AtlasIntervention).filter(
                     AtlasIntervention.created_at < cutoff,
                 ).all()
@@ -588,7 +588,7 @@ class InterventionService:
             if cooldown.total_seconds() <= 0:
                 return False
 
-            cutoff = datetime.utcnow() - cooldown
+            cutoff = datetime.now(timezone.utc) - cooldown
             with SessionLocal() as db:
                 recent = db.query(AtlasIntervention).filter(
                     AtlasIntervention.user_id == user_id,
@@ -605,7 +605,7 @@ class InterventionService:
     def _check_daily_limit(user_id: str) -> bool:
         """True si se excedió el límite diario de intervenciones."""
         try:
-            cutoff = datetime.utcnow() - timedelta(days=1)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=1)
             with SessionLocal() as db:
                 count = db.query(sa_func.count(AtlasIntervention.id)).filter(
                     AtlasIntervention.user_id == user_id,

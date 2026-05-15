@@ -12,7 +12,7 @@ Flujo:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func as sa_func
@@ -109,7 +109,7 @@ def process_pending(dry_run: bool = False) -> list[dict[str, Any]]:
                 try:
                     if not dry_run:
                         event.processed = True
-                        event.processed_at = datetime.utcnow()
+                        event.processed_at = datetime.now(timezone.utc)
 
                     # Evaluar triggers para este evento
                     from app.services.intervention_service import InterventionService
@@ -193,7 +193,7 @@ def cleanup_events(older_than_days: int = MAX_EVENT_AGE_DAYS) -> int:
         Número de eventos eliminados
     """
     try:
-        cutoff = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         with SessionLocal() as db:
             result = (
                 db.query(AtlasEvent)
