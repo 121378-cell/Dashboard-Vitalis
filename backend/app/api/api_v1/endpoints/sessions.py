@@ -240,6 +240,45 @@ def get_today_session(
     )
 
 
+@router.get("/history", response_model=List[SessionResponse])
+def get_session_history(
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Historial de sesiones de entrenamiento.
+    Parámetro 'days' especifica cuántos días hacia atrás consultar (default: 30).
+    """
+    cutoff_date = (date.today() - timedelta(days=days)).isoformat()
+    
+    sessions = db.query(TrainingSession).filter(
+        TrainingSession.user_id == user_id,
+        TrainingSession.date >= cutoff_date
+    ).order_by(TrainingSession.date.desc()).all()
+    
+    return [
+        SessionResponse(
+            id=s.id,
+            user_id=s.user_id,
+            date=s.date,
+            status=s.status,
+            generated_by=s.generated_by,
+            plan=json.loads(s.plan_json) if s.plan_json else None,
+            actual=json.loads(s.actual_json) if s.actual_json else None,
+            session_report=s.session_report,
+            garmin_activity_id=s.garmin_activity_id,
+            garmin_hr_avg=s.garmin_hr_avg,
+            garmin_hr_max=s.garmin_hr_max,
+            garmin_calories=s.garmin_calories,
+            garmin_duration_min=s.garmin_duration_min,
+            created_at=s.created_at,
+            updated_at=s.updated_at
+        )
+        for s in sessions
+    ]
+
+
 @router.get("/{session_id}", response_model=SessionResponse)
 def get_session_detail(
     session_id: str,
@@ -395,45 +434,6 @@ def analyze_session_endpoint(
         raise HTTPException(status_code=500, detail=f"Error generando informe: {str(e)}")
 
 
-@router.get("/history", response_model=List[SessionResponse])
-def get_session_history(
-    days: int = Query(default=30, ge=1, le=365),
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
-):
-    """
-    Historial de sesiones de entrenamiento.
-    Parámetro 'days' especifica cuántos días hacia atrás consultar (default: 30).
-    """
-    cutoff_date = (date.today() - timedelta(days=days)).isoformat()
-    
-    sessions = db.query(TrainingSession).filter(
-        TrainingSession.user_id == user_id,
-        TrainingSession.date >= cutoff_date
-    ).order_by(TrainingSession.date.desc()).all()
-    
-    return [
-        SessionResponse(
-            id=s.id,
-            user_id=s.user_id,
-            date=s.date,
-            status=s.status,
-            generated_by=s.generated_by,
-            plan=json.loads(s.plan_json) if s.plan_json else None,
-            actual=json.loads(s.actual_json) if s.actual_json else None,
-            session_report=s.session_report,
-            garmin_activity_id=s.garmin_activity_id,
-            garmin_hr_avg=s.garmin_hr_avg,
-            garmin_hr_max=s.garmin_hr_max,
-            garmin_calories=s.garmin_calories,
-            garmin_duration_min=s.garmin_duration_min,
-            created_at=s.created_at,
-            updated_at=s.updated_at
-        )
-        for s in sessions
-    ]
-
-
 @router.post("/weekly-report/generate", response_model=WeeklyReportResponse)
 def generate_weekly_report(
     db: Session = Depends(get_db),
@@ -445,7 +445,10 @@ def generate_weekly_report(
     Genera plan para la semana siguiente.
     """
     # Generar informe
-    report_data = SessionService.generate_weekly_report(user_id, db)
+    try:
+        report_data = SessionService.generate_weekly_report(user_id, db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando informe semanal: {str(e)}")
     
     # Guardar en BD
     weekly_report = WeeklyReport(
