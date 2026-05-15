@@ -66,22 +66,34 @@ class TriggerInterventionRequest(BaseModel):
 
 class OutcomeStatsResponse(BaseModel):
     total: int
-    type_stats: list[dict]
+    by_type: list[dict]
     avg_score: Optional[float] = None
-    acceptance_rate: float
+    acceptance_rate: Optional[float] = None
     outcome_distribution: dict
+
+    class Config:
+        # Permitir alias opcional para compatibilidad con frontend
+        from_attributes = True
 
 
 class BestChannelResponse(BaseModel):
-    channel: str
-    avg_score: float
+    best_channel: str
+    scores_by_channel: dict
+    confidence: float
     sample_size: int
+
+    class Config:
+        from_attributes = True
 
 
 class BestTimingResponse(BaseModel):
-    timing: str
-    avg_score: float
+    best_timing: str
+    scores_by_timing: dict
+    confidence: float
     sample_size: int
+
+    class Config:
+        from_attributes = True
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +189,7 @@ def get_outcome_stats(
     return InterventionOutcomeService.get_outcome_stats(
         user_id=user_id,
         intervention_type=intervention_type,
+        db=db,
     )
 
 
@@ -190,6 +203,7 @@ def get_best_channel(
     return InterventionOutcomeService.get_best_channel(
         user_id=user_id,
         intervention_type=intervention_type,
+        db=db,
     )
 
 
@@ -203,6 +217,7 @@ def get_best_timing(
     return InterventionOutcomeService.get_best_timing(
         user_id=user_id,
         intervention_type=intervention_type,
+        db=db,
     )
 
 

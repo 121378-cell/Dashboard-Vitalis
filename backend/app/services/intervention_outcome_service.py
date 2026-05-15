@@ -274,7 +274,10 @@ class InterventionOutcomeService:
 
         except Exception as e:
             logger.error("Error obteniendo stats para user %s: %s", user_id, e)
-            return {"total": 0, "by_type": [], "avg_score": None, "acceptance_rate": None}
+            return {
+                "total": 0, "by_type": [], "avg_score": None,
+                "acceptance_rate": None, "outcome_distribution": {},
+            }
         finally:
             if own_session:
                 session.close()
