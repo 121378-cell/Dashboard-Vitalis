@@ -112,16 +112,8 @@ def process_pending(dry_run: bool = False) -> list[dict[str, Any]]:
                         event.processed_at = datetime.utcnow()
 
                     # Evaluar triggers para este evento
-                    # Import lazy: InterventionService se crea en Semana 2
-                    try:
-                        from app.services.intervention_service import InterventionService
-                        result = InterventionService.evaluate_triggers(
-                            user_id=event.user_id,
-                            event=event,
-                        )
-                    except ImportError:
-                        # InterventionService aún no implementado
-                        result = None
+                    from app.services.intervention_service import InterventionService
+                    result = InterventionService.evaluate_triggers(event)
 
                     if result:
                         interventions.append({
