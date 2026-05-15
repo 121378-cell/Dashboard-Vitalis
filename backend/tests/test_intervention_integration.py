@@ -482,6 +482,181 @@ class TestActiveEndpoint:
 
 
 # ---------------------------------------------------------------------------
+# Tests: GET /interventions/ (listado con filtros)
+# ---------------------------------------------------------------------------
+
+
+class TestListEndpoint:
+    """GET /interventions/"""
+
+    API_PATH = "/api/v1/interventions/"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_list_with_data(self, client, db_session):
+        """Intervenciones existentes → 200 + listado ordenado DESC."""
+        now = datetime.now(timezone.utc)
+        i1 = _create_intervention(
+            db_session, status="pending", created_at=now,
+        )
+        i2 = _create_intervention(
+            db_session, status="accepted", response="accepted",
+            created_at=now - timedelta(hours=2),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        assert data[0]["id"] == i1.id  # Más reciente primero
+        assert data[1]["id"] == i2.id
+
+    def test_list_filters_by_days(self, client, db_session):
+        """Intervención fuera del rango default de 30 días → no listada."""
+        _create_intervention(
+            db_session, status="pending",
+            created_at=datetime.now(timezone.utc) - timedelta(days=60),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_list_custom_days(self, client, db_session):
+        """Parámetro days=60 incluye intervención de hace 45 días."""
+        _create_intervention(
+            db_session, status="pending",
+            created_at=datetime.now(timezone.utc) - timedelta(days=45),
+        )
+        resp = client.get(f"{self.API_PATH}?days=60", headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+
+    def test_list_filters_by_status(self, client, db_session):
+        """Filtro status=accepted → solo intervenciones accepted."""
+        _create_intervention(db_session, status="pending", created_at=datetime.now(timezone.utc))
+        i2 = _create_intervention(
+            db_session, status="accepted", response="accepted",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        resp = client.get(f"{self.API_PATH}?status=accepted", headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["id"] == i2.id
+        assert data[0]["status"] == "accepted"
+
+    def test_list_empty(self, client):
+        """Sin intervenciones → 200 + []."""
+        resp = client.get(self.API_PATH, headers={"x-user-id": "empty_user"})
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_list_other_user(self, client, db_session):
+        """Intervenciones de otro usuario → vacío."""
+        _create_intervention(db_session, user_id="other_user", status="pending",
+                             created_at=datetime.now(timezone.utc))
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_list_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(self.API_PATH)
+        assert resp.status_code == 401
+
+    def test_list_invalid_days(self, client):
+        """Parámetro days fuera de rango (0) → 422."""
+        resp = client.get(f"{self.API_PATH}?days=0", headers=self.HEADERS)
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Tests: GET /interventions/stats
+# ---------------------------------------------------------------------------
+
+
+class TestStatsEndpoint:
+    """GET /interventions/stats"""
+
+    API_PATH = "/api/v1/interventions/stats"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_stats_with_data(self, client, db_session):
+        """Intervenciones con varios estados → stats correctos."""
+        _create_intervention(db_session, status="accepted", response="accepted",
+                             created_at=datetime.now(timezone.utc))
+        _create_intervention(db_session, status="accepted", response="accepted",
+                             created_at=datetime.now(timezone.utc))
+        _create_intervention(db_session, status="rejected", response="rejected",
+                             created_at=datetime.now(timezone.utc))
+        _create_intervention(db_session, status="pending",
+                             created_at=datetime.now(timezone.utc))
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 4
+        assert data["pending"] == 1
+        assert data["accepted"] == 2
+        assert data["rejected"] == 1
+        # acceptance_rate = 2 / (2 + 1) * 100 = 66.7
+        assert data["acceptance_rate"] == 66.7
+
+    def test_stats_empty(self, client):
+        """Sin intervenciones → todo en 0."""
+        resp = client.get(self.API_PATH, headers={"x-user-id": "empty_user"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 0
+        assert data["pending"] == 0
+        assert data["accepted"] == 0
+        assert data["rejected"] == 0
+        assert data["acceptance_rate"] == 0
+
+    def test_stats_other_user(self, client, db_session):
+        """Intervenciones de otro usuario → todo en 0."""
+        _create_intervention(db_session, user_id="other_user", status="accepted",
+                             response="accepted", created_at=datetime.now(timezone.utc))
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 0
+        assert data["acceptance_rate"] == 0
+
+    def test_stats_only_pending(self, client, db_session):
+        """Solo intervenciones pending → acceptance_rate=0 (sin accepted+rejected)."""
+        _create_intervention(db_session, status="pending",
+                             created_at=datetime.now(timezone.utc))
+        _create_intervention(db_session, status="pending",
+                             created_at=datetime.now(timezone.utc))
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert data["pending"] == 2
+        assert data["accepted"] == 0
+        assert data["rejected"] == 0
+        assert data["acceptance_rate"] == 0
+
+    def test_stats_all_rejected(self, client, db_session):
+        """Todas rechazadas → acceptance_rate=0."""
+        _create_intervention(db_session, status="rejected", response="rejected",
+                             created_at=datetime.now(timezone.utc))
+        _create_intervention(db_session, status="rejected", response="rejected",
+                             created_at=datetime.now(timezone.utc))
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert data["accepted"] == 0
+        assert data["rejected"] == 2
+        assert data["acceptance_rate"] == 0
+
+    def test_stats_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(self.API_PATH)
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Tests: GET /interventions/{intervention_id}
 # ---------------------------------------------------------------------------
 
@@ -552,3 +727,54 @@ class TestGetInterventionEndpoint:
         inv = _create_intervention(db_session, status="pending")
         resp = client.get(f"{self.API_PATH}/{inv.id}")
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Tests: DELETE /interventions/{intervention_id}
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteEndpoint:
+    """DELETE /interventions/{intervention_id}"""
+
+    API_PATH = "/api/v1/interventions"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_delete_found(self, client, db_session):
+        """Eliminar intervención existente → 200 + ya no existe."""
+        inv = _create_intervention(db_session, status="pending")
+        resp = client.delete(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "Intervención eliminada"
+
+        # Verificar que ya no existe
+        resp2 = client.get(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp2.status_code == 404
+
+    def test_delete_not_found(self, client):
+        """ID inexistente → 404."""
+        resp = client.delete(f"{self.API_PATH}/99999", headers=self.HEADERS)
+        assert resp.status_code == 404
+        assert "no encontrada" in resp.json()["detail"].lower()
+
+    def test_delete_wrong_user(self, client, db_session):
+        """Intervención de otro usuario → 404 (filtro por user_id)."""
+        inv = _create_intervention(db_session, user_id="other_user", status="pending")
+        resp = client.delete(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp.status_code == 404
+
+    def test_delete_unauthorized(self, client, db_session):
+        """Sin header de autenticación → 401."""
+        inv = _create_intervention(db_session, status="pending")
+        resp = client.delete(f"{self.API_PATH}/{inv.id}")
+        assert resp.status_code == 401
+
+    def test_delete_twice(self, client, db_session):
+        """Eliminar dos veces → 200 primera, 404 segunda."""
+        inv = _create_intervention(db_session, status="pending")
+        # Primera vez
+        resp1 = client.delete(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp1.status_code == 200
+        # Segunda vez
+        resp2 = client.delete(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp2.status_code == 404

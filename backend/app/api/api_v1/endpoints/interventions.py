@@ -298,3 +298,24 @@ def get_intervention(
         raise HTTPException(status_code=404, detail="Intervención no encontrada")
 
     return _intervention_to_dict(intervention)
+
+
+@router.delete("/{intervention_id}")
+def delete_intervention(
+    intervention_id: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Eliminar una intervención."""
+    success = InterventionService.delete_intervention(
+        intervention_id=intervention_id,
+        user_id=user_id,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="Intervención no encontrada",
+        )
+
+    return {"message": "Intervención eliminada"}

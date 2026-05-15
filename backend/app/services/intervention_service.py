@@ -426,6 +426,35 @@ class InterventionService:
             return {}
 
     # ------------------------------------------------------------------
+    # Eliminación
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def delete_intervention(intervention_id: int, user_id: str) -> bool:
+        """
+        Elimina una intervención permanentemente.
+
+        Retorna True si se eliminó, False si no se encontró.
+        """
+        try:
+            with SessionLocal() as db:
+                intervention = db.query(AtlasIntervention).filter(
+                    AtlasIntervention.id == intervention_id,
+                    AtlasIntervention.user_id == user_id,
+                ).first()
+
+                if not intervention:
+                    return False
+
+                db.delete(intervention)
+                db.commit()
+                return True
+
+        except Exception as e:
+            logger.error("Error eliminando intervención %s: %s", intervention_id, e)
+            return False
+
+    # ------------------------------------------------------------------
     # Mantenimiento
     # ------------------------------------------------------------------
 
