@@ -307,6 +307,17 @@ class InterventionService:
                     intervention.decision_deadline = datetime.now(timezone.utc) + timedelta(hours=4)
                     db.commit()
 
+                # Registrar outcome_score post-respuesta
+                try:
+                    from app.services.intervention_outcome_service import InterventionOutcomeService
+                    InterventionOutcomeService.record_outcome(
+                        intervention_id=intervention_id,
+                        outcome=None,  # Auto-deducir del estado
+                        db=db,
+                    )
+                except Exception as oc_err:
+                    logger.warning("Error registrando outcome: %s", oc_err)
+
                 return True
 
         except Exception as e:
