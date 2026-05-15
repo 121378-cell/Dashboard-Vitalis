@@ -657,6 +657,232 @@ class TestStatsEndpoint:
 
 
 # ---------------------------------------------------------------------------
+# Tests: GET /interventions/outcome-stats (estadísticas de efectividad)
+# ---------------------------------------------------------------------------
+
+
+class TestOutcomeStatsEndpoint:
+    """GET /interventions/outcome-stats"""
+
+    API_PATH = "/api/v1/interventions/outcome-stats"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_outcome_stats_with_data(self, client, db_session):
+        """Intervenciones con outcome_scores → stats completos."""
+        now = datetime.now(timezone.utc)
+        # 2 adherence_nudge: 1 accepted, 1 rejected
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            status="accepted", response="accepted", outcome_score=0.85,
+            created_at=now,
+        )
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            status="rejected", response="rejected", outcome_score=0.2,
+            created_at=now - timedelta(hours=1),
+        )
+        # 1 check_in_request: accepted
+        _create_intervention(
+            db_session, intervention_type="check_in_request",
+            status="accepted", response="accepted", outcome_score=0.9,
+            created_at=now - timedelta(hours=2),
+        )
+
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+        assert len(data["by_type"]) == 2
+        assert data["avg_score"] is not None
+        assert data["acceptance_rate"] is not None
+        assert isinstance(data["outcome_distribution"], dict)
+        # by_type items have type, count, avg_score, acceptance_rate
+        for entry in data["by_type"]:
+            assert "type" in entry
+            assert "count" in entry
+            assert entry["count"] > 0
+
+    def test_outcome_stats_filter_by_type(self, client, db_session):
+        """Filtro ?intervention_type=adherence_nudge → solo ese tipo."""
+        now = datetime.now(timezone.utc)
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            status="accepted", response="accepted", outcome_score=0.85,
+            created_at=now,
+        )
+        _create_intervention(
+            db_session, intervention_type="check_in_request",
+            status="accepted", response="accepted", outcome_score=0.9,
+            created_at=now - timedelta(hours=1),
+        )
+        resp = client.get(
+            f"{self.API_PATH}?intervention_type=adherence_nudge",
+            headers=self.HEADERS,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert len(data["by_type"]) == 1
+        assert data["by_type"][0]["type"] == "adherence_nudge"
+
+    def test_outcome_stats_empty(self, client):
+        """Sin intervenciones → valores por defecto."""
+        resp = client.get(self.API_PATH, headers={"x-user-id": "empty_user"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 0
+        assert data["by_type"] == []
+        assert data["avg_score"] is None
+        assert data["acceptance_rate"] is None
+        assert data["outcome_distribution"] == {}
+
+    def test_outcome_stats_other_user(self, client, db_session):
+        """Intervenciones de otro usuario → vacío."""
+        _create_intervention(
+            db_session, user_id="other_user", intervention_type="adherence_nudge",
+            status="accepted", response="accepted", outcome_score=0.85,
+            created_at=datetime.now(timezone.utc),
+        )
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 0
+
+    def test_outcome_stats_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(self.API_PATH)
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Tests: GET /interventions/outcome-stats/best-channel
+# ---------------------------------------------------------------------------
+
+
+class TestBestChannelEndpoint:
+    """GET /interventions/outcome-stats/best-channel"""
+
+    API_PATH = "/api/v1/interventions/outcome-stats/best-channel"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_best_channel_with_data(self, client, db_session):
+        """Intervenciones con diferentes autonomy_levels → mejor canal."""
+        now = datetime.now(timezone.utc)
+        # AUTONOMOUS → canal "app" con score alto
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            autonomy_level="AUTONOMOUS", status="accepted",
+            response="accepted", outcome_score=0.9,
+            created_at=now,
+        )
+        # PROPOSAL → canales "app" + "system"
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            autonomy_level="PROPOSAL", status="rejected",
+            response="rejected", outcome_score=0.3,
+            created_at=now - timedelta(hours=1),
+        )
+        resp = client.get(
+            f"{self.API_PATH}?intervention_type=adherence_nudge",
+            headers=self.HEADERS,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["best_channel"] in ("app", "system")
+        assert isinstance(data["scores_by_channel"], dict)
+        assert len(data["scores_by_channel"]) > 0
+        assert isinstance(data["confidence"], float)
+        assert data["sample_size"] > 0
+
+    def test_best_channel_no_data(self, client):
+        """Sin datos → valores por defecto."""
+        resp = client.get(
+            f"{self.API_PATH}?intervention_type=adherence_nudge",
+            headers=self.HEADERS,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["best_channel"] == "app"
+        assert data["scores_by_channel"] == {}
+        assert data["confidence"] == 0.0
+        assert data["sample_size"] == 0
+
+    def test_best_channel_missing_type(self, client):
+        """Falta ?intervention_type (required) → 422."""
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 422
+
+    def test_best_channel_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(f"{self.API_PATH}?intervention_type=adherence_nudge")
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Tests: GET /interventions/outcome-stats/best-timing
+# ---------------------------------------------------------------------------
+
+
+class TestBestTimingEndpoint:
+    """GET /interventions/outcome-stats/best-timing"""
+
+    API_PATH = "/api/v1/interventions/outcome-stats/best-timing"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_best_timing_with_data(self, client, db_session):
+        """Intervenciones en diferentes horas → mejor franja horaria."""
+        now = datetime.now(timezone.utc)
+        # Mañana (6-12) con score alto
+        morning = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            status="accepted", response="accepted", outcome_score=0.9,
+            created_at=morning,
+        )
+        # Noche (22-06) con score bajo
+        night = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        _create_intervention(
+            db_session, intervention_type="adherence_nudge",
+            status="rejected", response="rejected", outcome_score=0.2,
+            created_at=night,
+        )
+        resp = client.get(
+            f"{self.API_PATH}?intervention_type=adherence_nudge",
+            headers=self.HEADERS,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["best_timing"] in ("morning", "afternoon", "evening", "night")
+        assert isinstance(data["scores_by_timing"], dict)
+        assert len(data["scores_by_timing"]) > 0
+        assert isinstance(data["confidence"], float)
+        assert data["sample_size"] > 0
+
+    def test_best_timing_no_data(self, client):
+        """Sin datos → valores por defecto."""
+        resp = client.get(
+            f"{self.API_PATH}?intervention_type=adherence_nudge",
+            headers=self.HEADERS,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["best_timing"] == "morning"
+        assert data["scores_by_timing"] == {}
+        assert data["confidence"] == 0.0
+        assert data["sample_size"] == 0
+
+    def test_best_timing_missing_type(self, client):
+        """Falta ?intervention_type (required) → 422."""
+        resp = client.get(self.API_PATH, headers=self.HEADERS)
+        assert resp.status_code == 422
+
+    def test_best_timing_unauthorized(self, client):
+        """Sin header de autenticación → 401."""
+        resp = client.get(f"{self.API_PATH}?intervention_type=adherence_nudge")
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Tests: GET /interventions/{intervention_id}
 # ---------------------------------------------------------------------------
 
