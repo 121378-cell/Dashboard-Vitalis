@@ -135,6 +135,9 @@ def _create_intervention(
     executed_at=None,
     is_active=True,
     decision_deadline=None,
+    title="Test Intervention",
+    message="This is a test intervention.",
+    priority="medium",
 ):
     """Crea un AtlasIntervention de prueba."""
     now = created_at or datetime.now(timezone.utc)
@@ -142,9 +145,9 @@ def _create_intervention(
         user_id=user_id,
         intervention_type=intervention_type,
         autonomy_level=autonomy_level,
-        title="Test Intervention",
-        message="This is a test intervention.",
-        priority="medium",
+        title=title,
+        message=message,
+        priority=priority,
         status=status,
         created_at=now,
         responded_at=responded_at,
@@ -475,4 +478,77 @@ class TestActiveEndpoint:
     def test_active_unauthorized(self, client):
         """Sin header de autenticación → 401."""
         resp = client.get(self.API_PATH)
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Tests: GET /interventions/{intervention_id}
+# ---------------------------------------------------------------------------
+
+
+class TestGetInterventionEndpoint:
+    """GET /interventions/{intervention_id}"""
+
+    API_PATH = "/api/v1/interventions"
+    HEADERS = {"x-user-id": "test_user"}
+
+    def test_get_by_id_found(self, client, db_session):
+        """Intervención existente → 200 + datos completos."""
+        now = datetime.now(timezone.utc)
+        inv = _create_intervention(
+            db_session, status="pending",
+            title="Intervención de prueba",
+            message="Mensaje de prueba",
+            priority="high",
+            created_at=now,
+        )
+        resp = client.get(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == inv.id
+        assert data["intervention_type"] == "adherence_nudge"
+        assert data["autonomy_level"] == "PROPOSAL"
+        assert data["title"] == "Intervención de prueba"
+        assert data["message"] == "Mensaje de prueba"
+        assert data["priority"] == "high"
+        assert data["status"] == "pending"
+        assert data["created_at"] is not None
+        assert data["response"] is None
+        assert data["outcome_score"] is None
+        assert data["metadata"] is None
+
+    def test_get_by_id_with_response(self, client, db_session):
+        """Intervención con respuesta completa → 200 + todos los campos."""
+        now = datetime.now(timezone.utc)
+        inv = _create_intervention(
+            db_session, status="accepted", response="accepted",
+            outcome_score=0.85,
+            created_at=now - timedelta(hours=24),
+            responded_at=now - timedelta(hours=2),
+            executed_at=now,
+        )
+        resp = client.get(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["response"] == "accepted"
+        assert data["outcome_score"] == 0.85
+        assert data["responded_at"] is not None
+        assert data["executed_at"] is not None
+
+    def test_get_by_id_not_found(self, client):
+        """ID inexistente → 404."""
+        resp = client.get(f"{self.API_PATH}/99999", headers=self.HEADERS)
+        assert resp.status_code == 404
+        assert "no encontrada" in resp.json()["detail"].lower()
+
+    def test_get_by_id_wrong_user(self, client, db_session):
+        """Intervención de otro usuario → 404 (filtro por user_id)."""
+        inv = _create_intervention(db_session, user_id="other_user", status="pending")
+        resp = client.get(f"{self.API_PATH}/{inv.id}", headers=self.HEADERS)
+        assert resp.status_code == 404
+
+    def test_get_by_id_unauthorized(self, client, db_session):
+        """Sin header de autenticación → 401."""
+        inv = _create_intervention(db_session, status="pending")
+        resp = client.get(f"{self.API_PATH}/{inv.id}")
         assert resp.status_code == 401
