@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from typing import Optional
@@ -7,12 +8,15 @@ from pathlib import Path
 _BACKEND_DIR = Path(__file__).parent.parent.parent
 _DB_PATH = _BACKEND_DIR / "atlas_v2.db"
 
+# Fallback: Usa valor de entorno DATABASE_URL si está definido, sino usa ruta local
+default_db_url = os.getenv("DATABASE_URL", f"sqlite:///{_DB_PATH}")
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Fitness Coach"
     API_V1_STR: str = "/api/v1"
 
-    # Database — ruta absoluta para evitar ambigüedad según CWD
-    DATABASE_URL: str = f"sqlite:///{_DB_PATH}"
+    # Database — sqlite:////data/atlas_v2.db en Fly.io (volumen persistente)
+    DATABASE_URL: str = default_db_url
     
     # Auth
     GARMIN_EMAIL: Optional[str] = None

@@ -11,6 +11,8 @@ import time
 from app.services.scheduler_service import start_scheduler, shutdown_scheduler
 from app.middleware.monitoring import MonitoringMiddleware, get_metrics
 from app.core.rate_limiter import RateLimiterMiddleware
+from app.core.error_handler import register_error_handlers
+from app.core import health_endpoints
 from sqlalchemy import text
 
 logger = logging.getLogger("app.main")
@@ -184,6 +186,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Registrar handlers de excepciones personalizadas
+try:
+    register_error_handlers(app)
+except Exception as e:
+    logger.error(f"Error registrando handlers: {e}")
+
 # Middleware para corregir Mixed Content en redirecciones (Detrás de Fly.io)
 @app.middleware("http")
 async def fix_https_redirect(request: Request, call_next):
@@ -229,19 +237,20 @@ _start_time = time.time()
 
 @app.get("/health")
 def health_check():
-    db_ok = False
-    try:
-        from app.db.session import SessionLocal
-        with SessionLocal() as db:
-            db.execute(text("SELECT 1"))
-            db_ok = True
-    except Exception as e:
-        logger.error(f"Health check DB error: {e}")
-    return {
-        "status": "ok" if db_ok else "degraded",
-        "db": "ok" if db_ok else "error",
-        "uptime_seconds": int(time.time() - _start_time),
-    }
+    result = health_endpoints.basic_health()
+    return result
+
+
+@app.get("/health/ready")
+def readiness_check():
+    result = health_endpoints.ready_health()
+    return result
+
+
+@app.get("/health/deep")
+def deep_health_check():
+    result = health_endpoints.deep_health()
+    return result
 
 @app.get("/metrics")
 def metrics_endpoint():

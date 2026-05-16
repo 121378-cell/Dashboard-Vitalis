@@ -24,6 +24,7 @@ from app.models.biometrics import Biometrics
 from app.models.adaptive_training_plan import AdaptiveTrainingPlan, AdaptivePlannedSession, AdaptivePlanAdjustment
 from app.services.athletic_intelligence_service import AthleticIntelligenceService
 from app.services.training_plan_service import TrainingPlanService
+from app.core.exceptions import BiometricDataNotFoundError
 
 logger = logging.getLogger("app.services.daily_loop_service")
 
@@ -205,7 +206,9 @@ class DailyLoopService:
 
         else:
             logger.warning(f"No hay datos biométricos recientes para user {user_id}")
-            return None, None, None, None, "none"
+            raise BiometricDataNotFoundError(
+                detail={"user_id": user_id, "dates_checked": [today_str, yesterday_str]}
+            )
 
         return bb_value, rhr_value, sleep_hours, stress_value, biometrics_source
 
