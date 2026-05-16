@@ -1,6 +1,6 @@
 """
 ATLAS Readiness Score v2
-=========================
+==========================
 
 Adaptive Personal Baseline Algorithm v2:
 - Learns personal baseline from 30-day history
@@ -18,33 +18,36 @@ Components:
 Output: ReadinessResult with score, status, recommendation, components
 
 Autor: ATLAS Team
-Version: 2.0.0
+Version: 2.0.1 (refactored to use pure functions from readiness_calculator)
 """
 
 import json
 import logging
-import statistics
 from datetime import date, timedelta
 from typing import Dict, Optional, List, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.models.biometrics import Biometrics
+from app.core.readiness_calculator import (
+    PersonalBaseline as PurePersonalBaseline,
+    score_hrv as pure_score_hrv,
+    score_sleep as pure_score_sleep,
+    score_sleep_with_quality as pure_score_sleep_with_quality,
+    score_stress as pure_score_stress,
+    score_rhr as pure_score_rhr,
+    score_body_battery as pure_score_body_battery,
+    score_training_load_from_duration as pure_score_training_load,
+    score_to_status as pure_score_to_status,
+    generate_recommendation as pure_generate_recommendation,
+    calculate_baseline_from_values as pure_calculate_baseline,
+    calculate_readiness_score as pure_calculate_readiness,
+    ReadinessComponents,
+)
 
 logger = logging.getLogger("app.services.readiness")
 
-
-@dataclass
-class PersonalBaseline:
-    """Personal baseline metrics calculated from history."""
-    hrv_mean: float = 0.0
-    hrv_std: float = 0.0
-    sleep_mean: float = 0.0
-    rhr_mean: float = 0.0
-    rhr_std: float = 0.0
-    stress_mean: float = 0.0
-    body_battery_mean: float = 0.0
-    days_available: int = 0
+PersonalBaseline = PurePersonalBaseline
 
 
 @dataclass
@@ -54,7 +57,7 @@ class ReadinessResult:
     status: str
     recommendation: str
     component_scores: Dict[str, float]
-    baseline_used: PersonalBaseline
+    baseline_used: PurePersonalBaseline
     overtraining_risk: bool
 
 
@@ -337,38 +340,11 @@ class ReadinessService:
     def _score_hrv(hrv: float, baseline_mean: float, baseline_std: float) -> float:
         """
         Score HRV relative to personal baseline.
-        
+
         Higher HRV = better recovery. Score based on how many
         standard deviations above/below the mean.
         """
-        if baseline_mean <= 0:
-            # No baseline - use absolute scale
-            if hrv >= 70:
-                return 100.0
-            elif hrv >= 55:
-                return 80.0
-            elif hrv >= 40:
-                return 60.0
-            return 30.0
-        
-        if baseline_std <= 0:
-            baseline_std = baseline_mean * 0.1  # Assume 10% variability
-        
-        # Score based on z-score
-        z_score = (hrv - baseline_mean) / baseline_std
-        
-        if z_score >= 1.0:
-            return 100.0  # Exceptional
-        elif z_score >= 0.5:
-            return 90.0   # Very good
-        elif z_score >= 0:
-            return 80.0   # Good (above average)
-        elif z_score >= -0.5:
-            return 60.0   # Below average
-        elif z_score >= -1.0:
-            return 40.0   # Poor
-        else:
-            return 20.0   # Very poor (possible overtraining)
+        return pure_score_hrv(hrv, baseline_mean, baseline_std)
 
     @staticmethod
     def _score_sleep(hours: float, baseline_mean: float = 0) -> float:
@@ -501,15 +477,7 @@ class ReadinessService:
     @staticmethod
     def _score_to_status(score: int) -> str:
         """Convert numeric score to status string."""
-        if score >= 85:
-            return "excellent"
-        elif score >= 70:
-            return "good"
-        elif score >= 50:
-            return "moderate"
-        elif score >= 30:
-            return "poor"
-        return "rest"
+        return pure_score_to_status(score)
 
     @classmethod
     def _calculate_from_garmin_readiness(
