@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
@@ -43,6 +43,37 @@ export const TrainingPage = () => {
 
   const isLoading = isLoadingVolume || isLoadingPRs || isLoadingDistribution;
 
+  const weeklyData = useMemo(() => muscleVolume?.length ? muscleVolume : [], [muscleVolume]);
+  const prs = useMemo(() => personalRecords?.length ? personalRecords : [], [personalRecords]);
+  const sessionData = useMemo(() => distribution?.length ? distribution : [], [distribution]);
+
+  const totalByMuscle = useMemo(() => 
+    Object.entries(
+      weeklyData.slice(-4).reduce((acc: Record<string, number>, week: any) => {
+        Object.entries(week).forEach(([muscle, value]) => {
+          if (muscle !== 'week' && typeof value === 'number') {
+            acc[muscle] = (acc[muscle] || 0) + value;
+          }
+        });
+        return acc;
+      }, {} as Record<string, number>)
+    ).map(([muscle, value]) => ({
+      muscle,
+      value,
+      color: MUSCLE_COLORS[muscle] || COLORS.primary,
+    })),
+    [weeklyData]
+  );
+
+  const pieData = useMemo(() => 
+    totalByMuscle.map(d => ({
+      name: d.muscle,
+      value: d.value,
+      color: d.color,
+    })),
+    [totalByMuscle]
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -53,31 +84,6 @@ export const TrainingPage = () => {
       </div>
     );
   }
-
-  const weeklyData = muscleVolume?.length ? muscleVolume : [];
-  const prs = personalRecords?.length ? personalRecords : [];
-  const sessionData = distribution?.length ? distribution : [];
-
-  const totalByMuscle = Object.entries(
-    weeklyData.slice(-4).reduce((acc: Record<string, number>, week: any) => {
-      Object.entries(week).forEach(([muscle, value]) => {
-        if (muscle !== 'week' && typeof value === 'number') {
-          acc[muscle] = (acc[muscle] || 0) + value;
-        }
-      });
-      return acc;
-    }, {} as Record<string, number>)
-  ).map(([muscle, value]) => ({
-    muscle,
-    value,
-    color: MUSCLE_COLORS[muscle] || COLORS.primary,
-  }));
-
-  const pieData = totalByMuscle.map(d => ({
-    name: d.muscle,
-    value: d.value,
-    color: d.color,
-  }));
 
   return (
     <div className="space-y-6">

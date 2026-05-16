@@ -12,18 +12,15 @@ Flujo: Event → evaluate_triggers() → create_intervention() → deliver()
 Autor: ATLAS Team
 """
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy import func as sa_func
-from sqlalchemy.orm import Session
 
 from app.core.autonomy_policy import (
     AutonomyLevel,
     InterventionType,
-    get_autonomy_level,
     resolve_autonomy,
     get_cooldown,
 )
@@ -329,7 +326,11 @@ class InterventionService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def get_pending(user_id: str) -> list[AtlasIntervention]:
+    def get_pending(
+        user_id: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[AtlasIntervention]:
         """Intervenciones pendientes (no expiradas)."""
         try:
             with SessionLocal() as db:
@@ -343,13 +344,17 @@ class InterventionService:
                     ),
                 ).order_by(
                     AtlasIntervention.created_at.desc(),
-                ).all()
+                ).offset(skip).limit(limit).all()
         except Exception as e:
             logger.error("Error obteniendo intervenciones pendientes: %s", e)
             return []
 
     @staticmethod
-    def get_active(user_id: str) -> list[AtlasIntervention]:
+    def get_active(
+        user_id: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[AtlasIntervention]:
         """Intervenciones activas (pending + accepted + executed recientes)."""
         try:
             with SessionLocal() as db:
@@ -360,7 +365,7 @@ class InterventionService:
                     AtlasIntervention.is_active == True,
                 ).order_by(
                     AtlasIntervention.created_at.desc(),
-                ).all()
+                ).offset(skip).limit(limit).all()
         except Exception as e:
             logger.error("Error obteniendo intervenciones activas: %s", e)
             return []
@@ -370,6 +375,8 @@ class InterventionService:
         user_id: str,
         days: int = 30,
         status_filter: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
     ) -> list[AtlasIntervention]:
         """Historial de intervenciones."""
         try:
@@ -383,7 +390,7 @@ class InterventionService:
                     query = query.filter(AtlasIntervention.status == status_filter)
                 return query.order_by(
                     AtlasIntervention.created_at.desc(),
-                ).all()
+                ).offset(skip).limit(limit).all()
         except Exception as e:
             logger.error("Error obteniendo historial: %s", e)
             return []

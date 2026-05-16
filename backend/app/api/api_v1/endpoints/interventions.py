@@ -140,33 +140,44 @@ def _intervention_to_dict(intervention) -> dict:
 def list_interventions(
     days: int = Query(default=30, ge=1, le=365),
     status: Optional[str] = Query(default=None, description="Filter by status"),
+    skip: int = Query(default=0, ge=0, description="Results to skip"),
+    limit: int = Query(default=100, ge=1, le=500, description="Max results"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Historial de intervenciones del usuario."""
     interventions = InterventionService.get_history(
         user_id, days=days, status_filter=status,
+        skip=skip, limit=limit,
     )
     return [_intervention_to_dict(i) for i in interventions]
 
 
 @router.get("/pending", response_model=list[InterventionResponse])
 def list_pending(
+    skip: int = Query(default=0, ge=0, description="Results to skip"),
+    limit: int = Query(default=50, ge=1, le=200, description="Max results"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Intervenciones pendientes (no expiradas)."""
-    interventions = InterventionService.get_pending(user_id)
+    interventions = InterventionService.get_pending(
+        user_id, skip=skip, limit=limit,
+    )
     return [_intervention_to_dict(i) for i in interventions]
 
 
 @router.get("/active", response_model=list[InterventionResponse])
 def list_active(
+    skip: int = Query(default=0, ge=0, description="Results to skip"),
+    limit: int = Query(default=50, ge=1, le=200, description="Max results"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     """Intervenciones activas de los últimos 7 días."""
-    interventions = InterventionService.get_active(user_id)
+    interventions = InterventionService.get_active(
+        user_id, skip=skip, limit=limit,
+    )
     return [_intervention_to_dict(i) for i in interventions]
 
 

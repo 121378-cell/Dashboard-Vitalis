@@ -1,8 +1,34 @@
-import React, { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Plus, Play, Dumbbell, Flame, X, Check, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getExercises, createCustomExercise, Exercise } from '../services/exerciseService';
+
+const MUSCLE_TRANSLATIONS: Record<string, string> = {
+  'chest': 'Pecho',
+  'back': 'Espalda',
+  'shoulders': 'Hombros',
+  'biceps': 'Bíceps',
+  'triceps': 'Tríceps',
+  'legs_quads': 'Cuádriceps',
+  'legs_hamstrings': 'Isquiotibiales',
+  'legs_glutes': 'Glúteos',
+  'calves': 'Gemelos',
+  'core': 'Core',
+  'full_body': 'Full Body'
+};
+
+const TYPE_TRANSLATIONS: Record<string, string> = {
+  'strength': 'Fuerza',
+  'hypertrophy': 'Hipertrofia',
+  'power': 'Potencia',
+  'endurance': 'Resistencia',
+  'recovery': 'Recuperación',
+  'deload': 'Descarga'
+};
+
+const formatMuscle = (val: string) => MUSCLE_TRANSLATIONS[val] || val.replace('_', ' ');
+const formatType = (val: string) => TYPE_TRANSLATIONS[val] || val;
 
 export const ExerciseSelector: React.FC = () => {
   const queryClient = useQueryClient();
@@ -32,20 +58,24 @@ export const ExerciseSelector: React.FC = () => {
     }
   });
 
-  const filtered = exercises?.filter(ex => 
-    ex.name.toLowerCase().includes(search.toLowerCase()) ||
-    ex.primary_muscle.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  const filtered = useMemo(() => 
+    exercises?.filter(ex => 
+      ex.name.toLowerCase().includes(search.toLowerCase()) ||
+      ex.primary_muscle.toLowerCase().includes(search.toLowerCase())
+    ) || [],
+    [exercises, search]
+  );
 
-  const toggleSelect = (ex: Exercise) => {
-    if (selectedExercises.find(s => s.id === ex.id)) {
-      setSelectedExercises(selectedExercises.filter(s => s.id !== ex.id));
-    } else {
-      setSelectedExercises([...selectedExercises, ex]);
-    }
-  };
+  const toggleSelect = useCallback((ex: Exercise) => {
+    setSelectedExercises(prev => {
+      if (prev.find(s => s.id === ex.id)) {
+        return prev.filter(s => s.id !== ex.id);
+      }
+      return [...prev, ex];
+    });
+  }, []);
 
-  const handleCreateCustom = (e: React.FormEvent) => {
+  const handleCreateCustom = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (customName.trim().length === 0) return;
     mutation.mutate({
@@ -54,36 +84,15 @@ export const ExerciseSelector: React.FC = () => {
       exercise_type: customType,
       difficulty_level: 1
     });
-  };
+  }, [customName, customGroup, customType, mutation]);
 
-  const formatMuscle = (val: string) => {
-    const translation: Record<string, string> = {
-      'chest': 'Pecho',
-      'back': 'Espalda',
-      'shoulders': 'Hombros',
-      'biceps': 'Bíceps',
-      'triceps': 'Tríceps',
-      'legs_quads': 'Cuádriceps',
-      'legs_hamstrings': 'Isquiotibiales',
-      'legs_glutes': 'Glúteos',
-      'calves': 'Gemelos',
-      'core': 'Core',
-      'full_body': 'Full Body'
-    };
-    return translation[val] || val.replace('_', ' ');
-  };
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+  }, []);
 
-  const formatType = (val: string) => {
-    const translation: Record<string, string> = {
-      'strength': 'Fuerza',
-      'hypertrophy': 'Hipertrofia',
-      'power': 'Potencia',
-      'endurance': 'Resistencia',
-      'recovery': 'Recuperación',
-      'deload': 'Descarga'
-    };
-    return translation[val] || val;
-  };
+  const toggleCustomForm = useCallback(() => {
+    setIsCreatingCustom(prev => !prev);
+  }, []);
 
   return (
     <div className="w-full h-full min-h-[600px] flex flex-col bg-gradient-to-br from-surface-container/90 to-surface-container-high/80 backdrop-blur-2xl rounded-[32px] border border-white/5 shadow-2xl overflow-hidden p-8 relative">
@@ -104,7 +113,7 @@ export const ExerciseSelector: React.FC = () => {
         <motion.button 
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setIsCreatingCustom(!isCreatingCustom)}
+          onClick={toggleCustomForm}
           className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg ${
             isCreatingCustom 
             ? 'bg-error/10 text-error hover:bg-error/20 border border-error/20' 
@@ -202,7 +211,7 @@ export const ExerciseSelector: React.FC = () => {
           type="text"
           placeholder="Busca cualquier ejercicio o grupo muscular..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
           className="w-full bg-surface-container/30 backdrop-blur-md border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-sm text-on-surface focus:bg-surface-container/60 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-on-surface-variant/40 font-medium"
         />
       </div>

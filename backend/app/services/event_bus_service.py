@@ -10,7 +10,7 @@ Flujo:
 3. process_pending() evalúa triggers y genera intervenciones si procede
 """
 
-import json
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -71,6 +71,28 @@ def emit(
     except Exception as e:
         logger.error("Failed to emit event %s for user %s: %s", event_type, user_id, e)
         return None
+
+
+async def async_emit(
+    user_id: str,
+    event_type: str,
+    payload: dict | None = None,
+    source: str = "system",
+    correlation_id: str | None = None,
+) -> AtlasEvent | None:
+    """
+    Versión asíncrona de emit() para usar desde endpoints FastAPI.
+
+    Ejecuta la operación DB en un executor de hilos para no bloquear
+    el event loop de asyncio.
+
+    Uso:
+        await async_emit(user_id, "workout_logged", payload={"workout_id": 123})
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, emit, user_id, event_type, payload, source, correlation_id,
+    )
 
 
 def process_pending(dry_run: bool = False) -> list[dict[str, Any]]:
