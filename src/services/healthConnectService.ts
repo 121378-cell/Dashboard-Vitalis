@@ -198,12 +198,14 @@ class HealthConnectServiceClass {
     try {
       // Usar permisos requeridos actualizados
       const result = await Health.requestHealthPermissions({
-        permissions: REQUIRED_HEALTH_PERMISSIONS as unknown as string[]
+        permissions: REQUIRED_HEALTH_PERMISSIONS as any
       });
 
-      const granted = (result as HCPermissionResult).display === 'granted' ||
-                     (result as HCPermissionResult).granted === true ||
-                     !!((result as HCPermissionResult).permissions);
+      // Cast a any para evitar problemas con la API del plugin
+      const resultAny = result as any;
+      const granted = resultAny.display === 'granted' ||
+                     resultAny.granted === true ||
+                     !!resultAny.permissions;
       
       this.permissionsGranted = !!granted;
       

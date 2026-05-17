@@ -273,6 +273,7 @@ export interface Biometrics {
   weight?: number | null;
   body_fat?: number | null;
   sleep_seconds?: number | null;
+  synced?: boolean;
 }
 
 export interface ReadinessScore {
@@ -452,6 +453,7 @@ export interface Workout {
   date?: string;
   duration?: number;
   calories?: number;
+  synced?: boolean;
 }
 
 // Daily Loop / Readiness Dashboard Types
