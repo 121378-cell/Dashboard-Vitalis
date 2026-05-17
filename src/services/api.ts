@@ -62,16 +62,16 @@ api.interceptors.response.use(
 );
 
 // Helper functions
-export const getData = <T>(url: string, params?: Record<string, any>) => 
+export const getData = <T>(url: string, params?: Record<string, unknown>) =>
   api.get<T>(url, { params }).then(r => r.data);
 
-export const postData = <T>(url: string, data?: any) => 
+export const postData = <T>(url: string, data?: object) =>
   api.post<T>(url, data).then(r => r.data);
 
-export const putData = <T>(url: string, data?: any) => 
+export const putData = <T>(url: string, data?: object) =>
   api.put<T>(url, data).then(r => r.data);
 
-export const deleteData = <T>(url: string) => 
+export const deleteData = <T>(url: string) =>
   api.delete<T>(url).then(r => r.data);
 
 export default api;

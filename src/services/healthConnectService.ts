@@ -73,6 +73,25 @@ export interface HCPermissionStatus {
   permissions: { [key: string]: boolean };
 }
 
+interface HCPermissionResult {
+  display?: string;
+  granted?: boolean;
+  permissions?: Record<string, boolean>;
+}
+
+interface HCAggregatedDataPoint {
+  value?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
+interface HCRecord {
+  count?: number;
+  value?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 // Permissions que soporta el plugin
 export type HCHealthPermission =
   | 'READ_STEPS'
@@ -178,13 +197,13 @@ class HealthConnectServiceClass {
 
     try {
       // Usar permisos requeridos actualizados
-      const result = await Health.requestHealthPermissions({ 
-        permissions: REQUIRED_HEALTH_PERMISSIONS as any 
+      const result = await Health.requestHealthPermissions({
+        permissions: REQUIRED_HEALTH_PERMISSIONS as unknown as string[]
       });
-      
-      const granted = (result as any).display === 'granted' || 
-                     (result as any).granted === true || 
-                     !!((result as any).permissions);
+
+      const granted = (result as HCPermissionResult).display === 'granted' ||
+                     (result as HCPermissionResult).granted === true ||
+                     !!((result as HCPermissionResult).permissions);
       
       this.permissionsGranted = !!granted;
       
@@ -352,7 +371,7 @@ class HealthConnectServiceClass {
         bucket: 'day',
       });
       if (r.aggregatedData && r.aggregatedData.length > 0) {
-        const total = r.aggregatedData.reduce((s: number, d: any) => s + (d.value || 0), 0);
+        const total = r.aggregatedData.reduce((s: number, d: HCAggregatedDataPoint) => s + (d.value || 0), 0);
         steps = total;
         console.log(`[HC] Steps: ${total}`);
       }
@@ -368,7 +387,7 @@ class HealthConnectServiceClass {
           dataType: 'steps'
         });
         if (records.length > 0) {
-          const total = records.reduce((s: number, r: any) => s + (r.count || r.value || 0), 0);
+          const total = records.reduce((s: number, r: HCRecord) => s + (r.count || r.value || 0), 0);
           steps = total;
           console.log(`[HC] Steps (records): ${total}`);
         } else {
@@ -390,7 +409,7 @@ class HealthConnectServiceClass {
         bucket: 'day',
       });
       if (r.aggregatedData && r.aggregatedData.length > 0) {
-        const total = r.aggregatedData.reduce((s: number, d: any) => s + (d.value || 0), 0);
+        const total = r.aggregatedData.reduce((s: number, d: HCAggregatedDataPoint) => s + (d.value || 0), 0);
         activeCalories = total;
         calories = total;
         console.log(`[HC] Active calories: ${total}`);
@@ -407,7 +426,7 @@ class HealthConnectServiceClass {
         bucket: 'day',
       });
       if (r.aggregatedData && r.aggregatedData.length > 0) {
-        const total = r.aggregatedData.reduce((s: number, d: any) => s + (d.value || 0), 0);
+        const total = r.aggregatedData.reduce((s: number, d: HCAggregatedDataPoint) => s + (d.value || 0), 0);
         if (calories === null || total > (calories || 0)) calories = total;
       }
     } catch (e) {}

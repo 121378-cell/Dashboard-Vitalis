@@ -9,7 +9,7 @@ export interface WeeklyPlan {
   objective: string;
   structure_name?: string;
   week_number?: number;
-  plan_data?: any;
+  plan_data?: Record<string, unknown>;
   sessions: TrainingSession[];
 }
 
@@ -23,7 +23,7 @@ export interface TrainingSession {
   exercises: PlanExercise[];
   exercises_data?: PlanExercise[];
   completed: boolean;
-  actual_data?: any;
+  actual_data?: Record<string, unknown>;
   skipped?: boolean;
   notes?: string;
   readiness_score?: number | null;

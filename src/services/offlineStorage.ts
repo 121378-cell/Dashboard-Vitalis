@@ -1,21 +1,22 @@
 import Dexie, { Table } from 'dexie';
+import type { Biometrics, Workout } from '../types';
 
 export interface SyncQueueItem {
   id?: number;
   type: 'biometrics' | 'workouts' | 'plans';
-  data: any;
+  data: Record<string, unknown>;
   createdAt: number;
 }
 
 export class OfflineStorageDb extends Dexie {
-  biometrics!: Table<any, number>;
-  workouts!: Table<any, number>;
-  plans!: Table<any, number>;
+  biometrics!: Table<Biometrics, number>;
+  workouts!: Table<Workout, number>;
+  plans!: Table<Record<string, unknown>, number>;
   syncQueue!: Table<SyncQueueItem, number>;
 
   constructor() {
     super('vitalis_offline');
-    
+
     this.version(1).stores({
       biometrics: '++id, date, synced',
       workouts: '++id, date, synced',
@@ -24,14 +25,14 @@ export class OfflineStorageDb extends Dexie {
     });
   }
 
-  async saveBiometricsLocally(data: any) {
+  async saveBiometricsLocally(data: Biometrics) {
     await this.biometrics.add({ ...data, synced: false });
-    await this.syncQueue.add({ type: 'biometrics', data, createdAt: Date.now() });
+    await this.syncQueue.add({ type: 'biometrics', data: data as unknown as Record<string, unknown>, createdAt: Date.now() });
   }
-  
-  async saveWorkoutLocally(data: any) {
+
+  async saveWorkoutLocally(data: Workout) {
     await this.workouts.add({ ...data, synced: false });
-    await this.syncQueue.add({ type: 'workouts', data, createdAt: Date.now() });
+    await this.syncQueue.add({ type: 'workouts', data: data as unknown as Record<string, unknown>, createdAt: Date.now() });
   }
 
   async getUnsyncedData(): Promise<SyncQueueItem[]> {

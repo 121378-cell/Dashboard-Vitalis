@@ -49,7 +49,7 @@ export const sessionService = {
   },
 
   // Save completed session
-  async saveSession(sessionId: string, actualData: any): Promise<boolean> {
+  async saveSession(sessionId: string, actualData: Record<string, unknown>): Promise<boolean> {
     try {
       await api.post(`/sessions/${sessionId}/save`, { actual_data: actualData });
       return true;
