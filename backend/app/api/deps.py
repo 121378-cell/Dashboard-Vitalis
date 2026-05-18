@@ -41,28 +41,18 @@ def verify_token(token: str) -> Optional[str]:
 
 
 def get_current_user_id(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
-    x_user_id: Optional[str] = Header(None, alias="x-user-id")
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme)
 ) -> str:
     """
-    Extrae el user_id del JWT Bearer token (primario) o x-user-id (fallback deprecated).
-
-    En produccion, todos los clientes deben usar Authorization: Bearer <token>.
-    El header x-user-id solo se acepta en desarrollo y mostrara una advertencia.
+    Extrae el user_id del JWT Bearer token.
+    
+    Todos los clientes deben usar Authorization: Bearer <token>.
     """
     # Primario: JWT Bearer token via Authorization header
     if credentials:
         user_id = verify_token(credentials.credentials)
         if user_id:
             return user_id
-
-    # Fallback temporal: x-user-id header (solo desarrollo)
-    if x_user_id and x_user_id.strip():
-        logger.warning(
-            "Uso de x-user-id header DEPRECADO. "
-            "Los clientes deben usar Authorization: Bearer <token>"
-        )
-        return x_user_id.strip()
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
