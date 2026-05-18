@@ -38,7 +38,7 @@ function extractSessionPlan(content: string): SessionPlan | null {
   return null;
 }
 
-export const Chat: React.FC<Props> = ({ messages, onSendMessage, loading, quickActions }) => {
+export const Chat: React.FC<Props> = ({ messages = [], onSendMessage = () => {}, loading = false, quickActions = [] }) => {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -155,6 +155,7 @@ export const Chat: React.FC<Props> = ({ messages, onSendMessage, loading, quickA
           <button 
             onClick={handleSend}
             disabled={!input.trim() || loading}
+            aria-label="Enviar mensaje"
             className="absolute bottom-4 right-4 p-2 bg-primary text-on-primary rounded-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send size={18} />

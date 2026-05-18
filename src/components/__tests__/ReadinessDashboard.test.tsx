@@ -38,6 +38,18 @@ describe('ReadinessDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    let rafStartTime = 0;
+    vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => {
+      rafStartTime = performance.now();
+      const handle = setTimeout(() => cb(rafStartTime + 800), 0) as unknown as number;
+      return handle;
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders loading skeleton when isLoading is true', () => {
@@ -113,6 +125,8 @@ describe('ReadinessDashboard', () => {
     });
 
     render(<ReadinessDashboard />, { wrapper });
+
+    vi.advanceTimersByTime(800);
 
     await waitFor(() => {
       expect(screen.getByText('75')).toBeTruthy();
