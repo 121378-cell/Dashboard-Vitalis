@@ -206,7 +206,6 @@ origins = [
     "https://atlas-vitalis-backend.fly.dev",
     "http://localhost:5173",
     "http://localhost:3000",
-    "http://localhost",
     "capacitor://localhost",
     "ionic://localhost",
 ]
