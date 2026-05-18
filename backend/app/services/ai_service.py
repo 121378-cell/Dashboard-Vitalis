@@ -715,15 +715,24 @@ class AIService:
                 api_key=settings.GROQ_API_KEY,
                 base_url="https://api.groq.com/openai/v1"
             )
-        
+         
         self.gemini_client = None
         if settings.GEMINI_API_KEY:
             self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-            
+             
         self.ollama_client = OpenAI(
             api_key="ollama",
             base_url=f"{settings.OLLAMA_BASE_URL}/v1"
         )
+        
+        # Circuit breaker states for AI providers
+        self._circuit_breaker = {
+            "groq": {"failures": 0, "last_failure": None, "state": "CLOSED"},  # CLOSED, OPEN, HALF_OPEN
+            "gemini": {"failures": 0, "last_failure": None, "state": "CLOSED"},
+            "ollama": {"failures": 0, "last_failure": None, "state": "CLOSED"}
+        }
+        self._failure_threshold = 3
+        self._recovery_timeout = 30  # seconds
 
     @staticmethod
     def chat(messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> Dict[str, Any]:
@@ -741,43 +750,63 @@ class AIService:
     def _generate_chat_response(self, messages: List[Dict[str, str]], system_instruction: Optional[str] = None) -> Dict[str, Any]:
         start_time = time.time()
         
-        # 1. Groq (llama-3.3-70b-versatile) — fastest, 10s timeout
-        if self.groq_client:
-            try:
-                logger.info("Trying Groq AI provider...")
-                content = self._generate_openai_compatible(
-                    self.groq_client, "llama-3.3-70b-versatile", messages, system_instruction, timeout=10
-                )
-                logger.info(f"Groq responded in {time.time() - start_time:.1f}s")
-                return {"content": content, "provider": "Groq"}
-            except Exception as e:
-                logger.warning(f"Groq failed: {e}")
-
-        # 2. Gemini (gemini-2.0-flash) — fallback, 10s timeout
-        if self.gemini_client:
-            try:
-                logger.info("Trying Gemini AI provider...")
-                content = self._generate_gemini(messages, system_instruction)
-                logger.info(f"Gemini responded in {time.time() - start_time:.1f}s")
-                return {"content": content, "provider": "Gemini"}
-            except Exception as e:
-                logger.error(f"Gemini failed: {e}")
-
-        # 3. Ollama local — offline fallback, 10s timeout
-        if self._check_ollama_available():
-            try:
-                logger.info("Trying Ollama (local) AI provider...")
-                content = self._generate_openai_compatible(
-                    self.ollama_client, "llama3", messages, system_instruction, timeout=10
-                )
-                logger.info(f"Ollama responded in {time.time() - start_time:.1f}s")
-                return {"content": content, "provider": "Ollama (Local)"}
-            except Exception as e:
-                logger.warning(f"Ollama failed: {e}")
+        # Define provider order with their clients and model info
+        providers = [
+            ("groq", self.groq_client, "llama-3.3-70b-versatile", self._generate_openai_compatible),
+            ("gemini", self.gemini_client, "gemini-2.0-flash", self._generate_gemini),
+            ("ollama", self.ollama_client if self._check_ollama_available() else None, "llama3", self._generate_openai_compatible)
+        ]
         
-        elapsed = time.time() - start_time
-        logger.error(f"All AI providers failed after {elapsed:.1f}s")
-        raise Exception("All AI providers failed. Please check your API keys or try again later.")
+        # Try each provider in order, respecting circuit breaker state
+        for provider_name, client, model_name, generate_func in providers:
+            # Skip if client is not available
+            if not client:
+                logger.debug(f"Skipping {provider_name} - client not available")
+                continue
+                
+            # Check circuit breaker state
+            breaker = self._circuit_breaker[provider_name]
+            if breaker["state"] == "OPEN":
+                # Check if enough time has passed to try half-open
+                if breaker["last_failure"] and (time.time() - breaker["last_failure"]) > self._recovery_timeout:
+                    breaker["state"] = "HALF_OPEN"
+                    logger.info(f"Circuit breaker for {provider_name} is now HALF_OPEN")
+                else:
+                    logger.debug(f"Skipping {provider_name} - circuit breaker is OPEN")
+                    continue
+            elif breaker["state"] == "HALF_OPEN":
+                logger.info(f"Trying {provider_name} in HALF_OPEN state")
+            
+            # Try the provider
+            try:
+                logger.info(f"Trying {provider_name} AI provider...")
+                if provider_name == "gemini":
+                    content = generate_func(messages, system_instruction)
+                else:
+                    content = generate_func(client, model_name, messages, system_instruction, timeout=10)
+                
+                # Success! Reset failure count and close circuit breaker
+                logger.info(f"{provider_name} responded in {time.time() - start_time:.1f}s")
+                breaker["failures"] = 0
+                breaker["state"] = "CLOSED"
+                return {"content": content, "provider": provider_name.capitalize()}
+                
+            except Exception as e:
+                logger.warning(f"{provider_name} failed: {e}")
+                # Increment failure count and check if we should open the circuit breaker
+                breaker["failures"] += 1
+                breaker["last_failure"] = time.time()
+                
+                if breaker["failures"] >= self._failure_threshold:
+                    breaker["state"] = "OPEN"
+                    logger.warning(f"Circuit breaker for {provider_name} is now OPEN after {breaker['failures']} failures")
+                
+                # If this was the last provider to try, continue to the exception handling below
+                if provider_name == "ollama":
+                    # All providers have been tried and failed
+                    elapsed = time.time() - start_time
+                    logger.error(f"All AI providers failed after {elapsed:.1f}s")
+                    raise Exception("All AI providers failed. Please check your API keys or try again later.")
 
     def _check_ollama_available(self) -> bool:
         """Quick 2s check if Ollama is running."""
