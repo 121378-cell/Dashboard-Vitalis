@@ -37,6 +37,9 @@ class _TokenBucket:
             return round(deficit / self.refill_rate, 1)
 
 
+# Default rate limit for endpoints not explicitly listed: 60 requests per minute
+_DEFAULT_RATE_LIMIT = (60, 60)
+
 _RATE_LIMITS: Dict[str, Tuple[int, int]] = {
     "POST:/api/v1/ai/chat": (30, 60),
     "POST:/api/v1/sync/garmin": (10, 3600),
@@ -103,21 +106,24 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
         if matched_rule:
             max_req, window_sec = _RATE_LIMITS[matched_rule]
+        else:
+            # Usar límite por defecto para endpoints no especificados
+            max_req, window_sec = _DEFAULT_RATE_LIMIT
 
-            if "login" in matched_rule:
-                identity = f"ip:{_get_client_ip(request)}"
-            else:
-                identity = f"user:{_get_user_id(request)}"
+        if "login" in matched_rule:
+            identity = f"ip:{_get_client_ip(request)}"
+        else:
+            identity = f"user:{_get_user_id(request)}"
 
-            bucket_key = f"{matched_rule}:{identity}"
-            bucket = _get_bucket(bucket_key, max_req, window_sec)
+        bucket_key = f"{matched_rule or 'default'}:{identity}"
+        bucket = _get_bucket(bucket_key, max_req, window_sec)
 
-            if not bucket.consume():
-                retry = bucket.retry_after()
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"Rate limit exceeded. Retry after {retry}s.",
-                    headers={"Retry-After": str(int(retry))},
-                )
+        if not bucket.consume():
+            retry = bucket.retry_after()
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded. Retry after {retry}s.",
+                headers={"Retry-After": str(int(retry))},
+            )
 
         return await call_next(request)
