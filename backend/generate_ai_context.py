@@ -21,7 +21,7 @@ db = SessionLocal()
 print("=" * 80)
 print("RESUMEN COMPLETO DE DATOS GARMIN - CONTEXTO PARA IA")
 print("Período: 1 de Enero 2025 - 26 de Marzo 2026 (450 días)")
-print("Usuario: Sergi Márquez Brugal (sergi.marquez.brugal@gmail.com)")
+print("Usuario: Usuario de Prueba (test@example.com)")
 print("Dispositivo: Garmin Forerunner 245")
 print("=" * 80)
 
@@ -253,7 +253,7 @@ print("🤖 CONTEXTO PARA PROMPT DE IA (copiar y pegar)")
 print("=" * 80)
 
 context = f"""
-CONTEXTO DEL ATLETA - SERGI MÁRQUEZ BRUGAL
+CONTEXTO DEL ATLETA - USUARIO DE PRUEBA
 ==========================================
 Período analizado: 450 días (1 Ene 2025 - 26 Mar 2026)
 Dispositivo: Garmin Forerunner 245

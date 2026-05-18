@@ -132,16 +132,16 @@ def _cache_key(user_id: str) -> str:
     return f"atlas_prompt_{user_id}"
 
 
-FALLBACK_SYSTEM_PROMPT = """Eres ATLAS, el Director Deportivo de IA de Sergi. NO eres un asistente pasivo.
+FALLBACK_SYSTEM_PROMPT = """Eres ATLAS, el Director Deportivo de IA. NO eres un asistente pasivo.
 
 IDENTIDAD CORE:
-- Eres el guardián del PROYECTO 31/07: Sergi debe llegar al 31 de Julio en su mejor forma histórica.
+- Eres el guardián del objetivo del atleta: ayudarlo a llegar a su mejor forma histórica.
 - Tono: Directo, basado en datos, exigente pero leal.
-- Edad del atleta: 47 años — ajusta recuperación y volumen en consecuencia.
-- ATENCIÓN: Sergi usa un Forerunner 245 que NO mide HRV. NUNCA menciones HRV como dato disponible.
+- Edad del atleta: {athlete_age} años — ajusta recuperación y volumen en consecuencia.
+- ATENCIÓN: El dispositivo del atleta no mide HRV. NUNCA menciones HRV como dato disponible.
 
 LIMITACIONES HONESTAS:
-- NUNCA menciones HRV como métrica disponible — el dispositivo del atleta (FR245) no lo mide.
+- NUNCA menciones HRV como métrica disponible.
 - Usa Body Battery y FC Reposo como indicadores de recuperación.
 - Si no tienes un dato, di qué dato falta y qué decisión tomarías.
 
@@ -152,7 +152,7 @@ REGLAS ABSOLUTAS:
 4. Cuando generes un entrenamiento, USA SIEMPRE los marcadores 'json_session_start' y 'json_session_end' con JSON editable por filas.
 5. Usa ÚNICAMENTE nombres de ejercicios de la lista HEVY para que el usuario pueda registrarlos sin problemas.
 
-PERFIL DEL ATLETA: Sergi, 47 años. FC Reposo: 45.5bpm. Sueño crónico: 6.15h. Body Battery medio: 70.5. 560 actividades registradas. Deporte principal: strength_training. Objetivo: Proyecto 31/07."""
+PERFIL DEL ATLETA: {athlete_name}, {athlete_age} años. Deporte principal: strength_training."""
 
 
 def build_coach_context(db, user_id: str = "default_user") -> Dict[str, Any]:
@@ -165,9 +165,9 @@ def build_coach_context(db, user_id: str = "default_user") -> Dict[str, Any]:
     """
     today_str = date.today().isoformat()
     now = datetime.now()
-    athlete_name = "Sergi"
-    athlete_age = "47"
-    step_target = "20.000"
+    athlete_name = "Atleta"
+    athlete_age = "40"
+    step_target = "10.000"
     readiness_score = None
     bio_summary = ""
     injury_summary = "clear"
@@ -189,7 +189,7 @@ def build_coach_context(db, user_id: str = "default_user") -> Dict[str, Any]:
             _coach_context_cache.set(ai_cache_key, {"result": profile_data, "ts": now})
 
         identity = profile_data.get("athlete_identity", {})
-        athlete_name = identity.get("name", "Sergi")
+        athlete_name = identity.get("name", "Atleta")
         age_val = identity.get("age")
         if age_val:
             athlete_age = str(age_val)
@@ -461,7 +461,7 @@ def generate_welcome_message(db, user_id: str = "default_user") -> Dict[str, Any
         welcome_msg = " ".join(parts)
     except Exception as e:
         logger.warning(f"generate_welcome_message failed, using fallback: {e}")
-        welcome_msg = "Hola, Sergi. Soy ATLAS, tu Director Deportivo. ¿En qué te puedo ayudar?"
+        welcome_msg = f"Hola, {athlete_name}. Soy ATLAS, tu Director Deportivo. ¿En qué te puedo ayudar?"
 
     result = {"message": welcome_msg, "generated_at": now.isoformat()}
     _welcome_cache.set(cache_key, {"result": result, "ts": now})
@@ -521,9 +521,9 @@ def build_atlas_system_prompt(db, user_id: str) -> Dict[str, Any]:
 
     today_str = date.today().isoformat()
 
-    athlete_name = "Sergi"
-    athlete_age = "47"
-    step_target = "20.000"
+    athlete_name = "Atleta"
+    athlete_age = "40"
+    step_target = "10.000"
 
     try:
         from app.models.user import User

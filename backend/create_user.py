@@ -29,9 +29,9 @@ try:
         # Crear nuevo usuario
         new_user = User(
             id='default_user',
-            name='Sergi',
-            email='sergi.marquez.brugal@gmail.com',
-            birth_date=date(1978, 5, 30)
+            name='Usuario Test',
+            email='test@example.com',
+            birth_date=date(1990, 1, 1)
         )
         
         db.add(new_user)

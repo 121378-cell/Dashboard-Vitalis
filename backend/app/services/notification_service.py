@@ -289,7 +289,7 @@ class NotificationService:
         message = "\n".join(lines)
 
         NotificationService.send_notification(
-            title="\U0001f305 Buenos d\u00edas, Sergi",
+            title="\U0001f305 Buenos d\u00edas, Atleta",
             message=message,
             notification_type="daily_readiness",
             priority="high" if score < 50 else "medium",

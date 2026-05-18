@@ -1,9 +1,8 @@
-"""
-Athletic Intelligence Service para ATLAS
+"""Athletic Intelligence Service para ATLAS
 ==========================================
 
 Servicio de inteligencia deportiva que analiza datos históricos
-de Sergi para proporcionar insights al coach de Atlas.
+del atleta para proporcionar insights al coach de ATLAS.
 
 Características:
 - Análisis de baseline de fitness sin HRV (FR245 no lo mide)
