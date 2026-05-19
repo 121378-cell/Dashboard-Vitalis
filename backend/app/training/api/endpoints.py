@@ -14,15 +14,15 @@ Diseño:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from typing import List, Optional
 from sqlalchemy import or_
 from datetime import datetime
+from typing import Optional
 
 from app.api.deps import get_db, get_current_user_id
 from app.training.domain.models import (
     PlannedWorkout, TrainingPlan, ExerciseSet, WorkoutFeedback,
-    WorkoutStatus, SetStatus, AdaptationReason
+    WorkoutStatus, SetStatus, AdaptationReason, WorkoutType
 )
 from app.training.schemas import (
     WorkoutCreate, WorkoutResponse, WorkoutUpdate,
@@ -34,7 +34,7 @@ from app.training.schemas import (
 )
 from app.training.use_cases import (
     WorkoutGenerator, WorkoutAdapter, TrainingAnalyzer,
-    TrainingEntityFactory, TrainingConstants
+    TrainingEntityFactory, TrainingConstants, TrainingPlanGenerator
 )
 
 router = APIRouter(prefix="/training", tags=["training"])
@@ -88,6 +88,9 @@ def generate_training_plan(
     weeks: int = 4,
     workouts_per_week: int = 3,
     workout_type: str = "strength",
+    goal: Optional[str] = None,
+    experience_level: str = "intermediate",
+    available_days: Optional[List[int]] = None,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user_id)
 ):
@@ -97,16 +100,63 @@ def generate_training_plan(
     - Periodización básica
     - Distribución de cargas
     - Progresión semanal
+    - Personalización basada en objetivos y experiencia
     """
-    # TODO: Implementar generación de planes completos
+    # Validar permisos
+    if weeks < 1 or weeks > 52:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El número de semanas debe estar entre 1 y 52"
+        )
+    
+    if workouts_per_week < 1 or workouts_per_week > 7:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Los entrenamientos por semana deben estar entre 1 y 7"
+        )
+    
+    # Validar que los días disponibles sean válidos (0-6)
+    if available_days:
+        for day in available_days:
+            if day < 0 or day > 6:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Los días disponibles deben estar entre 0 (lunes) y 6 (domingo)"
+                )
+    
+    # Generar plan de entrenamiento completo
+    generator = TrainingPlanGenerator(db)
+    plan_schema = generator.generate_training_plan(
+        user_id=current_user,
+        weeks=weeks,
+        workouts_per_week=workouts_per_week,
+        workout_type=WorkoutType(workout_type),
+        goal=goal,
+        experience_level=experience_level,
+        available_days=available_days
+    )
+    
+    # Crear entidad de plan de entrenamiento
+    plan = TrainingEntityFactory.create_training_plan_from_schema(
+        plan_schema, 
+        current_user
+    )
+    
+    # Guardar
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+    
     return {
-        "message": "Plan generation endpoint - implementación pendiente",
+        "message": "Plan de entrenamiento generado exitosamente",
+        "plan_id": plan.id,
         "user_id": current_user,
-        "params": {
-            "weeks": weeks,
-            "workouts_per_week": workouts_per_week,
-            "type": workout_type
-        }
+        "weeks": weeks,
+        "workouts_per_week": workouts_per_week,
+        "workout_type": workout_type,
+        "goal": goal,
+        "experience_level": experience_level,
+        "total_workouts": len(plan_schema.workouts)
     }
 
 

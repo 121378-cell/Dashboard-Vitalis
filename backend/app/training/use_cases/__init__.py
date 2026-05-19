@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import random
 import logging
+import math
 
 from app.training.domain.models import (
     ExerciseLibrary, TrainingPlan, PlannedWorkout, ExerciseBlock, ExerciseSet,
@@ -678,6 +679,498 @@ class TrainingAnalyzer:
 
 
 # ============================================================================
+# GENERADOR DE PLANES DE ENTRENAMIENTO
+# ============================================================================
+
+class TrainingPlanGenerator:
+    """
+    Generador de planes de entrenamiento a largo plazo con periodización.
+    Crea macros-ciclos basados en objetivos, experiencia y disponibilidad.
+    """
+    
+    def __init__(self, db: Session):
+        self.db = db
+        self.workout_generator = WorkoutGenerator(db)
+        self.constants = TrainingConstants()
+    
+    def generate_training_plan(self, user_id: str, weeks: int = 4, 
+                             workouts_per_week: int = 3, 
+                             workout_type: WorkoutType = WorkoutType.STRENGTH,
+                             goal: Optional[str] = None,
+                             experience_level: str = "intermediate",
+                             available_days: Optional[List[int]] = None) -> TrainingPlanCreate:
+        """
+        Genera un plan de entrenamiento completo con periodización.
+        
+        Args:
+            user_id: ID del usuario
+            weeks: Número de semanas del plan
+            workouts_per_week: Sesiones por semana
+            workout_type: Tipo principal de entrenamiento
+            goal: Objetivo específico (strength_gain, weight_loss, etc.)
+            experience_level: beginner, intermediate, advanced
+            available_days: Días de la semana disponibles (0=lunes, 6=domingo)
+            
+        Returns:
+            TrainingPlanComplete con workouts generados para cada semana
+        """
+        # Obtener perfil de entrenamiento del usuario
+        user_profile = self._get_user_training_profile(user_id)
+        
+        # Determinar parámetros de periodización basado en objetivo y experiencia
+        periodization_params = self._determine_periodization_params(
+            goal, experience_level, weeks
+        )
+        
+        # Generar workouts para cada semana
+        all_workouts = []
+        
+        for week in range(weeks):
+            # Calcular factores de semana basada en periodización
+            week_factor = self._calculate_week_factor(
+                week, weeks, periodization_params
+            )
+            
+            # Generar workouts para esta semana
+            week_workouts = self._generate_week_workouts(
+                user_id, week + 1, workouts_per_week, 
+                workout_type, week_factor, user_profile,
+                available_days
+            )
+            
+            all_workouts.extend(week_workouts)
+        
+        # Crear nombre y descripción del plan
+        plan_name = self._generate_plan_name(workout_type, goal, weeks)
+        plan_description = self._generate_plan_description(
+            workout_type, goal, weeks, experience_level
+        )
+        
+        # Parámetros de generación para tracking
+        generation_params = {
+            "weeks": weeks,
+            "workouts_per_week": workouts_per_week,
+            "workout_type": workout_type.value if hasattr(workout_type, 'value') else str(workout_type),
+            "goal": goal,
+            "experience_level": experience_level,
+            "available_days": available_days,
+            "periodization_type": periodization_params.get("type", "linear")
+        }
+        
+        return TrainingPlanCreate(
+            name=plan_name,
+            description=plan_description,
+            plan_type=workout_type,
+            duration_weeks=weeks,
+            target_sessions_per_week=workouts_per_week,
+            workouts=all_workouts,
+            generation_params=generation_params
+        )
+    
+    def _get_user_training_profile(self, user_id: str) -> Dict[str, Any]:
+        """Obtiene el perfil de entrenamiento del usuario"""
+        profile = self.db.query(UserTrainingProfile).filter(
+            UserTrainingProfile.user_id == user_id
+        ).first()
+        
+        if not profile:
+            # Crear perfil por defecto si no existe
+            profile = UserTrainingProfile(user_id=user_id)
+            self.db.add(profile)
+            self.db.commit()
+            self.db.refresh(profile)
+        
+        return {
+            "preferred_duration": profile.preferred_workout_duration_minutes,
+            "preferred_freq": profile.preferred_workouts_per_week,
+            "preferred_type": profile.preferred_training_type,
+            "max_lifts": profile.max_lifts or {},
+            "training_age": profile.training_age_months or 0,
+            "injury_history": profile.injury_history or [],
+            "volume_tolerance": profile.volume_tolerance or 1.0,
+            "recovery_capacity": profile.recovery_capacity or 1.0,
+            "base_rpe_target": profile.base_rpe_target or 8.0
+        }
+    
+    def _determine_periodization_params(self, goal: Optional[str], 
+                                      experience_level: str, 
+                                      weeks: int) -> Dict[str, Any]:
+        """Determina parámetros de periodización basado en objetivo y experiencia"""
+        
+        # Parámetros por defecto (periodización lineal básica)
+        params = {
+            "type": "linear",
+            "intensity_curve": "linear_increase",
+            "volume_curve": "linear_decrease",
+            "deload_frequency": 4,  # Cada 4 semanas
+            "phases": []
+        }
+        
+        # Ajustar basado en objetivo
+        if goal == "strength_gain":
+            params.update({
+                "type": "undulating",
+                "intensity_curve": "wave_like",
+                "volume_curve": "step_wave",
+                "focus": "intensity_over_volume",
+                "rep_range_primary": (1, 5),  # Fuerza máxima
+                "rep_range_secondary": (6, 10)  # Hipertrofia secundaria
+            })
+        elif goal == "hypertrophy":
+            params.update({
+                "type": "linear",
+                "intensity_curve": "moderate_increase",
+                "volume_curve": "moderate_decrease",
+                "focus": "balanced",
+                "rep_range_primary": (6, 12),  # Hipertrofia principal
+                "rep_range_secondary": (12, 20)  # Resistencia muscular
+            })
+        elif goal == "endurance":
+            params.update({
+                "type": "linear",
+                "intensity_curve": "stable",
+                "volume_curve": "linear_increase",
+                "focus": "volume_over_intensity",
+                "rep_range_primary": (12, 20),  # Resistencia
+                "rep_range_secondary": (20, 30)  # Resistencia extrema
+            })
+        elif goal == "weight_loss":
+            params.update({
+                "type": "hybrid",
+                "intensity_curve": "interval_based",
+                "volume_curve": "high_volume",
+                "focus": "metabolic_cost",
+                "rep_range_primary": (8, 15),  # Moderado para mayor gasto
+                "rep_range_secondary": (15, 25)  # Alta resistencia
+            })
+        
+        # Ajustar basado en nivel de experiencia
+        if experience_level == "beginner":
+            params.update({
+                "intensity_modifier": 0.7,  # Comenzar más conservador
+                "complexity": "simple",
+                "exercise_variety": "low",
+                "technique_focus": True
+            })
+        elif experience_level == "advanced":
+            params.update({
+                "intensity_modifier": 1.2,  # Puede manejar más intensidad
+                "complexity": "high",
+                "exercise_variety": "high",
+                "technique_focus": False
+            })
+        else:  # intermediate
+            params.update({
+                "intensity_modifier": 1.0,
+                "complexity": "moderate",
+                "exercise_variety": "moderate",
+                "technique_focus": False
+            })
+        
+        # Ajustar frecuencia de descarga basada en experiencia y objetivo
+        if experience_level == "beginner":
+            params["deload_frequency"] = max(4, weeks // 2)  # Descarga más frecuente para principiantes
+        elif goal == "strength_gain" and experience_level == "advanced":
+            params["deload_frequency"] = 3  # Descarga más frecuente para levantadores avanzados
+        
+        # Definir fases del plan
+        params["phases"] = self._define_plan_phases(weeks, params["deload_frequency"], goal)
+        
+        return params
+    
+    def _define_plan_phases(self, total_weeks: int, deload_frequency: int, 
+                          goal: Optional[str]) -> List[Dict[str, Any]]:
+        """Define las fases del plan de entrenamiento"""
+        phases = []
+        current_week = 1
+        
+        while current_week <= total_weeks:
+            # Determinar si es semana de descarga
+            is_deload = (current_week % deload_frequency == 0 and 
+                        current_week != total_weeks and 
+                        current_week > deload_frequency)
+            
+            if is_deload:
+                phase_name = "Deload"
+                phase_goal = "Recuperación y adaptación"
+                intensity_mod = 0.6
+                volume_mod = 0.6
+                duration = 1
+            else:
+                # Fase normal de entrenamiento
+                if goal == "strength_gain":
+                    if current_week <= total_weeks * 0.4:
+                        phase_name = "Acumulación"
+                        phase_goal = "Base de fuerza y técnica"
+                        intensity_mod = 0.8
+                        volume_mod = 1.0
+                    elif current_week <= total_weeks * 0.7:
+                        phase_name = "Intensificación"
+                        phase_goal = "Máxima fuerza y densidad"
+                        intensity_mod = 1.0
+                        volume_mod = 0.9
+                    else:
+                        phase_name = "Realización"
+                        phase_goal = "Pico de potencia y prueba"
+                        intensity_mod = 1.1
+                        volume_mod = 0.8
+                elif goal == "hypertrophy":
+                    phase_name = "Hipertrofia Progresiva"
+                    phase_goal = "Crecimiento muscular sostenido"
+                    intensity_mod = 0.9
+                    volume_mod = 1.1
+                elif goal == "endurance":
+                    phase_name = "Base Aeróbica"
+                    phase_goal = "Capacidad de trabajo sostenida"
+                    intensity_mod = 0.7
+                    volume_mod = 1.2
+                else:
+                    phase_name = "Entrenamiento General"
+                    phase_goal = "Fitness y salud general"
+                    intensity_mod = 0.9
+                    volume_mod = 1.0
+                
+                # Calcular duración de la fase (mínimo 2 semanas, máximo restante)
+                remaining_weeks = total_weeks - current_week + 1
+                if remaining_weeks <= 2:
+                    duration = remaining_weeks
+                elif remaining_weeks <= 4:
+                    duration = remaining_weeks
+                else:
+                    duration = min(4, remaining_weeks // 2)
+                    duration = max(2, duration)  # Al menos 2 semanas
+            
+            phases.append({
+                "name": phase_name,
+                "goal": phase_goal,
+                "start_week": current_week,
+                "end_week": min(current_week + duration - 1, total_weeks),
+                "intensity_modifier": intensity_mod,
+                "volume_modifier": volume_mod,
+                "is_deload": is_deload
+            })
+            
+            current_week += duration
+        
+        return phases
+    
+    def _calculate_week_factor(self, week_index: int, total_weeks: int, 
+                             periodization_params: Dict[str, Any]) -> Dict[str, float]:
+        """Calcula factores de intensidad y volumen para una semana específica"""
+        week_num = week_index + 1  # Convertir a 1-indexed
+        
+        # Encontrar la fase actual
+        current_phase = None
+        for phase in periodization_params["phases"]:
+            if phase["start_week"] <= week_num <= phase["end_week"]:
+                current_phase = phase
+                break
+        
+        if not current_phase:
+            # Por defecto, usar factores neutros
+            return {
+                "intensity_factor": 1.0,
+                "volume_factor": 1.0,
+                "is_deload": False
+            }
+        
+        # Calcular progresión dentro de la fase
+        phase_duration = phase["end_week"] - phase["start_week"] + 1
+        week_in_phase = week_num - phase["start_week"] + 1
+        
+        if phase_duration > 1:
+            progress = (week_in_phase - 1) / (phase_duration - 1)  # 0.0 a 1.0
+        else:
+            progress = 0.5  # Semana única en medio
+        
+        # Aplicar curvas de intensidd y volumen
+        intensity_curve = periodization_params.get("intensity_curve", "linear")
+        volume_curve = periodization_params.get("volume_curve", "linear")
+        
+        if intensity_curve == "linear":
+            intensity_progress = progress
+        elif intensity_curve == "exponential":
+            intensity_progress = progress ** 0.5  # Raíz cuadrada para inicio lento
+        elif intensity_curve == "wave_like":
+            # Ondular: subir-bajar-subir para periodización ondulada
+            intensity_progress = 0.5 + 0.5 * math.sin(progress * math.pi * 2)
+        else:
+            intensity_progress = progress
+        
+        if volume_curve == "linear":
+            volume_progress = 1.0 - progress  # Volumen típicamente disminuye
+        elif volume_curve == "step_wave":
+            # Paso-onda para fuerza: volumen alto, medio, alto, medio
+            phase_progress = week_in_phase / phase_duration
+            volume_progress = 1.0 - 0.3 * (math.sin(phase_progress * math.pi * 4) + 1) / 2
+        else:
+            volume_progress = 1.0 - progress
+        
+        # Aplicar modificadores de la fase
+        intensity_factor = (
+            current_phase["intensity_modifier"] * 
+            (0.5 + 0.5 * intensity_progress)  # Rango 0.5-1.0 del modificador
+        )
+        
+        volume_factor = (
+            current_phase["volume_modifier"] * 
+            volume_progress
+        )
+        
+        # Aplicar modificadores globales de experiencia
+        intensity_factor *= periodization_params.get("intensity_modifier", 1.0)
+        
+        return {
+            "intensity_factor": max(0.3, min(1.5, intensity_factor)),
+            "volume_factor": max(0.3, min(1.8, volume_factor)),
+            "is_deload": current_phase["is_deload"]
+        }
+    
+    def _generate_week_workouts(self, user_id: str, week_number: int,
+                              workouts_per_week: int, workout_type: WorkoutType,
+                              week_factor: Dict[str, float], 
+                              user_profile: Dict[str, Any],
+                              available_days: Optional[List[int]]) -> List[WorkoutCreate]:
+        """Genera los workouts para una semana específica"""
+        workouts = []
+        
+        # Determinar días de entrenamiento para esta semana
+        if available_days is None:
+            # Distribuir uniformemente a lo largo de la semana
+            training_days = [0, 2, 4]  # Lunes, Miércoles, Viernes por defecto
+            if workouts_per_week > 3:
+                training_days = [0, 1, 3, 4, 6]  # Añadir martes, jueves, domingo
+            elif workouts_per_week == 4:
+                training_days = [0, 2, 3, 5]  # Lunes, Miércoles, Jueves, Sábado
+            elif workouts_per_week == 5:
+                training_days = [0, 1, 3, 4, 6]  # Lunes, Martes, Jueves, Viernes, Domingo
+            elif workouts_per_week == 6:
+                training_days = [0, 1, 2, 3, 4, 5]  # Lunes a Sábado (descanso domingo)
+            elif workouts_per_week == 7:
+                training_days = [0, 1, 2, 3, 4, 5, 6]  # Todos los días
+            else:
+                # Para 1-2 entrenamiento por semana, distribuir bien
+                if workouts_per_week == 1:
+                    training_days = [3]  # Miércoles
+                elif workouts_per_week == 2:
+                    training_days = [1, 4]  # Martes y Viernes
+        else:
+            # Usar días disponibles, tomar los primeros N necesarios
+            training_days = available_days[:workouts_per_week]
+            # Si no hay suficientes días disponibles, repetir desde el inicio
+            while len(training_days) < workouts_per_week:
+                training_days.extend(available_days)
+            training_days = training_days[:workouts_per_week]
+        
+        # Generar un workout para cada día de entrenamiento
+        for i, day_index in enumerate(training_days[:workouts_per_week]):
+            # Calcular fecha del workout (asumiendo que la semana empieza en lunes)
+            # En una implementación real, esto vendría de una fecha de inicio
+            workout_date = datetime.utcnow() + timedelta(
+                days=(week_number - 1) * 7 + day_index
+            )
+            
+            # Ajustar parámetros basados en factores de la semana
+            adjusted_readiness = min(100, max(0, 
+                user_profile.get("base_rpe_target", 8.0) * 12.5  # Convertir RPE a readiness aproximado
+            ))
+            
+            # Aplicar fatiga semanal acumulada (simplificado)
+            weekly_fatigue = min(30, (week_number - 1) * 5)  # Aumenta ligeramente cada semana
+            adjusted_readiness = max(20, adjusted_readiness - weekly_fatigue)
+            
+            workout_request = TrainingGenerationRequest(
+                user_id=user_id,
+                readiness_score=adjusted_readiness,
+                fatigue_score=min(100, weekly_fatigue + 10),
+                stress_level=user_profile.get("base_rpe_target", 8.0),
+                workout_type=workout_type,
+                target_duration_minutes=user_profile.get("preferred_duration", 60),
+                muscle_groups=[],  # Dejar vacío para selección equilibrada
+                exclude_exercises=[],
+                include_exercises=[],
+                base_rpe=8.0 * week_factor["intensity_factor"],
+                total_sets=int(15 * week_factor["volume_factor"])
+            )
+            
+            # Generar el workout
+            workout_schema = self.workout_generator.generate_workout(workout_request)
+            
+            # Personalizar nombre y descripción
+            week_name = f"Semana {week_number}, Día {i+1}"
+            if day_index < 7:
+                day_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                week_name = f"{day_names[day_index]} Semana {week_number}"
+            
+            workout_schema.name = f"{workout_type.value.title()} - {week_name}"
+            workout_schema.description = (
+                f"Entrenamiento de {workout_type.value} - Semana {week_number} "
+                f"(Intensidad: {week_factor['intensity_factor']:.1f}x, "
+                f"Volumen: {week_factor['volume_factor']:.1f}x)"
+            )
+            
+            # Marcar como parte del plan (el plan_id se establecerá al crear la entidad)
+            workouts.append(workout_schema)
+        
+        return workouts
+    
+    def _generate_plan_name(self, workout_type: WorkoutType, 
+                          goal: Optional[str], weeks: int) -> str:
+        """Genera nombre descriptivo para el plan"""
+        type_names = {
+            WorkoutType.STRENGTH: "Fuerza",
+            WorkoutType.HYPERTROPHY: "Hipertrofia",
+            WorkoutType.POWER: "Potencia",
+            WorkoutType.ENDURANCE: "Resistencia",
+            WorkoutType.RECOVERY: "Recuperación",
+            WorkoutType.DELoad: "Descarga"
+        }
+        
+        type_name = type_names.get(workout_type, "Entrenamiento")
+        
+        if goal:
+            goal_names = {
+                "strength_gain": "Fuerza Máxima",
+                "hypertrophy": "Crecimiento Muscular",
+                "endurance": "Resistencia Aeróbica",
+                "weight_loss": "Pérdida de Grasa",
+                "maintenance": "Mantenimiento"
+            }
+            goal_name = goal_names.get(goal, goal.title())
+            return f"Plan {goal_name} - {type_name} ({weeks}s)"
+        else:
+            return f"Plan {type_name} General ({weeks}s)"
+    
+    def _generate_plan_description(self, workout_type: WorkoutType,
+                                 goal: Optional[str], weeks: int,
+                                 experience_level: str) -> str:
+        """Genera descripción detallada del plan"""
+        desc = f"Plan de entrenamiento de {workout_type.value} diseñado para "
+        
+        if experience_level == "beginner":
+            desc += "principiantes que buscan establecer una base sólida. "
+        elif experience_level == "intermediate":
+            desc += "atletas intermedios que buscan progreso consistente. "
+        else:
+            desc += "atletas avanzados que buscan superar plataformas. "
+        
+        if goal:
+            goal_desc = {
+                "strength_gain": "aumentar la fuerza máxima en levantamientos básicos.",
+                "hypertrophy": "maximizar el crecimiento muscular en todos los grupos principales.",
+                "endurance": "mejorar la capacidad de trabajo sostenido y resistencia muscular.",
+                "weight_loss": "reducir grasa corporal preservando masa muscular mediante entrenamiento de alta intensidad.",
+                "maintenance": "mantener el nivel actual de fuerza y condición física."
+            }.get(goal, "mejorar el estado físico general.")
+            desc += goal_desc
+        else:
+            desc += "lograr un equilibrio entre fuerza, resistencia y condición física general."
+        
+        desc += f" El plan se desarrolla durante {weeks} semanas con progresión sistemática."
+        
+        return desc
+
+# ============================================================================
 # FACTORY PARA CREACIÓN DE ENTIDADES
 # ============================================================================
 
@@ -729,10 +1222,32 @@ class TrainingEntityFactory:
                     planned_tempo=set_schema.planned_tempo,
                     planned_rest_seconds=set_schema.planned_rest_seconds,
                     status=SetStatus.PLANNED
-                )
-                block.sets.append(set_data)
-                workout.total_sets_planned += 1
-            
-            workout.exercise_blocks.append(block)
+        )
+        block.sets.append(set_data)
+        workout.total_sets_planned += 1
         
-        return workout
+        workout.exercise_blocks.append(block)
+    
+    return workout
+
+    @staticmethod
+    def create_training_plan_from_schema(
+        schema: TrainingPlanCreate,
+        user_id: str
+    ) -> TrainingPlan:
+        """Crea modelo TrainingPlan desde schema"""
+        
+        plan = TrainingPlan(
+            user_id=user_id,
+            name=schema.name,
+            description=schema.description,
+            plan_type=schema.plan_type,
+            duration_weeks=schema.duration_weeks,
+            target_sessions_per_week=schema.target_sessions_per_week,
+            target_volume_per_session=schema.target_volume_per_session,
+            status=WorkoutStatus.SCHEDULED,
+            generation_params=schema.generation_params or {},
+            adaptation_history=schema.adaptation_history or []
+        )
+        
+        return plan
